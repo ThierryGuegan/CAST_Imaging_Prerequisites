@@ -441,6 +441,9 @@
     if(a.topology === 'multi' && hasAnalysis(a)){
       rows.push({src:'analysis-node machine(s)', dst:'imaging-services (core node)', port:'443 or 80 (matches core node HTTP/HTTPS setting)', proto:'HTTP/HTTPS', purpose:'Each analysis-node registers against imaging-services and exchanges analysis jobs/results — required for the core and analysis machines to communicate', tag:'mandatory', note:'Multi-machine topology — bidirectional connectivity between every analysis-node machine and the core node'});
     }
+    if(a.topology === 'multi'){
+      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The /opt/cast/shared parent folder must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 8'});
+    }
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated){
       rows.push({src:'imaging-viewer', dst:'Neo4j (dedicated machine)', port:'7687', proto:'Bolt/TCP', purpose:'Graph database read/write for CAST Imaging Viewer — Neo4j\'s default Bolt port', tag:'mandatory', note:'Confirm against CAST\'s port reference if customized in your release'});
       rows.push({src:'Backup/admin host', dst:'Neo4j (dedicated machine)', port:'6362', proto:'TCP', purpose:'Neo4j backup operations', tag:'conditional', note:'Only if backups are triggered from outside the Neo4j machine'});
@@ -501,7 +504,7 @@
     document.getElementById('topology-hint').textContent =
       (a.scale === 'enterprise' && a.topology === 'single') ? 'Single machine is not recommended at Enterprise scale — consider Multi-machine or Kubernetes.' :
       (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-machine is usually unnecessary for a POC — Single machine is simpler.' :
-      (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more machines to provision and maintain, and network connectivity between machines must be correctly configured.' : '';
+      (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more machines to provision and maintain, network connectivity between machines must be correctly configured, and every machine must mount the same /opt/cast/shared network folder over SMB.' : '';
 
     // profile chips
     var chips = ['scale','users','platform','scenario','topology','egress','auth'].map(function(k){
@@ -647,6 +650,9 @@
           lines.push('# On EACH analysis-node machine ('+(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' in your profile):');
           lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost+'   # must resolve/be reachable from every analysis-node machine');
         }
+        lines.push('');
+        lines.push('# On EVERY machine above — required for distributed/multi-machine deployments (SMB only, not NFS):');
+        lines.push('# mount the SAME NAS/SAN network share as /opt/cast/shared before "compose up"');
       }
       lines.push('');
       lines.push('# --- Database (Section 2: '+esc(LABELS.dbHosting[a.dbHosting])+') ---');
@@ -679,7 +685,10 @@
       } else {
         lines.push('# Direct outbound HTTPS to extend.castsoftware.com — no proxy variables required');
       }
-      var dockerConfigNote = '<div class="callout warn">These <code>configuration.conf</code> keys are illustrative, derived from CAST\'s documented installation model (per-machine config file, distributed-mode <code>*_HOSTNAME</code> variables, <code>DB_MODE</code>, proxy exclusion for the imaging-services host). '+
+      var scenarioGuideHtml = (a.scenario === 'full' && a.topology === 'multi')
+        ? ' CAST\'s own step-by-step walkthrough for this exact scenario/topology combination ("S1 · all", multi-machine) is at <a href="https://doc.castsoftware.com/imaging/install/global/docker/s1-all/multi-machine/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/global/docker/s1-all/multi-machine</a> — follow it directly rather than this skeleton where they differ.'
+        : '';
+      var dockerConfigNote = '<div class="callout warn">These <code>configuration.conf</code> keys are illustrative, derived from CAST\'s documented installation model (per-machine config file, distributed-mode <code>*_HOSTNAME</code> variables, <code>DB_MODE</code>, proxy exclusion for the imaging-services host).'+scenarioGuideHtml+' '+
         'The network egress used to build this tool could not reach '+
         '<a href="https://doc.castsoftware.com/imaging/install/global/docker/reference/config-examples/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/global/docker/reference/config-examples</a> to verify exact key names for your release — confirm every variable name and value against that page before editing your real <code>configuration.conf</code>.</div>';
       dockerConfigHtml = '<h3>{N}. '+engineLabel+' <code>configuration.conf</code> reference</h3>' +
@@ -692,6 +701,7 @@
     checklist.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(LABELS.topology[a.topology])+')');
     if(a.topology === 'multi' && hasAnalysis(a)) checklist.push('Network connectivity correctly configured between the core node and every analysis-node machine ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)');
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) checklist.push('Network connectivity correctly configured between imaging-viewer and the dedicated Neo4j machine (Bolt port 7687)');
+    if(a.topology === 'multi') checklist.push('Shared network folder (NAS/SAN, SMB only) provisioned and mounted as /opt/cast/shared on every machine before install');
     checklist.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
     checklist.push('TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and TLS termination configured ('+esc(LABELS.reverseProxy[a.reverseProxy])+')');
     checklist.push('All firewall rules from Section 3 opened before install day');
