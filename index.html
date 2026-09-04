@@ -114,7 +114,7 @@
   <aside class="form-pane" id="form-pane">
 
     <fieldset>
-      <legend>1 · Platform &amp; topology</legend>
+      <legend>1 · Platform, scenario &amp; topology</legend>
       <div class="q">
         <label class="qlabel">Which host platform will you install on?</label>
         <div class="opt-row">
@@ -129,12 +129,22 @@
         </div>
       </div>
       <div class="q">
+        <label class="qlabel">Deployment scenario — which components do you need?</label>
+        <select id="scenario">
+          <option value="full" selected>Full: analysis + Viewer + Dashboards (imaging-services, analysis-node, imaging-viewer, dashboards)</option>
+          <option value="viewer-readonly">Viewer + Dashboards, read-only — no local analysis (imaging-services, imaging-viewer, dashboards; no analysis-node)</option>
+          <option value="dashboards-only">Dashboards only, read-only — no Viewer, no local analysis (imaging-services, dashboards; KPIs only, no graph drill-down)</option>
+          <option value="analysis-only">Analysis only, headless — no Viewer/Dashboards UI (imaging-services, analysis-node; consumed via Imaging APIs / CI)</option>
+        </select>
+        <p class="hint">A <b>scenario</b> defines which components are installed; <b>topology</b> (below) defines how they're spread across machines. imaging-services is always required. Source: CAST's "choose your deployment" step at <code>doc.castsoftware.com/imaging/install/global/docker</code>.</p>
+      </div>
+      <div class="q">
         <label class="qlabel">Topology</label>
         <div class="opt-row">
           <label class="opt"><input type="radio" name="topology" value="single" checked>
-            <span class="opt-text"><b>Single machine</b><span>imaging-services, imaging-viewer, dashboards, PostgreSQL and analysis-node all on one host</span></span></label>
+            <span class="opt-text"><b>Single machine</b><span>All selected components on one host — suitable for POC, testing, demo, or small production</span></span></label>
           <label class="opt"><input type="radio" name="topology" value="multi">
-            <span class="opt-text"><b>Multi-machine</b><span>imaging-services, imaging-viewer, dashboards and PostgreSQL share one machine; analysis-node runs on a separate, dedicated machine</span></span></label>
+            <span class="opt-text"><b>Multi-machine</b><span>Components distributed across dedicated hosts — recommended for production</span></span></label>
         </div>
         <p class="hint" id="topology-hint"></p>
         <div class="sub-block" id="analysis-nodes-sub">
@@ -145,6 +155,10 @@
             <option value="4+">4+ (large/numerous codebases, high analysis throughput)</option>
           </select>
           <p class="hint">Each analysis-node registers itself against the same imaging-services instance and can run on its own machine — this is CAST Imaging's horizontal scaling mechanism for analysis workload.</p>
+        </div>
+        <div class="sub-block" id="neo4j-dedicated-sub">
+          <label class="opt"><input type="checkbox" id="neo4jDedicated">
+            <span class="opt-text"><b>Run Neo4j on its own dedicated machine</b><span>Separate from imaging-viewer — isolates graph-database load and lets you update CAST Imaging independently of Neo4j</span></span></label>
         </div>
       </div>
     </fieldset>
@@ -174,16 +188,19 @@
     <fieldset>
       <legend>3 · Database</legend>
       <div class="q">
-        <label class="qlabel">Database engine</label>
-        <p class="hint" style="margin-top:0;">CAST Imaging supports <b>PostgreSQL only</b> — no other engine is supported.</p>
+        <label class="qlabel">RDBMS engine</label>
+        <p class="hint" style="margin-top:0;">CAST Imaging supports <b>PostgreSQL only</b> as its RDBMS — no other engine is supported. Analysis and persistence data is stored here.</p>
       </div>
       <div class="q">
-        <label class="qlabel">Database hosting</label>
+        <label class="qlabel">PostgreSQL hosting</label>
         <select id="dbHosting">
           <option value="colocated" selected>Co-located with the application (container/local instance)</option>
           <option value="dedicated">Dedicated database server</option>
           <option value="managed">Managed / clustered DBaaS (HA)</option>
         </select>
+      </div>
+      <div class="q">
+        <p class="hint" style="margin-top:0;"><b>Neo4j</b> is bundled with imaging-viewer (not user-selectable) — an ETL step loads analysis results from PostgreSQL into Neo4j for graph browsing in the Viewer. Only relevant when your scenario (Section 1) includes the Viewer.</p>
       </div>
     </fieldset>
 
@@ -313,6 +330,7 @@
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
     users:{tiny:'< 10 users', small:'10–50 users', medium:'50–200 users', large:'200+ users'},
     platform:{docker:'Docker', podman:'Podman', kubernetes:'Kubernetes', windows:'Windows Server'},
+    scenario:{full:'Full (analysis + Viewer + Dashboards)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
     topology:{single:'Single machine', multi:'Multi-machine'},
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
     egress:{direct:'Direct outbound', proxy:'Via proxy', airgapped:'Air-gapped'},
@@ -329,37 +347,65 @@
     other:'(FQDN of your internal/alternate LLM gateway — determine and allowlist explicitly)'
   };
 
-  // ---- Sizing table, keyed by scale + topology ----
-  // Multi-machine: core node (imaging-services + imaging-viewer + dashboards + PostgreSQL) + analysis-node(s)
+  // ---- Sizing baselines, keyed by scale. Component lists are composed dynamically from the selected scenario. ----
   var SIZING = {
     poc:{
-      single:[{c:'All-in-one host (imaging-services + imaging-viewer + dashboards + PostgreSQL + analysis-node)', cpu:4, ram:16, disk:150}],
-      multi:[{c:'Core node (imaging-services + imaging-viewer + dashboards + PostgreSQL)', cpu:2, ram:8, disk:60},{c:'Analysis-node machine', cpu:2, ram:8, disk:80}]
+      single:{cpu:4, ram:16, disk:150},
+      core:{cpu:2, ram:8, disk:60}, analysis:{cpu:2, ram:8, disk:80}, neo4j:{cpu:2, ram:16, disk:60},
+      singleNote:'', multiNote:''
     },
     small:{
-      single:[{c:'All-in-one host (imaging-services + imaging-viewer + dashboards + PostgreSQL + analysis-node)', cpu:8, ram:32, disk:300}],
-      multi:[{c:'Core node (imaging-services + imaging-viewer + dashboards + PostgreSQL)', cpu:4, ram:16, disk:100},{c:'Analysis-node machine', cpu:4, ram:16, disk:200}]
+      single:{cpu:8, ram:32, disk:300},
+      core:{cpu:4, ram:16, disk:100}, analysis:{cpu:4, ram:16, disk:200}, neo4j:{cpu:4, ram:32, disk:100},
+      singleNote:'', multiNote:''
     },
     standard:{
-      single:[{c:'All-in-one host (not recommended for production — prefer multi-machine)', cpu:12, ram:48, disk:400}],
-      multi:[{c:'Core node (imaging-services + imaging-viewer + dashboards + PostgreSQL)', cpu:8, ram:32, disk:200},{c:'Analysis-node machine', cpu:8, ram:32, disk:'500+'}]
+      single:{cpu:12, ram:48, disk:400},
+      core:{cpu:8, ram:32, disk:200}, analysis:{cpu:8, ram:32, disk:'500+'}, neo4j:{cpu:8, ram:32, disk:200},
+      singleNote:' (not recommended for production — prefer multi-machine)', multiNote:''
     },
     enterprise:{
-      single:[{c:'All-in-one host (strongly discouraged at this scale — use multi-machine/Kubernetes)', cpu:16, ram:64, disk:600}],
-      multi:[{c:'Core node (imaging-services + imaging-viewer + dashboards + PostgreSQL)', cpu:16, ram:64, disk:400},
-             {c:'Analysis-node machine (each)', cpu:16, ram:64, disk:'1000+'}]
+      single:{cpu:16, ram:64, disk:600},
+      core:{cpu:16, ram:64, disk:400}, analysis:{cpu:16, ram:64, disk:'1000+'}, neo4j:{cpu:8, ram:64, disk:400},
+      singleNote:' (strongly discouraged at this scale — use multi-machine/Kubernetes)', multiNote:''
     }
   };
 
+  // ---- Component lists per scenario, used to build sizing row labels ----
+  function coreComponentList(a){
+    var comps = ['imaging-services'];
+    if(hasViewer(a)) comps.push('imaging-viewer');
+    if(hasDashboards(a)) comps.push('dashboards');
+    comps.push('PostgreSQL');
+    if(hasNeo4j(a) && !(a.topology === 'multi' && a.neo4jDedicated)) comps.push('Neo4j');
+    return comps.join(' + ');
+  }
+  function allInOneComponentList(a){
+    var comps = ['imaging-services'];
+    if(hasAnalysis(a)) comps.push('analysis-node');
+    if(hasViewer(a)) comps.push('imaging-viewer');
+    if(hasDashboards(a)) comps.push('dashboards');
+    comps.push('PostgreSQL');
+    if(hasNeo4j(a)) comps.push('Neo4j');
+    return comps.join(' + ');
+  }
+
   var ANALYSIS_NODE_COUNT = {'1':1, '2-3':2, '4+':4};
+
+  function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-only'; }
+  function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
+  function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
+  function hasNeo4j(a){ return hasViewer(a); }
 
   function state(){
     return {
       scale: document.getElementById('scale').value,
       users: document.getElementById('users').value,
       platform: document.querySelector('input[name=platform]:checked').value,
+      scenario: document.getElementById('scenario').value,
       topology: document.querySelector('input[name=topology]:checked').value,
       analysisNodes: document.getElementById('analysisNodes').value,
+      neo4jDedicated: document.getElementById('neo4jDedicated').checked,
       dbHosting: document.getElementById('dbHosting').value,
       egress: document.querySelector('input[name=egress]:checked').value,
       certSource: document.getElementById('certSource').value,
@@ -380,7 +426,7 @@
   function buildPortRows(a){
     var dbPort = '5432';
     var dbLabel = 'PostgreSQL';
-    var dbDest = 'PostgreSQL (co-located on the core node — imaging-services, imaging-viewer, dashboards, PostgreSQL)';
+    var dbDest = 'PostgreSQL (' + (a.topology === 'multi' ? 'co-located on the core node' : 'co-located on the single host') + ')';
     var adminRows = a.platform === 'windows'
       ? [{src:'Administrator workstation', dst:'CAST Imaging host (Windows)', port:'3389', proto:'RDP', purpose:'Server administration', tag:'mandatory'}]
       : [{src:'Administrator workstation', dst:'CAST Imaging host (Linux)', port:'22', proto:'SSH', purpose:'Server administration', tag:'mandatory'}];
@@ -392,8 +438,12 @@
       {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory'}
     ]);
 
-    if(a.topology === 'multi'){
+    if(a.topology === 'multi' && hasAnalysis(a)){
       rows.push({src:'analysis-node machine(s)', dst:'imaging-services (core node)', port:'443 or 80 (matches core node HTTP/HTTPS setting)', proto:'HTTP/HTTPS', purpose:'Each analysis-node registers against imaging-services and exchanges analysis jobs/results — required for the core and analysis machines to communicate', tag:'mandatory', note:'Multi-machine topology — bidirectional connectivity between every analysis-node machine and the core node'});
+    }
+    if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated){
+      rows.push({src:'imaging-viewer', dst:'Neo4j (dedicated machine)', port:'7687', proto:'Bolt/TCP', purpose:'Graph database read/write for CAST Imaging Viewer — Neo4j\'s default Bolt port', tag:'mandatory', note:'Confirm against CAST\'s port reference if customized in your release'});
+      rows.push({src:'Backup/admin host', dst:'Neo4j (dedicated machine)', port:'6362', proto:'TCP', purpose:'Neo4j backup operations', tag:'conditional', note:'Only if backups are triggered from outside the Neo4j machine'});
     }
 
     if(a.platform === 'kubernetes'){
@@ -446,30 +496,36 @@
     var a = state();
 
     document.getElementById('mcp-sub').className = 'sub-block' + (a.mcp ? ' show' : '');
-    document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' ? ' show' : '');
+    document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' && hasAnalysis(a) ? ' show' : '');
+    document.getElementById('neo4j-dedicated-sub').className = 'sub-block' + (a.topology === 'multi' && hasNeo4j(a) ? ' show' : '');
     document.getElementById('topology-hint').textContent =
       (a.scale === 'enterprise' && a.topology === 'single') ? 'Single machine is not recommended at Enterprise scale — consider Multi-machine or Kubernetes.' :
       (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-machine is usually unnecessary for a POC — Single machine is simpler.' :
       (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more machines to provision and maintain, and network connectivity between machines must be correctly configured.' : '';
 
     // profile chips
-    var chips = ['scale','users','platform','topology','egress','auth'].map(function(k){
+    var chips = ['scale','users','platform','scenario','topology','egress','auth'].map(function(k){
       return '<span class="chip">'+k+': <b>'+esc(LABELS[k][a[k]])+'</b></span>';
     }).join('');
     if(a.mcp) chips += '<span class="chip">MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
     if(a.highlight) chips += '<span class="chip">Highlight: <b>enabled</b></span>';
     document.getElementById('profile-chips').innerHTML = chips;
 
-    var sizingRows = SIZING[a.scale][a.topology];
-    if(a.topology === 'multi'){
-      var coreRow = sizingRows[0];
-      var analysisSpec = sizingRows[1];
-      var nodeCount = ANALYSIS_NODE_COUNT[a.analysisNodes] || 1;
-      var analysisRows = [];
-      for(var i = 1; i <= nodeCount; i++){
-        analysisRows.push({c: analysisSpec.c + (nodeCount > 1 ? ' #' + i : ''), cpu: analysisSpec.cpu, ram: analysisSpec.ram, disk: analysisSpec.disk});
+    var sizeSpec = SIZING[a.scale];
+    var sizingRows;
+    if(a.topology === 'single'){
+      sizingRows = [{c:'All-in-one host (' + allInOneComponentList(a) + ')' + sizeSpec.singleNote, cpu:sizeSpec.single.cpu, ram:sizeSpec.single.ram, disk:sizeSpec.single.disk}];
+    } else {
+      sizingRows = [{c:'Core node (' + coreComponentList(a) + ')', cpu:sizeSpec.core.cpu, ram:sizeSpec.core.ram, disk:sizeSpec.core.disk}];
+      if(hasNeo4j(a) && a.neo4jDedicated){
+        sizingRows.push({c:'Neo4j machine (dedicated, serves imaging-viewer)', cpu:sizeSpec.neo4j.cpu, ram:sizeSpec.neo4j.ram, disk:sizeSpec.neo4j.disk});
       }
-      sizingRows = [coreRow].concat(analysisRows);
+      if(hasAnalysis(a)){
+        var nodeCount = ANALYSIS_NODE_COUNT[a.analysisNodes] || 1;
+        for(var i = 1; i <= nodeCount; i++){
+          sizingRows.push({c:'Analysis-node machine' + (nodeCount > 1 ? ' #' + i : ''), cpu:sizeSpec.analysis.cpu, ram:sizeSpec.analysis.ram, disk:sizeSpec.analysis.disk});
+        }
+      }
     }
     if(a.mcp) sizingRows = sizingRows.concat([{c:'MCP Server (Imaging + Gatekeeper)', cpu:2, ram:4, disk:20}]);
 
@@ -478,7 +534,11 @@
       sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+esc(r.disk)+' GB</td></tr>'; }).join('') +
       '</tbody></table></div>';
 
-    if(a.topology === 'multi' && (a.analysisNodes === '2-3' || a.analysisNodes === '4+')){
+    if(hasNeo4j(a)){
+      sizingHtml += '<div class="callout info">Neo4j (bundled with imaging-viewer) needs <b>16 GB RAM minimum, 32 GB recommended</b> — it defaults to an initial/maximum JVM heap of 12 GB, tunable via <code>imaging-viewer/.env</code>. Sizing above already accounts for this.</div>';
+    }
+
+    if(a.topology === 'multi' && hasAnalysis(a) && (a.analysisNodes === '2-3' || a.analysisNodes === '4+')){
       sizingHtml += '<div class="callout info">Each analysis-node machine registers itself against the same imaging-services instance, letting analyses run in parallel across multiple applications. This is CAST Imaging\'s horizontal scaling mechanism for analysis workload — it does not scale imaging-services, imaging-viewer, dashboards, or PostgreSQL themselves.</div>';
     }
 
@@ -492,12 +552,17 @@
       '</tbody></table></div>';
 
     var dbHtml = '<h3>2. Database requirements</h3><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
-      '<tr><td>Engine</td><td>PostgreSQL — port 5432 (the only database engine supported by CAST Imaging)</td></tr>' +
-      '<tr><td>Hosting</td><td>'+esc(LABELS.dbHosting[a.dbHosting])+
+      '<tr><td>RDBMS engine</td><td>PostgreSQL — port 5432 (the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data)</td></tr>' +
+      '<tr><td>PostgreSQL hosting</td><td>'+esc(LABELS.dbHosting[a.dbHosting])+
         (a.dbHosting==='colocated' && (a.scale==='standard'||a.scale==='enterprise') ? ' — <b>not recommended</b> at this scale; move to a dedicated or managed instance' : '') +
       '</td></tr>' +
       '<tr><td>Character set</td><td>UTF-8 required; case-sensitive collation as specified by CAST for your CAST Imaging release</td></tr>' +
       '<tr><td>High availability</td><td>' + (a.scale==='enterprise' ? 'Required — use a managed/clustered instance with replication' : 'Optional — plan regular automated backups regardless') + '</td></tr>' +
+      (hasNeo4j(a) ?
+        '<tr><td>Neo4j (graph store)</td><td>Bundled with imaging-viewer, port 7687 (Bolt) / 6362 (backup) — an ETL loads analysis results from PostgreSQL into Neo4j; not a user-selectable engine. '
+          + (a.topology==='multi' && a.neo4jDedicated ? '<b>Deployed on its own dedicated machine</b> per your topology answer.' : 'Co-located with imaging-viewer.')
+          + '</td></tr>'
+        : '<tr><td>Neo4j (graph store)</td><td>Not required — your scenario ('+esc(LABELS.scenario[a.scenario])+') excludes the Viewer.</td></tr>') +
       '</tbody></table></div>';
 
     var portRows = buildPortRows(a);
@@ -568,13 +633,20 @@
       lines.push('');
       lines.push('# --- Topology: one configuration.conf per machine, edited before "docker compose up" ---');
       if(a.topology === 'single'){
-        lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost+'   # this host — imaging-services, imaging-viewer, dashboards, PostgreSQL, analysis-node');
+        lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost+'   # this host — ' + allInOneComponentList(a));
       } else {
-        lines.push('# On the CORE node (imaging-services + imaging-viewer + dashboards + PostgreSQL):');
+        lines.push('# On the CORE node (' + coreComponentList(a) + '):');
         lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost);
-        lines.push('');
-        lines.push('# On EACH analysis-node machine ('+(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' in your profile):');
-        lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost+'   # must resolve/be reachable from every analysis-node machine');
+        if(hasNeo4j(a) && a.neo4jDedicated){
+          lines.push('');
+          lines.push('# On the dedicated NEO4J machine:');
+          lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost+'   # must resolve/be reachable from the Neo4j machine');
+        }
+        if(hasAnalysis(a)){
+          lines.push('');
+          lines.push('# On EACH analysis-node machine ('+(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' in your profile):');
+          lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost+'   # must resolve/be reachable from every analysis-node machine');
+        }
       }
       lines.push('');
       lines.push('# --- Database (Section 2: '+esc(LABELS.dbHosting[a.dbHosting])+') ---');
@@ -617,8 +689,9 @@
     }
 
     var checklist = [];
-    checklist.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.topology[a.topology])+')');
-    if(a.topology === 'multi') checklist.push('Network connectivity correctly configured between the core node and every analysis-node machine ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)');
+    checklist.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(LABELS.topology[a.topology])+')');
+    if(a.topology === 'multi' && hasAnalysis(a)) checklist.push('Network connectivity correctly configured between the core node and every analysis-node machine ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)');
+    if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) checklist.push('Network connectivity correctly configured between imaging-viewer and the dedicated Neo4j machine (Bolt port 7687)');
     checklist.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
     checklist.push('TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and TLS termination configured ('+esc(LABELS.reverseProxy[a.reverseProxy])+')');
     checklist.push('All firewall rules from Section 3 opened before install day');
