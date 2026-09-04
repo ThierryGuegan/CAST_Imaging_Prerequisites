@@ -171,8 +171,8 @@
       <div class="q">
         <label class="qlabel">Database hosting</label>
         <select id="dbHosting">
-          <option value="colocated">Co-located with the application (container/local instance)</option>
-          <option value="dedicated" selected>Dedicated database server</option>
+          <option value="colocated" selected>Co-located with the application (container/local instance)</option>
+          <option value="dedicated">Dedicated database server</option>
           <option value="managed">Managed / clustered DBaaS (HA)</option>
         </select>
       </div>
@@ -277,8 +277,6 @@
     <div class="profile-chips" id="profile-chips"></div>
 
     <div class="toolbar no-print">
-      <button class="btn" onclick="exportPortsCsv()">⬇ Export ports &amp; FQDN matrix (CSV)</button>
-      <button class="btn" onclick="exportSizingCsv()">⬇ Export sizing (CSV)</button>
       <button class="btn secondary" onclick="window.print()">🖨 Print / Save as PDF</button>
     </div>
 
@@ -376,8 +374,7 @@
 
     var rows = [
       {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'},
-      {src:'End-user browser', dst:'CAST Imaging Web', port:'80', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'},
-      {src:'AIP Console / delivery workstation', dst:'CAST Imaging', port:'443/80', proto:'HTTPS/HTTP', purpose:'Application package delivery', tag:'mandatory'}
+      {src:'End-user browser', dst:'CAST Imaging Web', port:'80', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'}
     ].concat(adminRows).concat([
       {src:'CAST Imaging application', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory'}
     ]);
@@ -392,10 +389,6 @@
     } else {
       rows.push({src:'CAST Imaging node', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Extensions catalog, product updates, licensing artifacts', tag:'mandatory'});
     }
-    if(a.egress === 'proxy'){
-      rows.push({src:'CAST Imaging node', dst:'Corporate HTTP(S) proxy', port:'(proxy-specific, e.g. 8080/3128)', proto:'HTTPS', purpose:'All outbound HTTPS flows below transit this proxy — configure proxy auth in CAST Imaging / CAST Extend client', tag:'mandatory'});
-    }
-
     if(a.highlight){
       rows.push({src:'CAST Imaging', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:'Highlight integration selected'});
       rows.push({src:'CAST Imaging', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:'Highlight integration selected'});
@@ -475,9 +468,6 @@
       '</tbody></table></div>';
 
     var portRows = buildPortRows(a);
-    window.__lastPortRows = portRows; // for CSV export
-    window.__lastSizingRows = sizingRows;
-    window.__lastState = a;
 
     var netHtml = '<h3>3. Network ports &amp; FQDN allowlist — tailored to your answers</h3>' +
       '<p>Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.</p>' +
@@ -557,40 +547,6 @@
     document.getElementById('results-content').innerHTML =
       sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + mcpHtml + checklistHtml;
   }
-
-  function download(filename, text){
-    var blob = new Blob([text], {type:'text/csv;charset=utf-8;'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  function csvCell(v){
-    v = String(v);
-    return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
-  }
-
-  window.exportPortsCsv = function(){
-    var rows = window.__lastPortRows || [];
-    var header = ['Source','Destination','Port','Protocol','Purpose','Note','Status'];
-    var lines = [header.join(',')];
-    rows.forEach(function(r){
-      lines.push([r.src, r.dst, r.port, r.proto, r.purpose, r.note||'', r.tag].map(csvCell).join(','));
-    });
-    download('cast-imaging-tailored-ports-matrix.csv', lines.join('\r\n'));
-  };
-
-  window.exportSizingCsv = function(){
-    var rows = window.__lastSizingRows || [];
-    var header = ['Component','vCPU','RAM (GB)','Disk (GB)'];
-    var lines = [header.join(',')];
-    rows.forEach(function(r){
-      lines.push([r.c, r.cpu, r.ram, r.disk].map(csvCell).join(','));
-    });
-    download('cast-imaging-tailored-sizing.csv', lines.join('\r\n'));
-  };
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
