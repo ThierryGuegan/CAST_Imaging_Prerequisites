@@ -132,11 +132,20 @@
         <label class="qlabel">Topology</label>
         <div class="opt-row">
           <label class="opt"><input type="radio" name="topology" value="single" checked>
-            <span class="opt-text"><b>Single machine</b><span>All components (web, application, database) on one host</span></span></label>
+            <span class="opt-text"><b>Single machine</b><span>imaging-services, imaging-viewer, dashboards, PostgreSQL and analysis-node all on one host</span></span></label>
           <label class="opt"><input type="radio" name="topology" value="multi">
-            <span class="opt-text"><b>Multi-machine</b><span>Dedicated database node, separate from the web/application node(s)</span></span></label>
+            <span class="opt-text"><b>Multi-machine</b><span>imaging-services, imaging-viewer, dashboards and PostgreSQL share one machine; analysis-node runs on a separate, dedicated machine</span></span></label>
         </div>
         <p class="hint" id="topology-hint"></p>
+        <div class="sub-block" id="analysis-nodes-sub">
+          <label class="qlabel">How many analysis-node instances do you need?</label>
+          <select id="analysisNodes">
+            <option value="1" selected>1 (no parallel analyses)</option>
+            <option value="2-3">2–3 (analyze a few applications in parallel)</option>
+            <option value="4+">4+ (large/numerous codebases, high analysis throughput)</option>
+          </select>
+          <p class="hint">Each analysis-node registers itself against the same imaging-services instance and can run on its own machine — this is CAST Imaging's horizontal scaling mechanism for analysis workload.</p>
+        </div>
       </div>
     </fieldset>
 
@@ -321,25 +330,28 @@
   };
 
   // ---- Sizing table, keyed by scale + topology ----
+  // Multi-machine: core node (imaging-services + imaging-viewer + dashboards + PostgreSQL) + analysis-node(s)
   var SIZING = {
     poc:{
-      single:[{c:'All-in-one node (Web + Application + Database)', cpu:4, ram:16, disk:150}],
-      multi:[{c:'Web/Application node', cpu:2, ram:8, disk:60},{c:'Database node', cpu:2, ram:8, disk:80}]
+      single:[{c:'All-in-one host (imaging-services + imaging-viewer + dashboards + PostgreSQL + analysis-node)', cpu:4, ram:16, disk:150}],
+      multi:[{c:'Core node (imaging-services + imaging-viewer + dashboards + PostgreSQL)', cpu:2, ram:8, disk:60},{c:'Analysis-node machine', cpu:2, ram:8, disk:80}]
     },
     small:{
-      single:[{c:'All-in-one node (Web + Application + Database)', cpu:8, ram:32, disk:300}],
-      multi:[{c:'Web/Application node', cpu:4, ram:16, disk:100},{c:'Database node', cpu:4, ram:16, disk:200}]
+      single:[{c:'All-in-one host (imaging-services + imaging-viewer + dashboards + PostgreSQL + analysis-node)', cpu:8, ram:32, disk:300}],
+      multi:[{c:'Core node (imaging-services + imaging-viewer + dashboards + PostgreSQL)', cpu:4, ram:16, disk:100},{c:'Analysis-node machine', cpu:4, ram:16, disk:200}]
     },
     standard:{
-      single:[{c:'All-in-one node (not recommended for production — prefer multi-machine)', cpu:12, ram:48, disk:400}],
-      multi:[{c:'Web/Application node', cpu:8, ram:32, disk:200},{c:'Database node', cpu:8, ram:32, disk:'500+'}]
+      single:[{c:'All-in-one host (not recommended for production — prefer multi-machine)', cpu:12, ram:48, disk:400}],
+      multi:[{c:'Core node (imaging-services + imaging-viewer + dashboards + PostgreSQL)', cpu:8, ram:32, disk:200},{c:'Analysis-node machine', cpu:8, ram:32, disk:'500+'}]
     },
     enterprise:{
-      single:[{c:'All-in-one node (strongly discouraged at this scale — use multi-machine/Kubernetes)', cpu:16, ram:64, disk:600}],
-      multi:[{c:'Web/Application tier (replicated, aggregate)', cpu:'16 (aggregate)', ram:'64 (aggregate)', disk:400},
-             {c:'Database tier (clustered / managed)', cpu:16, ram:64, disk:'1000+'}]
+      single:[{c:'All-in-one host (strongly discouraged at this scale — use multi-machine/Kubernetes)', cpu:16, ram:64, disk:600}],
+      multi:[{c:'Core node (imaging-services + imaging-viewer + dashboards + PostgreSQL)', cpu:16, ram:64, disk:400},
+             {c:'Analysis-node machine (each)', cpu:16, ram:64, disk:'1000+'}]
     }
   };
+
+  var ANALYSIS_NODE_COUNT = {'1':1, '2-3':2, '4+':4};
 
   function state(){
     return {
@@ -347,6 +359,7 @@
       users: document.getElementById('users').value,
       platform: document.querySelector('input[name=platform]:checked').value,
       topology: document.querySelector('input[name=topology]:checked').value,
+      analysisNodes: document.getElementById('analysisNodes').value,
       dbHosting: document.getElementById('dbHosting').value,
       egress: document.querySelector('input[name=egress]:checked').value,
       certSource: document.getElementById('certSource').value,
@@ -367,7 +380,7 @@
   function buildPortRows(a){
     var dbPort = '5432';
     var dbLabel = 'PostgreSQL';
-    var dbDest = a.topology === 'single' ? 'Database (co-located, same host)' : 'Dedicated database node/service';
+    var dbDest = 'PostgreSQL (co-located on the core node — imaging-services, imaging-viewer, dashboards, PostgreSQL)';
     var adminRows = a.platform === 'windows'
       ? [{src:'Administrator workstation', dst:'CAST Imaging host (Windows)', port:'3389', proto:'RDP', purpose:'Server administration', tag:'mandatory'}]
       : [{src:'Administrator workstation', dst:'CAST Imaging host (Linux)', port:'22', proto:'SSH', purpose:'Server administration', tag:'mandatory'}];
@@ -376,8 +389,12 @@
       {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'},
       {src:'End-user browser', dst:'CAST Imaging Web', port:'80', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'}
     ].concat(adminRows).concat([
-      {src:'CAST Imaging application', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory'}
+      {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory'}
     ]);
+
+    if(a.topology === 'multi'){
+      rows.push({src:'analysis-node machine(s)', dst:'imaging-services (core node)', port:'443 or 80 (matches core node HTTP/HTTPS setting)', proto:'HTTP/HTTPS', purpose:'Each analysis-node registers against imaging-services and exchanges analysis jobs/results — required for the core and analysis machines to communicate', tag:'mandatory', note:'Multi-machine topology — bidirectional connectivity between every analysis-node machine and the core node'});
+    }
 
     if(a.platform === 'kubernetes'){
       rows.push({src:'kubectl / CI pipelines', dst:'Kubernetes API server', port:'6443', proto:'TCP', purpose:'Cluster administration', tag:'conditional', note:'Kubernetes only'});
@@ -429,9 +446,11 @@
     var a = state();
 
     document.getElementById('mcp-sub').className = 'sub-block' + (a.mcp ? ' show' : '');
+    document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' ? ' show' : '');
     document.getElementById('topology-hint').textContent =
       (a.scale === 'enterprise' && a.topology === 'single') ? 'Single machine is not recommended at Enterprise scale — consider Multi-machine or Kubernetes.' :
-      (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-machine is usually unnecessary for a POC — Single machine is simpler.' : '';
+      (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-machine is usually unnecessary for a POC — Single machine is simpler.' :
+      (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more machines to provision and maintain, and network connectivity between machines must be correctly configured.' : '';
 
     // profile chips
     var chips = ['scale','users','platform','topology','egress','auth'].map(function(k){
@@ -442,12 +461,26 @@
     document.getElementById('profile-chips').innerHTML = chips;
 
     var sizingRows = SIZING[a.scale][a.topology];
+    if(a.topology === 'multi'){
+      var coreRow = sizingRows[0];
+      var analysisSpec = sizingRows[1];
+      var nodeCount = ANALYSIS_NODE_COUNT[a.analysisNodes] || 1;
+      var analysisRows = [];
+      for(var i = 1; i <= nodeCount; i++){
+        analysisRows.push({c: analysisSpec.c + (nodeCount > 1 ? ' #' + i : ''), cpu: analysisSpec.cpu, ram: analysisSpec.ram, disk: analysisSpec.disk});
+      }
+      sizingRows = [coreRow].concat(analysisRows);
+    }
     if(a.mcp) sizingRows = sizingRows.concat([{c:'MCP Server (Imaging + Gatekeeper)', cpu:2, ram:4, disk:20}]);
 
     var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr></thead><tbody>' +
       sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+esc(r.disk)+' GB</td></tr>'; }).join('') +
       '</tbody></table></div>';
+
+    if(a.topology === 'multi' && (a.analysisNodes === '2-3' || a.analysisNodes === '4+')){
+      sizingHtml += '<div class="callout info">Each analysis-node machine registers itself against the same imaging-services instance, letting analyses run in parallel across multiple applications. This is CAST Imaging\'s horizontal scaling mechanism for analysis workload — it does not scale imaging-services, imaging-viewer, dashboards, or PostgreSQL themselves.</div>';
+    }
 
     if(a.scale === 'standard' || a.scale === 'enterprise'){
       sizingHtml += '<div class="callout warn">Sizing scales with the number of applications delivered, retained snapshot history, and concurrent analyses/users. Re-validate after a pilot batch of real deliveries.</div>';
@@ -528,6 +561,7 @@
 
     var checklist = [];
     checklist.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.topology[a.topology])+')');
+    if(a.topology === 'multi') checklist.push('Network connectivity correctly configured between the core node and every analysis-node machine ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)');
     checklist.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
     checklist.push('TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and TLS termination configured ('+esc(LABELS.reverseProxy[a.reverseProxy])+')');
     checklist.push('All firewall rules from Section 3 opened before install day');
