@@ -585,6 +585,13 @@
       '<li>TLS termination: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — decide before install day; this determines the firewall path in Section 3.' : '.') + '</li>' +
       '<li>If you enable HTTPS, the customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
       '<li>If HTTPS is enabled, disable plain HTTP (port 80) once it is confirmed working, or keep only an HTTPS→redirect rule on port 80.</li>' +
+      ((a.platform === 'docker' || a.platform === 'podman') && a.reverseProxy === 'nginx' ?
+        '<li>On '+(a.platform==='podman'?'Podman':'Docker')+', CAST\'s documented approach is a dedicated Nginx vHost <code>.conf</code> file with <code>ssl_certificate</code> / <code>ssl_certificate_key</code> directives, <code>ssl_protocols TLSv1.2</code> or higher, and server cipher preference enabled — not a CAST-specific certificate variable.</li>' +
+        '<li><b>The private key must not be encrypted</b> ("BEGIN ENCRYPTED PRIVATE KEY") — CAST\'s bundled Nginx does not support encrypted keys; strip the passphrase before use.</li>' +
+        '<li>Self-signed certificates must be installed/trusted on every workstation that accesses CAST Imaging, or users will see browser warnings.</li>' +
+        '<li>Behind any reverse proxy: forward <code>X-Forwarded-For</code>, <code>X-Forwarded-Proto</code>, <code>X-Forwarded-Host</code>, and set <code>KC_PROXY=edge</code>, <code>KC_PROXY_HEADERS=xforwarded</code>, <code>PROXY_ADDRESS_FORWARDING=true</code> in <code>cast_imaging_services/.env</code> (and <code>cast_imaging_viewer/.env</code> if the Viewer is deployed) — otherwise redirects and asset URLs will be generated wrong.</li>' +
+        '<li>Serving CAST Imaging under a URL path prefix (e.g. <code>https://host/imaging</code>) additionally requires setting <code>APP_CONTEXT</code> and editing <code>cast_imaging_services/docker-compose.override.yml</code> — see CAST\'s reverse-proxy-with-context-URL reference.</li>'
+        : '') +
       '</ul>';
 
     var authHtml = '<h3>5. Authentication prerequisites</h3>';
@@ -668,12 +675,19 @@
       lines.push('');
       lines.push('# --- HTTPS / reverse proxy (Section 4: '+esc(LABELS.certSource[a.certSource])+', '+esc(LABELS.reverseProxy[a.reverseProxy])+') ---');
       if(a.reverseProxy === 'nginx'){
-        lines.push('HTTPS_ENABLED='+(a.certSource === 'self-signed' ? 'false                    # terminate TLS at the external reverse proxy instead, or set true and provide certs below' : 'true'));
-        lines.push('SSL_CERTIFICATE=/path/to/fullchain.pem');
-        lines.push('SSL_CERTIFICATE_KEY=/path/to/privkey.pem');
-        lines.push('CONTEXT_URL=https://imaging.example.com/   # public URL when fronted by the external reverse proxy');
+        lines.push('# Not a configuration.conf key — create a dedicated vHost .conf for the Nginx CAST Imaging ships:');
+        lines.push('#   ssl_certificate     /path/to/fullchain.pem;');
+        lines.push('#   ssl_certificate_key /path/to/privkey.pem;   # must NOT be an encrypted/passphrase-protected key');
+        lines.push('#   ssl_protocols       TLSv1.2 TLSv1.3;');
+        lines.push('#   ssl_prefer_server_ciphers on;');
+        lines.push('');
+        lines.push('# In cast_imaging_services/.env (and cast_imaging_viewer/.env if the Viewer is deployed):');
+        lines.push('KC_PROXY=edge');
+        lines.push('KC_PROXY_HEADERS=xforwarded');
+        lines.push('PROXY_ADDRESS_FORWARDING=true');
+        lines.push('# APP_CONTEXT=/imaging               # only if served under a URL path prefix — also edit docker-compose.override.yml');
       } else {
-        lines.push('HTTPS_ENABLED=false   # let the external component (Ingress/IIS) or a later decision handle TLS termination');
+        lines.push('# TLS terminated by the external component (Ingress/IIS) or undecided — no Nginx vHost/.env changes needed here');
       }
       lines.push('');
       lines.push('# --- Outbound network (Section 4: '+esc(LABELS.egress[a.egress])+') ---');
@@ -688,9 +702,13 @@
       var scenarioGuideHtml = (a.scenario === 'full' && a.topology === 'multi')
         ? ' CAST\'s own step-by-step walkthrough for this exact scenario/topology combination ("S1 · all", multi-machine) is at <a href="https://doc.castsoftware.com/imaging/install/global/docker/s1-all/multi-machine/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/global/docker/s1-all/multi-machine</a> — follow it directly rather than this skeleton where they differ.'
         : '';
-      var dockerConfigNote = '<div class="callout warn">These <code>configuration.conf</code> keys are illustrative, derived from CAST\'s documented installation model (per-machine config file, distributed-mode <code>*_HOSTNAME</code> variables, <code>DB_MODE</code>, proxy exclusion for the imaging-services host).'+scenarioGuideHtml+' '+
-        'The network egress used to build this tool could not reach '+
-        '<a href="https://doc.castsoftware.com/imaging/install/global/docker/reference/config-examples/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/global/docker/reference/config-examples</a> to verify exact key names for your release — confirm every variable name and value against that page before editing your real <code>configuration.conf</code>.</div>';
+      var dockerConfigNote = '<div class="callout warn">These <code>configuration.conf</code>/<code>.env</code> keys are illustrative, derived from CAST\'s documented installation model (per-machine config file, distributed-mode <code>*_HOSTNAME</code> variables, <code>DB_MODE</code>, <code>KC_PROXY</code>/<code>APP_CONTEXT</code> for reverse proxies, the shared <code>/opt/cast/shared</code> folder).'+scenarioGuideHtml+' '+
+        'The network egress used to build this tool could not reach doc.castsoftware.com — confirm every variable name and value against '+
+        '<a href="https://doc.castsoftware.com/imaging/install/global/docker/reference/config-examples/" target="_blank" rel="noopener">reference/config-examples</a>, '+
+        '<a href="https://doc.castsoftware.com/imaging/install/global/docker/reference/reverse-proxy/" target="_blank" rel="noopener">reference/reverse-proxy</a>, '+
+        '<a href="https://doc.castsoftware.com/imaging/install/https-ssl/docker/" target="_blank" rel="noopener">https-ssl/docker</a>, '+
+        '<a href="https://doc.castsoftware.com/imaging/install/global/docker/reference/shared-folder/" target="_blank" rel="noopener">reference/shared-folder</a> and '+
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/precheck/" target="_blank" rel="noopener">requirements/precheck</a> before editing your real files.</div>';
       dockerConfigHtml = '<h3>{N}. '+engineLabel+' <code>configuration.conf</code> reference</h3>' +
         '<p>Skeleton derived from your answers above, one file per machine, matching the <a href="https://doc.castsoftware.com/imaging/install/global/docker/reference/config-examples/" target="_blank" rel="noopener">config-examples reference</a> structure.</p>' +
         '<div class="tbl-wrap"><pre style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;overflow-x:auto;color:#cfd8e2;font-size:12.5px;line-height:1.6;">' + esc(lines.join('\n')) + '</pre></div>' +
@@ -699,6 +717,7 @@
 
     var checklist = [];
     checklist.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(LABELS.topology[a.topology])+')');
+    checklist.push('<code>curl</code> installed on every machine that runs the installer — required for the installer\'s own service health checks (CAST requirements precheck)');
     if(a.topology === 'multi' && hasAnalysis(a)) checklist.push('Network connectivity correctly configured between the core node and every analysis-node machine ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)');
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) checklist.push('Network connectivity correctly configured between imaging-viewer and the dedicated Neo4j machine (Bolt port 7687)');
     if(a.topology === 'multi') checklist.push('Shared network folder (NAS/SAN, SMB only) provisioned and mounted as /opt/cast/shared on every machine before install');
