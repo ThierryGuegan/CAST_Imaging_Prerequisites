@@ -258,8 +258,6 @@
       <legend>8 · Source code access</legend>
       <div class="q">
         <div class="opt-row">
-          <label class="opt"><input type="checkbox" id="repoSsh" checked>
-            <span class="opt-text"><b>Git over SSH</b><span>Port 22 to internal Git servers</span></span></label>
           <label class="opt"><input type="checkbox" id="repoHttps" checked>
             <span class="opt-text"><b>Git/SVN/DevOps over HTTPS</b><span>Port 443 to internal or cloud-hosted repositories</span></span></label>
           <label class="opt"><input type="checkbox" id="repoSmb">
@@ -360,7 +358,6 @@
       llmProvider: document.getElementById('llmProvider').value,
       highlight: document.getElementById('highlight').checked,
       email: document.getElementById('email').checked,
-      repoSsh: document.getElementById('repoSsh').checked,
       repoHttps: document.getElementById('repoHttps').checked,
       repoSmb: document.getElementById('repoSmb').checked
     };
@@ -378,8 +375,8 @@
       : [{src:'Administrator workstation', dst:'CAST Imaging host (Linux)', port:'22', proto:'SSH', purpose:'Server administration', tag:'mandatory'}];
 
     var rows = [
-      {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'mandatory'},
-      {src:'End-user browser', dst:'CAST Imaging Web', port:'80', proto:'HTTP', purpose:'Redirect to HTTPS only', tag:'optional', note:'Disable once HTTPS is validated'},
+      {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'},
+      {src:'End-user browser', dst:'CAST Imaging Web', port:'80', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'},
       {src:'AIP Console / delivery workstation', dst:'CAST Imaging', port:'443/80', proto:'HTTPS/HTTP', purpose:'Application package delivery', tag:'mandatory'}
     ].concat(adminRows).concat([
       {src:'CAST Imaging application', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory'}
@@ -389,10 +386,6 @@
       rows.push({src:'kubectl / CI pipelines', dst:'Kubernetes API server', port:'6443', proto:'TCP', purpose:'Cluster administration', tag:'conditional', note:'Kubernetes only'});
       rows.push({src:'Kubernetes worker nodes', dst:'Control plane / kubelet', port:'2379-2380, 10250-10259', proto:'TCP', purpose:'Standard cluster-internal communication', tag:'conditional', note:'Kubernetes only'});
     }
-    if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes'){
-      rows.push({src:'Container host', dst:'Container image registry', port:'443', proto:'HTTPS', purpose:'Pull CAST Imaging container images (install/upgrade)', tag:'mandatory'});
-    }
-
     if(a.egress === 'airgapped'){
       rows.push({src:'CAST Extend Local Update Server', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Only outbound path for extensions, updates, licensing artifacts', tag:'mandatory'});
       rows.push({src:'CAST Imaging node(s)', dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for extension/update downloads (no direct internet egress)', tag:'mandatory'});
@@ -414,9 +407,6 @@
       rows.push({src:'MCP Gatekeeper', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication', tag:'conditional', note:'AI/MCP selected'});
     }
 
-    if(a.repoSsh){
-      rows.push({src:'CAST Imaging', dst:'Internal source repository (Git/SVN over SSH)', port:'22', proto:'SSH', purpose:'Source code retrieval for analysis delivery', tag:'mandatory'});
-    }
     if(a.repoHttps){
       rows.push({src:'CAST Imaging', dst:'Source repository (Git/SVN/DevOps over HTTPS)', port:'443', proto:'HTTPS', purpose:'Source code retrieval for analysis delivery', tag:'mandatory'});
     }
@@ -433,9 +423,6 @@
     if(a.email){
       rows.push({src:'CAST Imaging', dst:'SMTP relay', port:'25 / 587 / 465', proto:'TCP', purpose:'Notification emails', tag:'optional', note:'Email notifications selected'});
     }
-
-    rows.push({src:'CAST Imaging', dst:'NTP server', port:'123', proto:'UDP', purpose:'Time synchronization (certificate validation, log correlation)', tag:'recommended'});
-    rows.push({src:'CAST Imaging', dst:'DNS server', port:'53', proto:'UDP/TCP', purpose:'Name resolution for all FQDNs above', tag:'mandatory'});
 
     return rows;
   }
@@ -500,11 +487,13 @@
       }).join('') +
       '</tbody></table></div>';
 
-    var httpsHtml = '<h3>4. HTTPS / TLS</h3><ul>' +
+    var httpsHtml = '<h3>4. HTTPS / TLS</h3>' +
+      '<div class="callout info"><b>HTTPS is recommended, not mandatory.</b> CAST Imaging can be served over plain HTTP; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment.</div>' +
+      '<ul>' +
       '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : '.') + '</li>' +
       '<li>TLS termination: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — decide before install day; this determines the firewall path in Section 3.' : '.') + '</li>' +
-      '<li>The customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
-      '<li>Disable plain HTTP (port 80) once HTTPS is confirmed working; keep only the HTTPS→redirect rule.</li>' +
+      '<li>If you enable HTTPS, the customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
+      '<li>If HTTPS is enabled, disable plain HTTP (port 80) once it is confirmed working, or keep only an HTTPS→redirect rule on port 80.</li>' +
       '</ul>';
 
     var authHtml = '<h3>5. Authentication prerequisites</h3>';
