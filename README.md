@@ -1,27 +1,32 @@
-# CAST Imaging Prerequisites
+# CAST Imaging Prerequisites — Requirements Builder
 
-Architecture and installation prerequisites for CAST Imaging and its associated modules,
-compiled from the structure of the official documentation at
-[doc.castsoftware.com/imaging/install](https://doc.castsoftware.com/imaging/install/).
+An interactive tool that helps you **define the architecture and installation
+prerequisites for your specific CAST Imaging deployment**, instead of handing you a
+generic, one-size-fits-all checklist.
 
-## Contents
+Open **`index.html`** in a browser. Answer the questions on the left (project scale,
+platform, topology, database, network egress, HTTPS, authentication, optional MCP/AI
+and CAST Highlight integrations, source-code access methods) and the document on the
+right regenerates live:
 
-- **`index.html`** — single-page HTML application covering: deployment options (platform /
-  scenario / topology decision matrix), hardware / software / database / disk requirements
-  refined per topology, MCP servers (Imaging, Gatekeeper, OAuth), per-platform installation
-  references (Windows, Docker, Podman, Kubernetes), HTTPS/SSL, authentication (Local, SAML,
-  LDAP), CAST Extend access and API key, outbound flows and exact FQDN allowlisting, the full
-  network ports matrix, licensing, and a consolidated pre-installation checklist. Open it
-  directly in a browser.
-- **`CAST-Imaging-Architecture-Installation-Prerequisites.pdf`** — printable export of the
-  same content (31 pages).
-- **`network-and-ports-matrix.csv`** — machine-readable inbound / internal / outbound port
-  and FQDN matrix.
-- **`sizing-requirements-matrix.csv`** — machine-readable hardware sizing matrix by scenario
-  and topology.
+- Hardware sizing for exactly the profile you selected (not every possible combination).
+- A network ports / FQDN allowlist matrix filtered to the flows your configuration
+  actually needs — no unused rows, no wildcards.
+- Database requirements matched to your chosen engine and hosting model.
+- HTTPS/TLS guidance matched to your certificate source and termination point.
+- Authentication prerequisites for the exact method you picked (Local / SAML / LDAP).
+- CAST Extend access and licensing steps, adapted for direct/proxy/air-gapped egress.
+- MCP Server (AI) prerequisites, only shown if you enable that integration.
+- A pre-installation checklist built from your actual answers.
 
-> **Validation notice.** This document was compiled from CAST Imaging's published
-> documentation structure and standard CAST Software deployment practices. Version-specific
-> figures (minimum OS/DB versions, default ports, sizing) should be verified against the
-> current `doc.castsoftware.com/imaging/install` for the exact CAST Imaging release being
-> deployed before use in infrastructure sizing or firewall change requests.
+Both the tailored ports matrix and the tailored sizing table can be exported as CSV
+directly from the page, and the whole result can be printed / saved as PDF (the
+questionnaire pane is hidden from the print output).
+
+Everything runs client-side in the browser — no data leaves the page.
+
+> **Validation notice.** Recommendations are derived from CAST Imaging's published
+> documentation structure and standard CAST Software deployment practices. Always
+> confirm exact minimum versions, default ports, and sizing against the current
+> [doc.castsoftware.com/imaging/install](https://doc.castsoftware.com/imaging/install/)
+> for the CAST Imaging release you are deploying.
