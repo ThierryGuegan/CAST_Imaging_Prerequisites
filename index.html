@@ -559,7 +559,7 @@
         osRows.push(['Podman', '<b>Beta support</b> per CAST — the installer itself still relies on a "docker compose"-compatible CLI to create containers/networks/volumes/shares, so confirm your Podman + podman-compose combination provides that compatibility before relying on it for production']);
       }
     } else if(a.platform === 'windows'){
-      osRows.push(['Host OS', 'Windows Server 2016, 2019, or 2022, 64-bit — <b>Server Core is not supported</b> (Desktop Experience required)']);
+      osRows.push(['Host OS', 'Windows Server 2016, 2019, or 2022, 64-bit (<b>Server Core is not supported</b>, Desktop Experience required); Windows 10/11 64-bit is also listed as supported']);
     } else if(a.platform === 'kubernetes'){
       osRows.push(['Cluster tooling', 'A running Kubernetes cluster with <code>helm</code> and <code>kubectl</code> available — CAST installs via Helm charts; confirm your cluster\'s Kubernetes version against CAST\'s current release notes (not pinned down by this tool)']);
     }
@@ -568,7 +568,7 @@
       '</tbody></table></div>') : '';
 
     sizingHtml += osHtml + '<h4>Client-side requirements</h4><div class="tbl-wrap"><table><thead><tr><th>Profile</th><th>Requirement</th></tr></thead><tbody>' +
-      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Modern browser (Chrome / Edge / Firefox, latest 2 versions), 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs</td></tr>' +
+      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs</td></tr>' +
       '<tr><td>Delivery / analyst workstation</td><td>Same as above, plus local disk for source checkouts, a compatible JDK (≥ 17 LTS and ≤ 21, 64-bit, with <code>JAVA_HOME</code> set), and SCM client tools for the repositories selected in Section 8</td></tr>' +
       '</tbody></table></div>';
 
