@@ -277,8 +277,6 @@
     <div class="profile-chips" id="profile-chips"></div>
 
     <div class="toolbar no-print">
-      <button class="btn" onclick="exportPortsCsv()">⬇ Export ports &amp; FQDN matrix (CSV)</button>
-      <button class="btn" onclick="exportSizingCsv()">⬇ Export sizing (CSV)</button>
       <button class="btn secondary" onclick="window.print()">🖨 Print / Save as PDF</button>
     </div>
 
@@ -470,9 +468,6 @@
       '</tbody></table></div>';
 
     var portRows = buildPortRows(a);
-    window.__lastPortRows = portRows; // for CSV export
-    window.__lastSizingRows = sizingRows;
-    window.__lastState = a;
 
     var netHtml = '<h3>3. Network ports &amp; FQDN allowlist — tailored to your answers</h3>' +
       '<p>Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.</p>' +
@@ -552,40 +547,6 @@
     document.getElementById('results-content').innerHTML =
       sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + mcpHtml + checklistHtml;
   }
-
-  function download(filename, text){
-    var blob = new Blob([text], {type:'text/csv;charset=utf-8;'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  function csvCell(v){
-    v = String(v);
-    return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
-  }
-
-  window.exportPortsCsv = function(){
-    var rows = window.__lastPortRows || [];
-    var header = ['Source','Destination','Port','Protocol','Purpose','Note','Status'];
-    var lines = [header.join(',')];
-    rows.forEach(function(r){
-      lines.push([r.src, r.dst, r.port, r.proto, r.purpose, r.note||'', r.tag].map(csvCell).join(','));
-    });
-    download('cast-imaging-tailored-ports-matrix.csv', lines.join('\r\n'));
-  };
-
-  window.exportSizingCsv = function(){
-    var rows = window.__lastSizingRows || [];
-    var header = ['Component','vCPU','RAM (GB)','Disk (GB)'];
-    var lines = [header.join(',')];
-    rows.forEach(function(r){
-      lines.push([r.c, r.cpu, r.ram, r.disk].map(csvCell).join(','));
-    });
-    download('cast-imaging-tailored-sizing.csv', lines.join('\r\n'));
-  };
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
