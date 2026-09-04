@@ -296,6 +296,7 @@
   <!-- ===================== RESULTS ===================== -->
   <main class="results-pane">
     <h2 class="page-title">Your CAST Imaging Deployment Requirements</h2>
+    <p class="page-sub" id="generated-date"></p>
     <p class="page-sub">Generated live from the answers on the left. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.</p>
 
     <div class="profile-chips" id="profile-chips"></div>
@@ -499,6 +500,15 @@
   function tagHtml(t){
     var label = {mandatory:'Mandatory', conditional:'Conditional', optional:'Optional', recommended:'Recommended'}[t] || t;
     return '<span class="tag '+t+'">'+label+'</span>';
+  }
+
+  function stampGeneratedDate(){
+    var el = document.getElementById('generated-date');
+    if(!el) return;
+    var now = new Date();
+    var dateStr = now.toLocaleDateString(undefined, {year:'numeric', month:'long', day:'numeric'});
+    var timeStr = now.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
+    el.textContent = 'Generated ' + dateStr + ' at ' + timeStr;
   }
 
   function render(){
@@ -733,6 +743,7 @@
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
+  stampGeneratedDate();
   render();
 })();
 </script>
