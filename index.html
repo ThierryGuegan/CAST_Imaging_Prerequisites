@@ -550,13 +550,70 @@
 
     var mcpHtml = '';
     if(a.mcp){
-      mcpHtml = '<h3>7. MCP Servers (AI features) — enabled</h3><ul>' +
+      mcpHtml = '<h3>{N}. MCP Servers (AI features) — enabled</h3><ul>' +
         '<li>Deploy the CAST Imaging MCP Server alongside a reachable CAST Imaging instance.</li>' +
         '<li>Front it with <b>Gatekeeper</b> for tool/application-level authorization policy.</li>' +
         '<li>Configure the <b>OAuth module</b> against an OAuth2/OIDC provider (can reuse your SAML/LDAP IdP if OIDC-capable) so MCP clients authenticate as the requesting user.</li>' +
         '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> (no wildcards).</li>' +
         '<li>Sizing: ~2 vCPU / 4 GB RAM per MCP service (already added to Section 1).</li>' +
         '</ul>';
+    }
+
+    var dockerConfigHtml = '';
+    if(a.platform === 'docker' || a.platform === 'podman'){
+      var engineLabel = a.platform === 'podman' ? 'Podman' : 'Docker';
+      var coreHost = a.topology === 'multi' ? 'core-node.internal.example.com' : 'imaging-host.internal.example.com';
+      var lines = [];
+      lines.push('# configuration.conf — '+engineLabel+', '+ (a.topology === 'multi' ? 'distributed / multi-machine' : 'single machine') +' (illustrative — confirm exact keys for your release)');
+      lines.push('');
+      lines.push('# --- Topology: one configuration.conf per machine, edited before "docker compose up" ---');
+      if(a.topology === 'single'){
+        lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost+'   # this host — imaging-services, imaging-viewer, dashboards, PostgreSQL, analysis-node');
+      } else {
+        lines.push('# On the CORE node (imaging-services + imaging-viewer + dashboards + PostgreSQL):');
+        lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost);
+        lines.push('');
+        lines.push('# On EACH analysis-node machine ('+(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' in your profile):');
+        lines.push('IMAGING_SERVICES_HOSTNAME='+coreHost+'   # must resolve/be reachable from every analysis-node machine');
+      }
+      lines.push('');
+      lines.push('# --- Database (Section 2: '+esc(LABELS.dbHosting[a.dbHosting])+') ---');
+      if(a.dbHosting === 'colocated'){
+        lines.push('DB_MODE=embedded                       # CAST Imaging runs its own PostgreSQL container');
+      } else {
+        lines.push('DB_MODE=external');
+        lines.push('POSTGRES_HOSTNAME=<your-postgresql-host-fqdn>');
+        lines.push('POSTGRES_PORT=5432');
+        lines.push('POSTGRES_USER=<service-account>');
+        lines.push('POSTGRES_PASSWORD=<use-a-secrets-store-do-not-commit>');
+      }
+      lines.push('');
+      lines.push('# --- HTTPS / reverse proxy (Section 4: '+esc(LABELS.certSource[a.certSource])+', '+esc(LABELS.reverseProxy[a.reverseProxy])+') ---');
+      if(a.reverseProxy === 'nginx'){
+        lines.push('HTTPS_ENABLED='+(a.certSource === 'self-signed' ? 'false                    # terminate TLS at the external reverse proxy instead, or set true and provide certs below' : 'true'));
+        lines.push('SSL_CERTIFICATE=/path/to/fullchain.pem');
+        lines.push('SSL_CERTIFICATE_KEY=/path/to/privkey.pem');
+        lines.push('CONTEXT_URL=https://imaging.example.com/   # public URL when fronted by the external reverse proxy');
+      } else {
+        lines.push('HTTPS_ENABLED=false   # let the external component (Ingress/IIS) or a later decision handle TLS termination');
+      }
+      lines.push('');
+      lines.push('# --- Outbound network (Section 4: '+esc(LABELS.egress[a.egress])+') ---');
+      if(a.egress === 'proxy'){
+        lines.push('HTTPS_PROXY=https://<user>:<password>@proxy.example.com:8080');
+        lines.push('NO_PROXY=localhost,127.0.0.1'+(a.topology === 'multi' ? ','+coreHost+'   # exclude the imaging-services host in distributed mode' : ''));
+      } else if(a.egress === 'airgapped'){
+        lines.push('EXTEND_URL=https://extend-local.internal.example.com   # internal CAST Extend Local Update Server, no direct internet egress');
+      } else {
+        lines.push('# Direct outbound HTTPS to extend.castsoftware.com — no proxy variables required');
+      }
+      var dockerConfigNote = '<div class="callout warn">These <code>configuration.conf</code> keys are illustrative, derived from CAST\'s documented installation model (per-machine config file, distributed-mode <code>*_HOSTNAME</code> variables, <code>DB_MODE</code>, proxy exclusion for the imaging-services host). '+
+        'The network egress used to build this tool could not reach '+
+        '<a href="https://doc.castsoftware.com/imaging/install/global/docker/reference/config-examples/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/global/docker/reference/config-examples</a> to verify exact key names for your release — confirm every variable name and value against that page before editing your real <code>configuration.conf</code>.</div>';
+      dockerConfigHtml = '<h3>{N}. '+engineLabel+' <code>configuration.conf</code> reference</h3>' +
+        '<p>Skeleton derived from your answers above, one file per machine, matching the <a href="https://doc.castsoftware.com/imaging/install/global/docker/reference/config-examples/" target="_blank" rel="noopener">config-examples reference</a> structure.</p>' +
+        '<div class="tbl-wrap"><pre style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;overflow-x:auto;color:#cfd8e2;font-size:12.5px;line-height:1.6;">' + esc(lines.join('\n')) + '</pre></div>' +
+        dockerConfigNote;
     }
 
     var checklist = [];
@@ -573,13 +630,17 @@
     if(a.mcp) checklist.push('MCP Server + Gatekeeper + OAuth module deployed; LLM provider FQDN allowlisted');
     if(a.highlight) checklist.push('CAST Highlight FQDNs allowlisted (cloud/auth/binaries)');
     if(a.platform === 'kubernetes') checklist.push('Cluster namespace, RBAC, StorageClass, and Ingress/TLS secret prepared');
+    if(a.platform === 'docker' || a.platform === 'podman') checklist.push('Per-machine configuration.conf reviewed against the '+(a.platform==='podman'?'Podman':'Docker')+' config-examples reference before "compose up" (Section 7)');
     checklist.push('End-user and delivery workstation requirements communicated to stakeholders');
 
-    var checklistHtml = '<h3>'+(a.mcp?'8':'7')+'. Pre-installation checklist for your profile</h3><ul class="checklist">' +
+    var optionalSections = [dockerConfigHtml, mcpHtml].filter(function(h){ return h; });
+    var nextNum = 7;
+    var optionalHtml = optionalSections.map(function(h){ return h.replace('{N}', String(nextNum++)); }).join('');
+    var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist for your profile</h3><ul class="checklist">' +
       checklist.map(function(c){ return '<li>'+c+'</li>'; }).join('') + '</ul>';
 
     document.getElementById('results-content').innerHTML =
-      sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + mcpHtml + checklistHtml;
+      sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + optionalHtml + checklistHtml;
   }
 
   document.getElementById('form-pane').addEventListener('input', render);
