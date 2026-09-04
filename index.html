@@ -391,10 +391,6 @@
     } else {
       rows.push({src:'CAST Imaging node', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Extensions catalog, product updates, licensing artifacts', tag:'mandatory'});
     }
-    if(a.egress === 'proxy'){
-      rows.push({src:'CAST Imaging node', dst:'Corporate HTTP(S) proxy', port:'(proxy-specific, e.g. 8080/3128)', proto:'HTTPS', purpose:'All outbound HTTPS flows below transit this proxy — configure proxy auth in CAST Imaging / CAST Extend client', tag:'mandatory'});
-    }
-
     if(a.highlight){
       rows.push({src:'CAST Imaging', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:'Highlight integration selected'});
       rows.push({src:'CAST Imaging', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:'Highlight integration selected'});
