@@ -554,6 +554,9 @@
     if(a.dbHosting === 'dedicated'){
       sizingRows.push({c:'PostgreSQL machine (dedicated database server)', cpu:4, ram:32, disk:512});
     }
+    if(a.dbHosting === 'managed'){
+      sizingRows.push({c:'PostgreSQL instance (managed/clustered DBaaS, primary + standby for HA)', cpu:8, ram:64, disk:1024});
+    }
     if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
       sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + userBonus.cpu, ram:sizingRows[0].ram + userBonus.ram, disk:sizingRows[0].disk};
     }
@@ -572,6 +575,10 @@
 
     if(hasNeo4j(a)){
       sizingHtml += '<div class="callout info">Neo4j (bundled with imaging-viewer) needs <b>16 GB RAM minimum, 32 GB recommended</b> — it defaults to an initial/maximum JVM heap of 12 GB, tunable via <code>imaging-viewer/.env</code>. Sizing above already accounts for this.</div>';
+    }
+
+    if(a.dbHosting === 'managed'){
+      sizingHtml += '<div class="callout info">The managed/clustered DBaaS row is an equivalent-capacity planning figure, not a machine you provision yourself — your cloud provider (e.g. Amazon RDS, Azure Database for PostgreSQL, Google Cloud SQL) sizes and replicates the underlying nodes for you. Pick an instance tier that meets or exceeds it.</div>';
     }
 
     if(a.topology === 'multi' && hasAnalysis(a) && (a.analysisNodes === '2-3' || a.analysisNodes === '4+')){
