@@ -769,6 +769,36 @@
         dockerConfigNote;
     }
 
+    // ---- Consolidated "open items to verify against doc.castsoftware.com" — every place this tool
+    // could not reach the primary source (network egress to doc.castsoftware.com is blocked) and had
+    // to reconstruct guidance from search snippets or reasonable inference instead. ----
+    var OPEN_ITEMS = [
+      {item:'Exact configuration.conf / .env key names and syntax', why:'Skeleton in the Docker/Podman section is reconstructed from search snippets, not read from the page', links:[['reference/config-examples','https://doc.castsoftware.com/imaging/install/global/docker/reference/config-examples/']], show:function(a){ return a.platform==='docker'||a.platform==='podman'; }},
+      {item:'Reverse-proxy directives (KC_PROXY, KC_PROXY_HEADERS, PROXY_ADDRESS_FORWARDING, APP_CONTEXT) and which file each belongs in', why:'Names confirmed via search but exact file/syntax not independently read', links:[['reference/reverse-proxy','https://doc.castsoftware.com/imaging/install/global/docker/reference/reverse-proxy/']], show:function(a){ return (a.platform==='docker'||a.platform==='podman') && a.reverseProxy==='nginx'; }},
+      {item:'Nginx vHost HTTPS syntax (ssl_certificate directives, TLS versions, cipher list)', why:'Reconstructed from search snippets describing the general approach', links:[['https-ssl/docker','https://doc.castsoftware.com/imaging/install/https-ssl/docker/']], show:function(a){ return (a.platform==='docker'||a.platform==='podman') && a.reverseProxy==='nginx'; }},
+      {item:'Full /opt/cast/shared folder requirements (exact sub-paths, permissions, size)', why:'Only the top-level requirement (SMB-only, mount before compose up) was confirmed via search', links:[['reference/shared-folder','https://doc.castsoftware.com/imaging/install/global/docker/reference/shared-folder/']], show:function(a){ return a.topology==='multi'; }},
+      {item:'Full requirements precheck (what it actually checks beyond curl)', why:'Only the curl/service-health-check requirement was confirmed', links:[['requirements/precheck','https://doc.castsoftware.com/imaging/install/requirements/precheck/']], show:function(){ return true; }},
+      {item:'SELinux guidance and full browser/OS version matrix', why:'No CAST-specific SELinux statement found; browser/Windows facts came from search snippets, not a direct read', links:[['requirements/software','https://doc.castsoftware.com/imaging/install/requirements/software/']], show:function(a){ return a.platform==='docker'||a.platform==='podman'; }},
+      {item:'Full supported/minimum PostgreSQL version range', why:'Only "18.x recommended for self-provisioned, 15 bundled" was confirmed — the full range was not', links:[['requirements/db','https://doc.castsoftware.com/imaging/install/requirements/db/']], show:function(){ return true; }},
+      {item:'Exact disk sizing beyond the 256GB floor, and full storage-location paths', why:'Per-scale sizing numbers and folder paths are reconstructed/estimated, not read from CAST\'s tables', links:[['requirements/hardware','https://doc.castsoftware.com/imaging/install/requirements/hardware/'], ['requirements/disk','https://doc.castsoftware.com/imaging/install/requirements/disk/'], ['storage-locations','https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/']], show:function(){ return true; }},
+      {item:'Windows-specific storage paths beyond the CASTStorageService/DBDATADIR default', why:'Only the default install path was confirmed', links:[['storage-locations/windows','https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/windows/']], show:function(a){ return a.platform==='windows'; }},
+      {item:'Docker-specific storage paths beyond delivery/common-data', why:'Only two of the "five main storage folders" were confirmed by name/path', links:[['storage-locations/docker','https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/docker/']], show:function(a){ return a.platform==='docker'||a.platform==='podman'; }},
+      {item:'Cloud/Kubernetes storage paths beyond the Azure Disks/Files default', why:'Only the AKS default was confirmed; GCP/AWS specifics were not', links:[['storage-locations/cloud','https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/cloud/']], show:function(a){ return a.platform==='kubernetes'; }},
+      {item:'Linux UID/GID alignment across machines for the shared folder', why:'No CAST-specific statement found — flagged as a plausible risk by analogy with the confirmed Windows service-account guidance, not as documented fact', links:[['requirements/software','https://doc.castsoftware.com/imaging/install/requirements/software/'], ['reference/shared-folder','https://doc.castsoftware.com/imaging/install/global/docker/reference/shared-folder/']], show:function(a){ return (a.platform==='docker'||a.platform==='podman') && a.topology==='multi'; }},
+      {item:'Minimum Kubernetes cluster version', why:'Not found via search at all', links:[['imaging/install','https://doc.castsoftware.com/imaging/install/']], show:function(a){ return a.platform==='kubernetes'; }}
+    ];
+    var openItems = OPEN_ITEMS.filter(function(o){ return o.show(a); });
+    var openItemsHtml = '';
+    if(openItems.length){
+      openItemsHtml = '<h3>{N}. Open items to verify against doc.castsoftware.com</h3>' +
+        '<p>This tool was built with network egress to <code>doc.castsoftware.com</code> blocked, so every item below was reconstructed from search snippets or reasonable inference rather than read directly from CAST\'s documentation. Nothing here is necessarily wrong — but confirm each one before you rely on it, and re-check this list if your answers on the left change.</p>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Item to verify</th><th>Why it\'s unverified</th><th>Check against</th></tr></thead><tbody>' +
+        openItems.map(function(o){
+          return '<tr><td>'+esc(o.item)+'</td><td>'+esc(o.why)+'</td><td>'+o.links.map(function(l){ return '<a href="'+l[1]+'" target="_blank" rel="noopener">'+esc(l[0])+'</a>'; }).join('<br>')+'</td></tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    }
+
     var checklist = [];
     checklist.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(LABELS.topology[a.topology])+')');
     checklist.push('<code>curl</code> installed on every machine that runs the installer — required for the installer\'s own service health checks (CAST requirements precheck)');
@@ -792,7 +822,7 @@
     if(a.platform === 'docker' || a.platform === 'podman') checklist.push('Per-machine configuration.conf reviewed against the '+(a.platform==='podman'?'Podman':'Docker')+' config-examples reference before "compose up" (Section 7)');
     checklist.push('End-user and delivery workstation requirements communicated to stakeholders');
 
-    var optionalSections = [dockerConfigHtml, mcpHtml].filter(function(h){ return h; });
+    var optionalSections = [dockerConfigHtml, mcpHtml, openItemsHtml].filter(function(h){ return h; });
     var nextNum = 7;
     var optionalHtml = optionalSections.map(function(h){ return h.replace('{N}', String(nextNum++)); }).join('');
     var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist for your profile</h3><ul class="checklist">' +
