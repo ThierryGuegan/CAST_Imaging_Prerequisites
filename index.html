@@ -574,10 +574,13 @@
 
     var dbHtml = '<h3>2. Database requirements</h3><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
       '<tr><td>RDBMS engine</td><td>PostgreSQL — port 5432 (the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data)</td></tr>' +
-      '<tr><td>PostgreSQL version</td><td>CAST currently recommends <b>PostgreSQL 18.x</b> for new installs. The legacy <b>CAST Storage Service is end-of-life</b> — deployments still on it must migrate to a standard PostgreSQL install. This tool could not verify the full supported/minimum version range (network egress to doc.castsoftware.com is blocked) — confirm against <a href="https://doc.castsoftware.com/imaging/install/db/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/db</a> before provisioning'+(a.dbHosting!=='colocated' ? ' your '+esc(LABELS.dbHosting[a.dbHosting]).toLowerCase()+' instance' : '')+'.</td></tr>' +
+      '<tr><td>PostgreSQL version</td><td>' +
+        (a.dbHosting==='colocated'
+          ? 'The bundled '+((a.platform==='docker'||a.platform==='podman')?'Docker':'')+' image ships <b>PostgreSQL 15</b> — pinned by CAST, nothing for you to choose.'
+          : 'You provision PostgreSQL yourself: on Windows, install from EnterpriseDB; on Linux, from the distribution\'s official PostgreSQL repository (or run it in Docker). CAST currently recommends <b>PostgreSQL 18.x</b> for a self-provisioned instance.') +
+        ' The legacy <b>CAST Storage Service is end-of-life</b> — deployments still on it must migrate to standard PostgreSQL. This tool could not verify the full supported/minimum version range (network egress to doc.castsoftware.com is blocked) — confirm against <a href="https://doc.castsoftware.com/imaging/install/requirements/db/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/db</a> before provisioning'+(a.dbHosting!=='colocated' ? ' your '+esc(LABELS.dbHosting[a.dbHosting]).toLowerCase()+' instance' : '')+'.</td></tr>' +
       '<tr><td>PostgreSQL hosting</td><td>'+esc(LABELS.dbHosting[a.dbHosting])+
         (a.dbHosting==='colocated' && (a.scale==='standard'||a.scale==='enterprise') ? ' — <b>not recommended</b> at this scale; move to a dedicated or managed instance' : '') +
-        (a.dbHosting==='colocated' ? ' — the embedded/co-located container pins its own known-good PostgreSQL version for you' : '') +
       '</td></tr>' +
       '<tr><td>Character set</td><td>UTF-8 required; case-sensitive collation as specified by CAST for your CAST Imaging release</td></tr>' +
       '<tr><td>High availability</td><td>' + (a.scale==='enterprise' ? 'Required — use a managed/clustered instance with replication' : 'Optional — plan regular automated backups regardless') + '</td></tr>' +
