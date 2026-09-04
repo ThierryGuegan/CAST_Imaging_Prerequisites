@@ -1,0 +1,12 @@
+Scenario,Topology,Component,vCPU,RAM (GB),Disk (GB),Notes
+POC / Evaluation (<=~50 applications),Single machine (all-in-one),All-in-one node (Web + Services + DB),4,16,150,"Docker/Podman single-host deployment; local or embedded PostgreSQL container; suitable for demo and trial only"
+Small Team (<=~150 applications),Single machine (all-in-one),All-in-one node (Web + Services + DB),8,32,300,"Recommended minimum for a small production/pilot deployment; SSD storage required"
+Small Team (<=~150 applications),Multi-machine,Web/Application node,4,16,100,"Runs Imaging Console, Viewer, dashboards, MCP servers"
+Small Team (<=~150 applications),Multi-machine,Database node (PostgreSQL),4,16,200,"Dedicated DB server; SSD required; sized per number/size of application results (Knowledge Base)"
+Standard Production (150-500 applications),Multi-machine,Web/Application node,8,32,200,"Add horizontal scaling / additional replicas in Kubernetes topology for HA"
+Standard Production (150-500 applications),Multi-machine,Database node (PostgreSQL),8,32,500+,"Grows with number of applications, snapshots retained, and analysis history; monitor and plan growth"
+Enterprise / High Availability (500+ applications),Multi-machine / Kubernetes,Web/Application tier (replicated),16 (aggregate),64 (aggregate),400,"Kubernetes Deployment with multiple replicas behind an Ingress/Load Balancer"
+Enterprise / High Availability (500+ applications),Multi-machine / Kubernetes,Database tier,16,64,1000+,"Consider managed/clustered PostgreSQL with backup and HA replication"
+MCP Server (Imaging / Gatekeeper),Any topology,MCP Server node/container,2,4,20,"Lightweight service; can be co-located with the application node or deployed as a separate container/pod"
+End-User Workstation,N/A,Client machine (browser access),2,8,5,"Modern browser (Chrome/Edge/Firefox latest 2 versions); no CAST software installation required for console/viewer access"
+Delivery Workstation (AIP Console),N/A,Client machine used to deliver applications,4,16,50+,"Local workspace for source code checkout and package preparation before delivery to CAST Imaging"
