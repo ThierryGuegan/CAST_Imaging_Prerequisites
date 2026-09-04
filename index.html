@@ -376,7 +376,7 @@
     var comps = ['imaging-services'];
     if(hasViewer(a)) comps.push('imaging-viewer');
     if(hasDashboards(a)) comps.push('dashboards');
-    comps.push('PostgreSQL');
+    if(a.dbHosting === 'colocated') comps.push('PostgreSQL');
     if(hasNeo4j(a) && !(a.topology === 'multi' && a.neo4jDedicated)) comps.push('Neo4j');
     return comps.join(' + ');
   }
@@ -385,7 +385,7 @@
     if(hasAnalysis(a)) comps.push('analysis-node');
     if(hasViewer(a)) comps.push('imaging-viewer');
     if(hasDashboards(a)) comps.push('dashboards');
-    comps.push('PostgreSQL');
+    if(a.dbHosting === 'colocated') comps.push('PostgreSQL');
     if(hasNeo4j(a)) comps.push('Neo4j');
     return comps.join(' + ');
   }
@@ -550,6 +550,9 @@
           sizingRows.push({c:'Analysis-node machine' + (nodeCount > 1 ? ' #' + i : ''), cpu:sizeSpec.analysis.cpu, ram:sizeSpec.analysis.ram, disk:sizeSpec.analysis.disk});
         }
       }
+    }
+    if(a.dbHosting === 'dedicated'){
+      sizingRows.push({c:'PostgreSQL machine (dedicated database server)', cpu:4, ram:32, disk:512});
     }
     if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
       sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + userBonus.cpu, ram:sizingRows[0].ram + userBonus.ram, disk:sizingRows[0].disk};
