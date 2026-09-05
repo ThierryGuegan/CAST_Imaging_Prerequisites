@@ -475,9 +475,15 @@
     }
     if(a.egress === 'airgapped'){
       rows.push({src:'CAST Extend Local Update Server', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Only outbound path for extensions, updates, licensing artifacts', tag:'mandatory'});
-      rows.push({src:'CAST Imaging node(s)', dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for extension/update downloads (no direct internet egress)', tag:'mandatory'});
+      rows.push({src:'imaging-services', dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for product updates and licensing artifacts (no direct internet egress)', tag:'mandatory'});
+      if(hasAnalysis(a)){
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for the extensions catalog — technology analyzers used during analysis (no direct internet egress)', tag:'mandatory'});
+      }
     } else {
-      rows.push({src:'CAST Imaging node', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Extensions catalog, product updates, licensing artifacts', tag:'mandatory'});
+      rows.push({src:'imaging-services', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Product updates and licensing artifacts', tag:'mandatory'});
+      if(hasAnalysis(a)){
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Extensions catalog — technology analyzers used during analysis', tag:'mandatory'});
+      }
     }
     if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes'){
       if(a.egress === 'airgapped'){
