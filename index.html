@@ -513,7 +513,7 @@
       rows.push({src:'Keycloak', dst:'LDAP / Active Directory server', port:'389 / 636 (LDAPS)', proto:'TCP', purpose:'Directory lookup and authentication — brokered through CAST\'s embedded Keycloak, not imaging-services directly', tag:'mandatory', note:'LDAP selected'});
     }
     if(a.email){
-      rows.push({src:'CAST Imaging', dst:'SMTP relay', port:'25 / 587 / 465', proto:'TCP', purpose:'Notification emails', tag:'optional', note:'Email notifications selected'});
+      rows.push({src:'imaging-services', dst:'SMTP relay', port:'25, 587, or 465', proto:'TCP', purpose:'Notification emails — pick the one port matching your relay\'s configuration (25 unauthenticated/relay-to-relay, 587 STARTTLS submission, 465 implicit TLS/SMTPS); opening all three is unnecessary', tag:'conditional', note:'Email notifications selected'});
     }
 
     return rows;
