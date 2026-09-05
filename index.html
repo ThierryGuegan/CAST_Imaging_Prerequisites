@@ -351,13 +351,13 @@
   // Every disk figure respects CAST's documented absolute floor of 256GB free disk per node (SSD/high-IOPS).
   var SIZING = {
     poc:{
-      single:{cpu:4, ram:16, disk:256},
-      core:{cpu:2, ram:8, disk:256}, analysis:{cpu:2, ram:8, disk:256}, neo4j:{cpu:2, ram:16, disk:256},
+      single:{cpu:4, ram:32, disk:256},
+      core:{cpu:2, ram:16, disk:256}, analysis:{cpu:2, ram:16, disk:256}, neo4j:{cpu:2, ram:16, disk:256},
       singleNote:'', multiNote:''
     },
     small:{
       single:{cpu:8, ram:32, disk:300},
-      core:{cpu:4, ram:16, disk:256}, analysis:{cpu:4, ram:16, disk:256}, neo4j:{cpu:4, ram:32, disk:256},
+      core:{cpu:4, ram:32, disk:256}, analysis:{cpu:4, ram:32, disk:256}, neo4j:{cpu:4, ram:32, disk:256},
       singleNote:'', multiNote:''
     },
     standard:{
@@ -626,6 +626,7 @@
     }
 
     sizingHtml += '<div class="callout info">CAST\'s absolute floor is <b>256 GB free disk per node</b>, on SSD or equivalent high-IOPS storage (SAN configured with SSD) — the figures above already sit at or above that floor for your profile, but treat 256 GB as a hard minimum on any node regardless.</div>';
+    sizingHtml += '<div class="callout info">CAST\'s RAM floor differs by topology: <b>32 GB minimum for a standalone/all-in-one machine</b> (everything on one host), versus <b>16 GB minimum per node in a distributed/multi-machine deployment</b> — 32 GB recommended per node there too. The figures above already respect these floors.</div>';
 
     var storageHtml = '';
     if(a.platform === 'docker' || a.platform === 'podman'){
