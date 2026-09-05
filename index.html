@@ -280,6 +280,7 @@
 
     <fieldset>
       <legend>8 · Source code access</legend>
+      <p class="hint" id="source-access-hint" style="margin-top:0;"></p>
       <div class="q">
         <div class="opt-row">
           <label class="opt"><input type="checkbox" id="repoHttps" checked>
@@ -498,11 +499,11 @@
       rows.push({src:'MCP Gatekeeper', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — this may be the same embedded Keycloak already listed above, or a separate IdP if the OAuth module is pointed elsewhere', tag:'conditional', note:'AI/MCP selected'});
     }
 
-    if(a.repoHttps){
-      rows.push({src:'CAST Imaging', dst:'Source repository (Git/SVN/DevOps over HTTPS)', port:'443', proto:'HTTPS', purpose:'Source code retrieval for analysis delivery', tag:'mandatory'});
+    if(a.repoHttps && hasAnalysis(a)){
+      rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'Source repository (Git/SVN/DevOps over HTTPS)', port:'443', proto:'HTTPS', purpose:'Source code retrieval for analysis delivery', tag:'mandatory'});
     }
-    if(a.repoSmb){
-      rows.push({src:'CAST Imaging', dst:'Internal file share (SMB)', port:'445', proto:'SMB', purpose:'Access to network shares hosting source code / delivery packages', tag:'mandatory'});
+    if(a.repoSmb && hasAnalysis(a)){
+      rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'Internal file share (SMB)', port:'445', proto:'SMB', purpose:'Access to network shares hosting source code / delivery packages', tag:'mandatory'});
     }
 
     if(a.auth === 'saml'){
@@ -542,6 +543,9 @@
       (a.scale === 'enterprise' && a.topology === 'single') ? 'Single machine is not recommended at Enterprise scale — consider Multi-machine or Kubernetes.' :
       (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-machine is usually unnecessary for a POC — Single machine is simpler.' :
       (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more machines to provision and maintain, network connectivity between machines must be correctly configured, and every machine must mount the same /opt/cast/shared network folder over SMB.' : '';
+
+    document.getElementById('source-access-hint').textContent = hasAnalysis(a) ? '' :
+      'Your scenario ('+LABELS.scenario[a.scenario]+') excludes analysis — these options won\'t add any firewall rows, since there\'s no analysis-node to check out source code.';
 
     // profile chips
     var chips = ['scale','users','platform','scenario','topology','egress','auth'].map(function(k){
