@@ -483,13 +483,14 @@
       }
     }
     if(a.highlight){
-      rows.push({src:'CAST Imaging', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:'Highlight integration selected'});
-      rows.push({src:'CAST Imaging', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:'Highlight integration selected'});
-      rows.push({src:'CAST Imaging', dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:'Highlight integration selected'});
+      var highlightNote = 'Highlight integration selected' + (a.egress === 'airgapped' ? ' — this is an external SaaS with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or Highlight must be dropped' : '');
+      rows.push({src:'CAST Imaging', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote});
+      rows.push({src:'CAST Imaging', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote});
+      rows.push({src:'CAST Imaging', dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote});
     }
 
     if(a.mcp){
-      rows.push({src:'MCP Server', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'Calls to the configured LLM provider for AI-assisted / MCP natural-language features', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]});
+      rows.push({src:'MCP Server', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'Calls to the configured LLM provider for AI-assisted / MCP natural-language features', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+(a.egress === 'airgapped' ? ' — this is an external API with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or an internal-only LLM gateway' : '')});
       rows.push({src:'MCP Gatekeeper', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication', tag:'conditional', note:'AI/MCP selected'});
     }
 
