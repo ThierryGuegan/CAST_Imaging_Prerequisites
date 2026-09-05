@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAST Imaging — Requirements Builder</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#141d29; --panel-alt:#1a2432; --border:#26313f;
+    --text:#e6edf3; --text-dim:#9fb0c0; --accent:#3ea6ff; --accent-2:#59d0a0;
+    --warn:#f2b84b; --danger:#f2685b; --code-bg:#0b1219;
+    --table-head:#1c2836; --table-row-alt:#111a24;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14.5px;line-height:1.5;}
+  a{color:var(--accent);}
+  code{background:var(--code-bg);padding:1px 5px;border-radius:4px;color:var(--accent-2);font-size:0.9em;}
+
+  header.app-header{padding:16px 24px;border-bottom:1px solid var(--border);background:var(--panel);
+    display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+  header.app-header h1{font-size:17px;margin:0;color:#fff;}
+  header.app-header p{margin:0;color:var(--text-dim);font-size:13px;}
+
+  .layout{display:flex;align-items:flex-start;}
+  .form-pane{width:420px;flex:0 0 420px;height:calc(100vh - 57px);overflow-y:auto;
+    border-right:1px solid var(--border);background:var(--panel);padding:20px 22px 60px;position:sticky;top:0;}
+  .results-pane{flex:1;min-width:0;height:calc(100vh - 57px);overflow-y:auto;padding:24px 32px 80px;}
+
+  fieldset{border:1px solid var(--border);border-radius:10px;padding:14px 16px 16px;margin:0 0 16px;background:var(--panel-alt);}
+  legend{font-size:12.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;padding:0 6px;}
+  .q{margin:12px 0;}
+  .q > label.qlabel{display:block;font-size:13px;color:#fff;margin-bottom:6px;font-weight:600;}
+  .opt-row{display:flex;flex-direction:column;gap:6px;}
+  .opt{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:7px;border:1px solid transparent;cursor:pointer;}
+  .opt:hover{background:rgba(255,255,255,.03);}
+  .opt input{margin-top:3px;flex:0 0 auto;}
+  .opt .opt-text b{display:block;font-size:13px;color:#fff;}
+  .opt .opt-text span{display:block;font-size:11.5px;color:var(--text-dim);}
+  select, input[type=text], input[type=number]{
+    width:100%;background:var(--code-bg);border:1px solid var(--border);color:var(--text);
+    padding:8px 10px;border-radius:6px;font-size:13.5px;}
+  .hint{font-size:11.5px;color:var(--text-dim);margin-top:4px;}
+  .sub-block{margin-top:10px;padding:10px 12px;border-left:2px solid var(--accent);background:rgba(62,166,255,.06);
+    border-radius:0 6px 6px 0;display:none;}
+  .sub-block.show{display:block;}
+
+  h2.page-title{font-size:22px;color:#fff;margin:0 0 4px;}
+  .page-sub{color:var(--text-dim);margin:0 0 18px;font-size:13.5px;}
+  h3{font-size:16.5px;color:#fff;margin:26px 0 10px;border-bottom:1px solid var(--border);padding-bottom:7px;}
+  h4{font-size:14px;color:var(--accent);margin:18px 0 8px;}
+  p{color:#cfd8e2;}
+  ul,ol{color:#cfd8e2;padding-left:20px;}
+  li{margin:4px 0;}
+
+  .profile-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 20px;}
+  .chip{background:var(--panel-alt);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;color:#cfd8e2;}
+  .chip b{color:#fff;}
+
+  .callout{border-radius:8px;padding:12px 14px;margin:14px 0;font-size:13.5px;border:1px solid;}
+  .callout.info{background:rgba(62,166,255,.08);border-color:rgba(62,166,255,.35);}
+  .callout.warn{background:rgba(242,184,75,.08);border-color:rgba(242,184,75,.4);}
+  .callout.danger{background:rgba(242,104,91,.08);border-color:rgba(242,104,91,.4);}
+  .callout b{color:#fff;}
+
+  table{width:100%;border-collapse:collapse;margin:10px 0 22px;font-size:13px;}
+  thead th{background:var(--table-head);color:#fff;text-align:left;padding:8px 10px;border:1px solid var(--border);white-space:nowrap;}
+  tbody td{padding:7px 10px;border:1px solid var(--border);color:#cfd8e2;vertical-align:top;}
+  tbody tr:nth-child(even){background:var(--table-row-alt);}
+  .tbl-wrap{overflow-x:auto;border-radius:6px;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;}
+  .tag.mandatory{background:rgba(242,104,91,.18);color:#ff9c92;}
+  .tag.conditional{background:rgba(242,184,75,.18);color:#f2b84b;}
+  .tag.optional{background:rgba(89,208,160,.18);color:#59d0a0;}
+  .tag.recommended{background:rgba(62,166,255,.18);color:#7cc4ff;}
+
+  .checklist{list-style:none;padding-left:0;}
+  .checklist li{padding:6px 0 6px 28px;position:relative;border-bottom:1px dashed var(--border);}
+  .checklist li:before{content:"☐";position:absolute;left:0;top:6px;color:var(--accent);font-size:15px;}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 22px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#04101c;font-weight:700;
+    padding:9px 16px;border-radius:7px;font-size:13px;border:none;cursor:pointer;}
+  .btn.secondary{background:transparent;border:1px solid var(--border);color:#cfd8e2;}
+  .btn:hover{filter:brightness(1.08);}
+
+  footer.doc-footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--border);color:var(--text-dim);font-size:11.5px;}
+
+  @media (max-width: 980px){
+    .layout{flex-direction:column;}
+    .form-pane{width:100%;flex:none;height:auto;position:relative;border-right:none;border-bottom:1px solid var(--border);}
+    .results-pane{height:auto;}
+  }
+
+  @media print{
+    header.app-header .no-print, .form-pane{display:none !important;}
+    body{background:#fff;color:#111;}
+    .results-pane{height:auto;overflow:visible;padding:0;}
+    .toolbar{display:none !important;}
+    table, .callout, fieldset{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>CAST Imaging — Requirements Builder</h1>
+  <p>Answer the questions on the left to generate the exact architecture &amp; installation prerequisites for <b>your</b> deployment — not a generic checklist.</p>
+</header>
+
+<div class="layout">
+
+  <!-- ===================== QUESTIONNAIRE ===================== -->
+  <aside class="form-pane" id="form-pane">
+
+    <fieldset>
+      <legend>1 · Platform, scenario &amp; topology</legend>
+      <div class="q">
+        <label class="qlabel">Which host platform will you install on?</label>
+        <div class="opt-row">
+          <label class="opt"><input type="radio" name="platform" value="docker" checked>
+            <span class="opt-text"><b>Docker</b><span>Docker Engine + Compose on Linux</span></span></label>
+          <label class="opt"><input type="radio" name="platform" value="podman">
+            <span class="opt-text"><b>Podman</b><span>Rootless / daemonless container engine (hardened Linux, RHEL-family)</span></span></label>
+          <label class="opt"><input type="radio" name="platform" value="kubernetes">
+            <span class="opt-text"><b>Kubernetes</b><span>Existing cluster, Helm/manifests, HA-capable</span></span></label>
+          <label class="opt"><input type="radio" name="platform" value="windows">
+            <span class="opt-text"><b>Windows Server</b><span>Native installation, no container runtime</span></span></label>
+        </div>
+      </div>
+      <div class="q">
+        <label class="qlabel">Deployment scenario — which components do you need?</label>
+        <select id="scenario">
+          <option value="full" selected>Full: analysis + Viewer + Dashboards (imaging-services, analysis-node, imaging-viewer, dashboards)</option>
+          <option value="viewer-readonly">Viewer + Dashboards, read-only — no local analysis (imaging-services, imaging-viewer, dashboards; no analysis-node)</option>
+          <option value="dashboards-only">Dashboards only, read-only — no Viewer, no local analysis (imaging-services, dashboards; KPIs only, no graph drill-down)</option>
+          <option value="analysis-only">Analysis only, headless — no Viewer/Dashboards UI (imaging-services, analysis-node; consumed via Imaging APIs / CI)</option>
+        </select>
+        <p class="hint">A <b>scenario</b> defines which components are installed; <b>topology</b> (below) defines how they're spread across machines. imaging-services is always required. Source: CAST's "choose your deployment" step at <code>doc.castsoftware.com/imaging/install/global/docker</code>.</p>
+      </div>
+      <div class="q">
+        <label class="qlabel">Topology</label>
+        <div class="opt-row">
+          <label class="opt"><input type="radio" name="topology" value="single" checked>
+            <span class="opt-text"><b>Single machine</b><span>All selected components on one host — suitable for POC, testing, demo, or small production</span></span></label>
+          <label class="opt"><input type="radio" name="topology" value="multi">
+            <span class="opt-text"><b>Multi-machine</b><span>Components distributed across dedicated hosts — recommended for production</span></span></label>
+        </div>
+        <p class="hint" id="topology-hint"></p>
+        <div class="sub-block" id="analysis-nodes-sub">
+          <label class="qlabel">How many analysis-node instances do you need?</label>
+          <select id="analysisNodes">
+            <option value="1" selected>1 (no parallel analyses)</option>
+            <option value="2-3">2–3 (analyze a few applications in parallel)</option>
+            <option value="4+">4+ (large/numerous codebases, high analysis throughput)</option>
+          </select>
+          <p class="hint">Each analysis-node registers itself against the same imaging-services instance and can run on its own machine — this is CAST Imaging's horizontal scaling mechanism for analysis workload.</p>
+        </div>
+        <div class="sub-block" id="neo4j-dedicated-sub">
+          <label class="opt"><input type="checkbox" id="neo4jDedicated">
+            <span class="opt-text"><b>Run Neo4j on its own dedicated machine</b><span>Separate from imaging-viewer — isolates graph-database load and lets you update CAST Imaging independently of Neo4j</span></span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2 · Project scale</legend>
+      <div class="q">
+        <label class="qlabel">How many applications will be delivered into CAST Imaging?</label>
+        <select id="scale">
+          <option value="poc">Proof of Concept / trial (&lt; 50 applications)</option>
+          <option value="small" selected>Small team (50 – 150 applications)</option>
+          <option value="standard">Standard production (150 – 500 applications)</option>
+          <option value="enterprise">Enterprise-wide (500+ applications, HA required)</option>
+        </select>
+      </div>
+      <div class="q">
+        <label class="qlabel">How many concurrent end users will consult CAST Imaging?</label>
+        <select id="users">
+          <option value="tiny">&lt; 10</option>
+          <option value="small" selected>10 – 50</option>
+          <option value="medium">50 – 200</option>
+          <option value="large">200+</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>3 · Database</legend>
+      <div class="q">
+        <label class="qlabel">RDBMS engine</label>
+        <p class="hint" style="margin-top:0;">CAST Imaging supports <b>PostgreSQL only</b> as its RDBMS — no other engine is supported. Analysis and persistence data is stored here.</p>
+      </div>
+      <div class="q">
+        <label class="qlabel">PostgreSQL hosting</label>
+        <select id="dbHosting">
+          <option value="colocated" selected>Co-located with the application (container/local instance)</option>
+          <option value="dedicated">Dedicated database server</option>
+          <option value="managed">Managed / clustered DBaaS (HA)</option>
+        </select>
+      </div>
+      <div class="q">
+        <p class="hint" style="margin-top:0;"><b>Neo4j</b> is bundled with imaging-viewer (not user-selectable) — an ETL step loads analysis results from PostgreSQL into Neo4j for graph browsing in the Viewer. Only relevant when your scenario (Section 1) includes the Viewer.</p>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>4 · Network egress</legend>
+      <div class="q">
+        <label class="qlabel">Internet (outbound) access model</label>
+        <div class="opt-row">
+          <label class="opt"><input type="radio" name="egress" value="direct" checked>
+            <span class="opt-text"><b>Direct outbound HTTPS</b><span>Server can reach the internet directly</span></span></label>
+          <label class="opt"><input type="radio" name="egress" value="proxy">
+            <span class="opt-text"><b>Via authenticated HTTP(S) proxy</b><span>All outbound traffic transits a corporate proxy</span></span></label>
+          <label class="opt"><input type="radio" name="egress" value="airgapped">
+            <span class="opt-text"><b>Air-gapped / no internet egress</b><span>Requires a CAST Extend Local Update Server as the only outbound path</span></span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>5 · HTTPS</legend>
+      <div class="q">
+        <label class="qlabel">TLS certificate source</label>
+        <select id="certSource">
+          <option value="ca-issued" selected>CA-issued (internal/corporate CA, public CA, or ACME/Let's Encrypt)</option>
+          <option value="self-signed">Self-signed (POC only)</option>
+        </select>
+      </div>
+      <div class="q">
+        <label class="qlabel">TLS termination point</label>
+        <select id="reverseProxy">
+          <option value="nginx" selected>External reverse proxy (Nginx / Apache / HAProxy / F5)</option>
+          <option value="ingress">Kubernetes Ingress controller</option>
+          <option value="iis">IIS with ARR (Windows)</option>
+          <option value="undecided">Not decided yet</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>6 · Authentication</legend>
+      <div class="q">
+        <div class="opt-row">
+          <label class="opt"><input type="radio" name="auth" value="local" checked>
+            <span class="opt-text"><b>Local accounts</b><span>No external identity provider</span></span></label>
+          <label class="opt"><input type="radio" name="auth" value="saml">
+            <span class="opt-text"><b>SAML 2.0 SSO</b><span>Azure AD/Entra ID, Okta, ADFS, PingFederate…</span></span></label>
+          <label class="opt"><input type="radio" name="auth" value="ldap">
+            <span class="opt-text"><b>LDAP / Active Directory</b><span>Directory-based authentication</span></span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>7 · Optional integrations</legend>
+      <div class="q">
+        <label class="opt"><input type="checkbox" id="mcp">
+          <span class="opt-text"><b>AI / MCP Server features</b><span>Expose CAST Imaging knowledge to AI assistants (MCP + Gatekeeper + OAuth)</span></span></label>
+        <div class="sub-block" id="mcp-sub">
+          <label class="qlabel">LLM provider used by MCP clients</label>
+          <select id="llmProvider">
+            <option value="anthropic" selected>Anthropic (api.anthropic.com)</option>
+            <option value="openai">OpenAI (api.openai.com)</option>
+            <option value="azure-openai">Azure OpenAI (custom *.openai.azure.com endpoint)</option>
+            <option value="other">Other / internal LLM gateway</option>
+          </select>
+        </div>
+      </div>
+      <div class="q">
+        <label class="opt"><input type="checkbox" id="highlight">
+          <span class="opt-text"><b>CAST Highlight integration</b><span>SaaS portal / MRI API cross-integration</span></span></label>
+      </div>
+      <div class="q">
+        <label class="opt"><input type="checkbox" id="email">
+          <span class="opt-text"><b>Email notifications</b><span>Outbound SMTP relay for alerts/notifications</span></span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>8 · Source code access</legend>
+      <p class="hint" id="source-access-hint" style="margin-top:0;"></p>
+      <div class="q">
+        <div class="opt-row">
+          <label class="opt"><input type="checkbox" id="repoHttps" checked>
+            <span class="opt-text"><b>Git/SVN/DevOps over HTTPS</b><span>Port 443 to internal or cloud-hosted repositories</span></span></label>
+          <label class="opt"><input type="checkbox" id="repoSmb">
+            <span class="opt-text"><b>SMB file shares</b><span>Port 445 to internal file servers</span></span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <p class="hint">Your answers regenerate the document on the right instantly — nothing is sent anywhere, everything runs in your browser.</p>
+  </aside>
+
+  <!-- ===================== RESULTS ===================== -->
+  <main class="results-pane">
+    <h2 class="page-title">Your CAST Imaging Deployment Requirements</h2>
+    <p class="page-sub" id="generated-date"></p>
+    <p class="page-sub">Generated live from the answers on the left. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.</p>
+
+    <div class="profile-chips" id="profile-chips"></div>
+
+    <div class="toolbar no-print">
+      <button class="btn secondary" onclick="window.print()">🖨 Print / Save as PDF</button>
+    </div>
+
+    <div class="callout warn no-print">
+      <b>Validation notice.</b> This tool derives recommendations from CAST Imaging's published
+      documentation structure and standard CAST deployment practices. Always confirm exact
+      minimum versions, default ports, and sizing against the current
+      <a href="https://doc.castsoftware.com/imaging/install/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install</a>
+      for the CAST Imaging release you are deploying.
+    </div>
+
+    <div id="results-content"></div>
+
+    <footer class="doc-footer">
+      CAST Imaging — Requirements Builder · Internal planning tool · Regenerated live in your browser
+      · <span id="tool-version"></span>
+    </footer>
+  </main>
+
+</div>
+
+<script>
+(function(){
+
+  // Bump this to today's date whenever a content-affecting edit ships (a fact, port, or
+  // label changes — not a pure refactor). This is the tool's own "last verified" marker,
+  // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
+  // clock and tells you nothing about how fresh the underlying content is.
+  var TOOL_VERSION = '2026-09-05';
+
+  var LABELS = {
+    scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
+    users:{tiny:'< 10 users', small:'10–50 users', medium:'50–200 users', large:'200+ users'},
+    platform:{docker:'Docker', podman:'Podman', kubernetes:'Kubernetes', windows:'Windows Server'},
+    scenario:{full:'Full (analysis + Viewer + Dashboards)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
+    topology:{single:'Single machine', multi:'Multi-machine'},
+    dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
+    egress:{direct:'Direct outbound', proxy:'Via proxy', airgapped:'Air-gapped'},
+    certSource:{'ca-issued':'CA-issued', 'self-signed':'Self-signed'},
+    reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', iis:'IIS + ARR', undecided:'TLS termination undecided'},
+    auth:{local:'Local accounts', saml:'SAML 2.0 SSO', ldap:'LDAP / Active Directory'},
+    llmProvider:{anthropic:'Anthropic API', openai:'OpenAI API', 'azure-openai':'Azure OpenAI', other:'Custom / internal LLM gateway'}
+  };
+
+  var LLM_FQDN = {
+    anthropic:'api.anthropic.com',
+    openai:'api.openai.com',
+    'azure-openai':'<your-resource>.openai.azure.com',
+    other:'(FQDN of your internal/alternate LLM gateway — determine and allowlist explicitly)'
+  };
+
+  // ---- Sizing baselines, keyed by scale. Component lists are composed dynamically from the selected scenario. ----
+  // Every disk figure respects CAST's documented absolute floor of 256GB free disk per node (SSD/high-IOPS).
+  var SIZING = {
+    poc:{
+      single:{cpu:4, ram:32, disk:256},
+      core:{cpu:2, ram:16, disk:256}, analysis:{cpu:2, ram:16, disk:256}, neo4j:{cpu:2, ram:16, disk:256},
+      singleNote:''
+    },
+    small:{
+      single:{cpu:8, ram:32, disk:300},
+      core:{cpu:4, ram:32, disk:256}, analysis:{cpu:4, ram:32, disk:256}, neo4j:{cpu:4, ram:32, disk:256},
+      singleNote:''
+    },
+    standard:{
+      single:{cpu:12, ram:48, disk:400},
+      core:{cpu:8, ram:32, disk:256}, analysis:{cpu:8, ram:32, disk:'500+'}, neo4j:{cpu:8, ram:32, disk:256},
+      singleNote:' (not recommended for production — prefer multi-machine)'
+    },
+    enterprise:{
+      single:{cpu:16, ram:64, disk:600},
+      core:{cpu:16, ram:64, disk:400}, analysis:{cpu:16, ram:64, disk:'1000+'}, neo4j:{cpu:8, ram:64, disk:400},
+      singleNote:' (strongly discouraged at this scale — use multi-machine/Kubernetes)'
+    }
+  };
+
+  // ---- Component lists per scenario, used to build sizing row labels ----
+  function coreComponentList(a){
+    var comps = ['imaging-services'];
+    if(hasViewer(a)) comps.push('imaging-viewer');
+    if(hasDashboards(a)) comps.push('dashboards');
+    if(a.dbHosting === 'colocated') comps.push('PostgreSQL');
+    if(hasNeo4j(a) && !(a.topology === 'multi' && a.neo4jDedicated)) comps.push('Neo4j');
+    return comps.join(' + ');
+  }
+  function allInOneComponentList(a){
+    var comps = ['imaging-services'];
+    if(hasAnalysis(a)) comps.push('analysis-node');
+    if(hasViewer(a)) comps.push('imaging-viewer');
+    if(hasDashboards(a)) comps.push('dashboards');
+    if(a.dbHosting === 'colocated') comps.push('PostgreSQL');
+    if(hasNeo4j(a)) comps.push('Neo4j');
+    return comps.join(' + ');
+  }
+
+  var ANALYSIS_NODE_COUNT = {'1':1, '2-3':2, '4+':4};
+
+  // Extra vCPU/RAM folded into the Viewer/Dashboards-serving node for concurrent browser sessions.
+  var USER_BONUS = {tiny:{cpu:0, ram:0}, small:{cpu:0, ram:0}, medium:{cpu:2, ram:8}, large:{cpu:4, ram:16}};
+
+  function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-only'; }
+  function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
+  function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
+  function hasNeo4j(a){ return hasViewer(a); }
+
+  function state(){
+    return {
+      scale: document.getElementById('scale').value,
+      users: document.getElementById('users').value,
+      platform: document.querySelector('input[name=platform]:checked').value,
+      scenario: document.getElementById('scenario').value,
+      topology: document.querySelector('input[name=topology]:checked').value,
+      analysisNodes: document.getElementById('analysisNodes').value,
+      neo4jDedicated: document.getElementById('neo4jDedicated').checked,
+      dbHosting: document.getElementById('dbHosting').value,
+      egress: document.querySelector('input[name=egress]:checked').value,
+      certSource: document.getElementById('certSource').value,
+      reverseProxy: document.getElementById('reverseProxy').value,
+      auth: document.querySelector('input[name=auth]:checked').value,
+      mcp: document.getElementById('mcp').checked,
+      llmProvider: document.getElementById('llmProvider').value,
+      highlight: document.getElementById('highlight').checked,
+      email: document.getElementById('email').checked,
+      repoHttps: document.getElementById('repoHttps').checked,
+      repoSmb: document.getElementById('repoSmb').checked
+    };
+  }
+
+  function esc(s){ return String(s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+
+  // ---- Port / FQDN matrix rows, each with a show(a) predicate ----
+  function buildPortRows(a){
+    var isK8s = a.platform === 'kubernetes';
+    var coreWord = isK8s ? 'core pods' : 'core node';
+    var unitWord = isK8s ? 'pod' : 'machine';
+    var dbPort = '5432';
+    var dbLabel = 'PostgreSQL';
+    var dbDest = 'PostgreSQL (' +
+      (a.dbHosting === 'dedicated' ? 'dedicated database server' :
+       a.dbHosting === 'managed' ? 'managed/clustered DBaaS' :
+       a.topology === 'multi' ? 'co-located with the ' + coreWord : (isK8s ? 'co-located with all pods' : 'co-located on the single host')) + ')';
+    var adminRows;
+    if(isK8s){
+      adminRows = [{src:'kubectl / CI pipelines', dst:'Kubernetes API server', port:'6443', proto:'TCP', purpose:'Cluster administration and CAST deployment/upgrade via Helm/manifests', tag:'mandatory'}];
+    } else if(a.platform === 'windows'){
+      adminRows = [{src:'Administrator workstation', dst:'CAST Imaging host (Windows)', port:'3389', proto:'RDP', purpose:'Server administration', tag:'mandatory'}];
+    } else {
+      adminRows = [{src:'Administrator workstation', dst:'CAST Imaging host (Linux)', port:'22', proto:'SSH', purpose:'Server administration', tag:'mandatory'}];
+    }
+
+    var podmanPortNote = a.platform === 'podman' ? ' — rootless Podman can\'t bind ports below 1024 by default; either lower net.ipv4.ip_unprivileged_port_start, grant CAP_NET_BIND_SERVICE, or publish to a high port and front it with something that can bind 80/443' : '';
+    var hasUi = hasDashboards(a) || hasViewer(a);
+    var rows = (hasUi ? [
+      {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'+podmanPortNote},
+      {src:'End-user browser', dst:'CAST Imaging Web', port:'8090', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled — CAST Imaging Web listens on 8090, not the standard port 80', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'+podmanPortNote},
+      {src:'End-user browser', dst:'Keycloak', port:'8096', proto:'HTTP/HTTPS', purpose:'CAST Imaging\'s embedded authentication/SSO broker — the browser is redirected here to sign in, whatever identity source (local, SAML, LDAP) is configured', tag:'mandatory', note:(a.reverseProxy !== 'undecided' ? 'If fronted by a reverse proxy, the proxy must forward this port/path too, not just CAST Imaging Web — otherwise sign-in breaks' : undefined)},
+      {src:'End-user browser', dst:'Eureka', port:'8098', proto:'HTTP/HTTPS', purpose:'Service discovery/registry endpoint the browser/frontend accesses directly', tag:'mandatory', note:(a.reverseProxy !== 'undecided' ? 'If fronted by a reverse proxy, the proxy must forward this port/path too' : undefined)}
+    ] : [
+      {src:'API client / CI pipeline', dst:'imaging-services', port:'443 or 8090 (matches your HTTPS/HTTP choice)', proto:'HTTP/HTTPS', purpose:'This scenario has no Viewer/Dashboards UI — imaging-services is consumed programmatically via CAST\'s REST APIs (delivery, analysis triggering, results retrieval) rather than through a browser', tag:'mandatory', note:'Headless scenario — no browser-facing ports (CAST Imaging Web UI, Keycloak, Eureka) are needed'+podmanPortNote},
+      {src:'API client / CI pipeline', dst:'Keycloak', port:'8096', proto:'HTTP/HTTPS', purpose:'Token issuance for API authentication — CAST\'s REST APIs may still require a Keycloak-issued OAuth2 token even without a human browser session', tag:'conditional', note:'Reasonable inference, not confirmed against your CAST Imaging release — check your API authentication docs before excluding this port'}
+    ]).concat(adminRows).concat([
+      {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened' : undefined)}
+    ]);
+
+    if(a.topology === 'multi' && hasAnalysis(a)){
+      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'443 or 8090 (matches '+coreWord+' HTTP/HTTPS setting)', proto:'HTTP/HTTPS', purpose:'Each analysis-node registers against imaging-services and exchanges analysis jobs/results — required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
+    }
+    if(a.topology === 'multi' && (a.platform === 'docker' || a.platform === 'podman')){
+      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The /opt/cast/shared parent folder must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 8'});
+    } else if(a.topology === 'multi' && a.platform === 'windows'){
+      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (deploy/delivery/common-data)', port:'445', proto:'SMB', purpose:'Windows file shares for the deploy/delivery/common-data folders, accessed under a service account whose credentials are consistent across every machine (see Section 1)', tag:'mandatory', note:'Exact folder layout not verified against CAST\'s Windows documentation — confirmed concept, not confirmed paths'});
+    }
+    if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated){
+      var neo4jDst = 'Neo4j (dedicated ' + (isK8s ? 'StatefulSet' : 'machine') + ')';
+      rows.push({src:'imaging-viewer', dst:neo4jDst, port:'7687', proto:'Bolt/TCP', purpose:'Graph database read/write for CAST Imaging Viewer — Neo4j\'s default Bolt port', tag:'mandatory', note:'Confirm against CAST\'s port reference if customized in your release'});
+      rows.push({src:'Backup/admin host', dst:neo4jDst, port:'6362', proto:'TCP', purpose:'Neo4j backup operations', tag:'conditional', note:'Only if backups are triggered from outside the Neo4j '+(isK8s?'pod':'machine')});
+    }
+
+    if(isK8s){
+      rows.push({src:'Worker nodes / kubelets', dst:'Control plane (API server, etcd, scheduler)', port:'Per your cluster\'s own network policy', proto:'TCP', purpose:'Standard Kubernetes control-plane/data-plane communication — provisioning and securing the cluster network is your Kubernetes administrator\'s responsibility, not a CAST-specific requirement', tag:'conditional', note:'Not a CAST-documented port — generic Kubernetes cluster networking, out of scope for this tool'});
+    }
+    if(a.egress === 'airgapped'){
+      rows.push({src:'CAST Extend Local Update Server', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Only outbound path for extensions, updates, licensing artifacts', tag:'mandatory'});
+      rows.push({src:'imaging-services', dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for product updates and licensing artifacts (no direct internet egress)', tag:'mandatory'});
+      if(hasAnalysis(a)){
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for the extensions catalog — technology analyzers used during analysis (no direct internet egress)', tag:'mandatory'});
+      }
+    } else {
+      var extendProxyNote = a.egress==='proxy' ? ' via your configured proxy' : '';
+      rows.push({src:'imaging-services', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Product updates and licensing artifacts'+extendProxyNote, tag:'mandatory'});
+      if(hasAnalysis(a)){
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Extensions catalog — technology analyzers used during analysis'+extendProxyNote, tag:'mandatory'});
+      }
+    }
+    if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes'){
+      if(a.egress === 'airgapped'){
+        rows.push({src:'CAST Imaging node(s)', dst:'Internal container registry (mirrored from Docker Hub)', port:'443', proto:'HTTPS', purpose:'CAST\'s images are published to Docker Hub — an air-gapped install needs them mirrored into a reachable internal registry before "compose up"/deploy', tag:'mandatory'});
+      } else {
+        rows.push({src:'CAST Imaging node(s)', dst:'registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com', port:'443', proto:'HTTPS', purpose:'Pull CAST\'s Docker Hub images at install/update time'+(a.egress==='proxy' ? ' via your configured proxy' : ''), tag:'mandatory', note:'Exact hostnames per Docker\'s own documented pull path — confirm CAST doesn\'t front them with its own registry for your release'});
+      }
+    }
+    if(a.highlight){
+      var highlightNote = 'Highlight integration selected' +
+        (a.egress === 'airgapped' ? ' — this is an external SaaS with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or Highlight must be dropped' :
+         a.egress === 'proxy' ? ' — reaches this external SaaS via your configured proxy' : '');
+      rows.push({src:'imaging-services', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote});
+      rows.push({src:'imaging-services', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote});
+      if(hasAnalysis(a)){
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote});
+      }
+    }
+
+    if(a.mcp){
+      rows.push({src:'MCP client (Claude Desktop / IDE / CI pipeline)', dst:'MCP Server (behind Gatekeeper)', port:'443 (exact port not confirmed — verify against your CAST Imaging release)', proto:'HTTPS', purpose:'Primary inbound path for MCP tool calls — Gatekeeper enforces authorization in front of the MCP Server', tag:'mandatory', note:'AI/MCP selected'});
+      rows.push({src:'MCP Server', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'Calls to the configured LLM provider for AI-assisted / MCP natural-language features', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+
+        (a.egress === 'airgapped' ? ' — this is an external API with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or an internal-only LLM gateway' :
+         a.egress === 'proxy' ? ' — reaches this external API via your configured proxy' : '')});
+      rows.push({src:'MCP Gatekeeper', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — this may be the same embedded Keycloak already listed above, or a separate IdP if the OAuth module is pointed elsewhere', tag:'conditional', note:'AI/MCP selected'});
+    }
+
+    if(a.repoHttps && hasAnalysis(a)){
+      rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'Source repository (Git/SVN/DevOps over HTTPS)', port:'443', proto:'HTTPS', purpose:'Source code retrieval for analysis delivery', tag:'mandatory'});
+    }
+    if(a.repoSmb && hasAnalysis(a)){
+      rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'Internal file share (SMB)', port:'445', proto:'SMB', purpose:'Access to network shares hosting source code / delivery packages', tag:'mandatory'});
+    }
+
+    if(a.auth === 'saml'){
+      rows.push({src:'Keycloak', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'SSO metadata exchange and assertion validation — brokered through CAST\'s embedded Keycloak, not imaging-services directly', tag:'mandatory', note:'SAML selected'});
+    }
+    if(a.auth === 'ldap'){
+      rows.push({src:'Keycloak', dst:'LDAP / Active Directory server', port:'389 / 636 (LDAPS)', proto:'TCP', purpose:'Directory lookup and authentication — brokered through CAST\'s embedded Keycloak, not imaging-services directly', tag:'mandatory', note:'LDAP selected'});
+    }
+    if(a.email){
+      rows.push({src:'imaging-services', dst:'SMTP relay', port:'25, 587, or 465', proto:'TCP', purpose:'Notification emails — pick the one port matching your relay\'s configuration (25 unauthenticated/relay-to-relay, 587 STARTTLS submission, 465 implicit TLS/SMTPS); opening all three is unnecessary', tag:'conditional', note:'Email notifications selected'});
+    }
+
+    return rows;
+  }
+
+  function tagHtml(t){
+    var label = {mandatory:'Mandatory', conditional:'Conditional', optional:'Optional', recommended:'Recommended'}[t] || t;
+    return '<span class="tag '+t+'">'+label+'</span>';
+  }
+
+  function stampGeneratedDate(){
+    var el = document.getElementById('generated-date');
+    if(!el) return;
+    var now = new Date();
+    var dateStr = now.toLocaleDateString(undefined, {year:'numeric', month:'long', day:'numeric'});
+    var timeStr = now.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
+    el.textContent = 'Generated ' + dateStr + ' at ' + timeStr;
+
+    var vEl = document.getElementById('tool-version');
+    if(vEl) vEl.textContent = 'Tool content last updated ' + TOOL_VERSION;
+  }
+
+  function render(){
+    stampGeneratedDate();
+    var a = state();
+
+    document.getElementById('mcp-sub').className = 'sub-block' + (a.mcp ? ' show' : '');
+    document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' && hasAnalysis(a) ? ' show' : '');
+    document.getElementById('neo4j-dedicated-sub').className = 'sub-block' + (a.topology === 'multi' && hasNeo4j(a) ? ' show' : '');
+    document.getElementById('topology-hint').textContent =
+      (a.scale === 'enterprise' && a.topology === 'single') ? 'Single machine is not recommended at Enterprise scale — consider Multi-machine or Kubernetes.' :
+      (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-machine is usually unnecessary for a POC — Single machine is simpler.' :
+      (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more machines to provision and maintain, network connectivity between machines must be correctly configured, and every machine must mount the same /opt/cast/shared network folder over SMB.' : '';
+
+    document.getElementById('source-access-hint').textContent = hasAnalysis(a) ? '' :
+      'Your scenario ('+LABELS.scenario[a.scenario]+') excludes analysis — these options won\'t add any firewall rows, since there\'s no analysis-node to check out source code.';
+
+    // profile chips
+    var chips = ['scale','users','platform','scenario','topology','egress','auth'].map(function(k){
+      return '<span class="chip">'+k+': <b>'+esc(LABELS[k][a[k]])+'</b></span>';
+    }).join('');
+    if(a.mcp) chips += '<span class="chip">MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
+    if(a.highlight) chips += '<span class="chip">Highlight: <b>enabled</b></span>';
+    document.getElementById('profile-chips').innerHTML = chips;
+
+    var sizeSpec = SIZING[a.scale];
+    var userBonus = USER_BONUS[a.users] || {cpu:0, ram:0};
+    var userBonusApplies = hasViewer(a) || hasDashboards(a);
+    var isK8s = a.platform === 'kubernetes';
+    var allInOneLabel = isK8s ? 'All pods' : 'All-in-one host';
+    var coreLabel = isK8s ? 'Core pods' : 'Core node';
+    var neo4jDedicatedLabel = isK8s ? 'Neo4j pod (dedicated StatefulSet, serves imaging-viewer)' : 'Neo4j machine (dedicated, serves imaging-viewer)';
+    var analysisLabel = isK8s ? 'Analysis-node pod' : 'Analysis-node machine';
+    var sizingRows;
+    if(a.topology === 'single'){
+      sizingRows = [{c:allInOneLabel + ' (' + allInOneComponentList(a) + ')' + sizeSpec.singleNote, cpu:sizeSpec.single.cpu, ram:sizeSpec.single.ram, disk:sizeSpec.single.disk}];
+    } else {
+      sizingRows = [{c:coreLabel + ' (' + coreComponentList(a) + ')', cpu:sizeSpec.core.cpu, ram:sizeSpec.core.ram, disk:sizeSpec.core.disk}];
+      if(hasNeo4j(a) && a.neo4jDedicated){
+        sizingRows.push({c:neo4jDedicatedLabel, cpu:sizeSpec.neo4j.cpu, ram:sizeSpec.neo4j.ram, disk:sizeSpec.neo4j.disk});
+      }
+      if(hasAnalysis(a)){
+        var nodeCount = ANALYSIS_NODE_COUNT[a.analysisNodes] || 1;
+        for(var i = 1; i <= nodeCount; i++){
+          sizingRows.push({c:analysisLabel + (nodeCount > 1 ? ' #' + i : ''), cpu:sizeSpec.analysis.cpu, ram:sizeSpec.analysis.ram, disk:sizeSpec.analysis.disk});
+        }
+      }
+    }
+    if(a.dbHosting === 'dedicated'){
+      sizingRows.push({c:'PostgreSQL machine (dedicated database server'+(isK8s ? ', typically outside the cluster' : '')+')', cpu:4, ram:32, disk:512});
+    }
+    if(a.dbHosting === 'managed'){
+      sizingRows.push({c:'PostgreSQL instance (managed/clustered DBaaS, primary + standby for HA)', cpu:8, ram:64, disk:1024});
+    }
+    if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
+      sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + userBonus.cpu, ram:sizingRows[0].ram + userBonus.ram, disk:sizingRows[0].disk};
+    }
+    if(a.mcp) sizingRows = sizingRows.concat([{c:'MCP Server (Imaging + Gatekeeper)' + (isK8s ? ' pods' : ''), cpu:2, ram:4, disk:20}]);
+
+    var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
+      (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk. "Single node pool" vs. one pod per row below mirrors the topology choice in Section 1, not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' : '') +
+      '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr></thead><tbody>' +
+      sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+esc(r.disk)+' GB</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+
+    if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
+      sizingHtml += '<div class="callout info">+'+userBonus.cpu+' vCPU / +'+userBonus.ram+' GB already folded into the '+(a.topology==='single'?allInOneLabel.toLowerCase():coreLabel.toLowerCase())+' above, to cover '+esc(LABELS.users[a.users])+' browsing the Viewer/Dashboards concurrently.</div>';
+    } else if(!userBonusApplies){
+      sizingHtml += '<div class="callout info">Your scenario excludes the Viewer/Dashboards, so concurrent end-user count does not add to server-side sizing here — it only affects the client-side requirements below.</div>';
+    }
+
+    if(hasNeo4j(a)){
+      sizingHtml += '<div class="callout info">Neo4j (bundled with imaging-viewer) needs <b>16 GB RAM minimum, 32 GB recommended</b> — it defaults to an initial/maximum JVM heap of 12 GB, tunable via <code>imaging-viewer/.env</code>. Sizing above already accounts for this.</div>';
+    }
+
+    if(a.dbHosting === 'managed'){
+      sizingHtml += '<div class="callout info">The managed/clustered DBaaS row is an equivalent-capacity planning figure, not a machine you provision yourself — your cloud provider (e.g. Amazon RDS, Azure Database for PostgreSQL, Google Cloud SQL) sizes and replicates the underlying nodes for you. Pick an instance tier that meets or exceeds it.</div>';
+    }
+
+    if(a.topology === 'multi' && hasAnalysis(a) && (a.analysisNodes === '2-3' || a.analysisNodes === '4+')){
+      sizingHtml += '<div class="callout info">Each analysis-node machine registers itself against the same imaging-services instance, letting analyses run in parallel across multiple applications. This is CAST Imaging\'s horizontal scaling mechanism for analysis workload — it does not scale imaging-services, imaging-viewer, dashboards, or PostgreSQL themselves.</div>';
+    }
+
+    if(a.scale === 'standard' || a.scale === 'enterprise'){
+      sizingHtml += '<div class="callout warn">Sizing scales with the number of applications delivered, retained snapshot history, and concurrent analyses/users. Re-validate after a pilot batch of real deliveries.</div>';
+    }
+
+    sizingHtml += '<div class="callout info">CAST\'s absolute floor is <b>256 GB free disk per node</b>, on SSD or equivalent high-IOPS storage (SAN configured with SSD) — the figures above already sit at or above that floor for your profile, but treat 256 GB as a hard minimum on any node regardless.</div>';
+    sizingHtml += '<div class="callout info">CAST\'s RAM floor differs by topology: <b>32 GB minimum for a standalone/all-in-one machine</b> (everything on one host), versus <b>16 GB minimum per node in a distributed/multi-machine deployment</b> — 32 GB recommended per node there too. The figures above already respect these floors.</div>';
+
+    var storageHtml = '';
+    if(a.platform === 'docker' || a.platform === 'podman'){
+      storageHtml = '<h4>Storage locations</h4><p>CAST Imaging uses <b>five main storage folders</b> per its documented model (deploy, delivery, common-data, plus database/graph data). On Docker/Podman, the confirmed defaults are:</p><ul>' +
+        '<li><code>/opt/cast/shared/delivery</code> — reference information about applications and their source-code deliveries</li>' +
+        '<li><code>/opt/cast/shared/common-data/&lt;custom-folder&gt;</code> — recommended location if you point analysis at a source-code folder directly; the analysis-node container already has access here</li>' +
+        (a.topology === 'multi' ? '<li>All of the above live under the shared <code>/opt/cast/shared</code> mount from Section 1/3 — required for every topology except a single all-in-one demo/POC machine</li>' : '') +
+        '</ul><p>Full paths for every folder, plus Windows- and cloud-specific storage layouts, are at CAST\'s reference pages: ' +
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/" target="_blank" rel="noopener">storage-locations</a>, ' +
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/docker/" target="_blank" rel="noopener">.../docker</a>' +
+        ' — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
+    } else if(a.platform === 'windows'){
+      storageHtml = '<h4>Storage locations</h4><p>CAST Storage Service/PostgreSQL on Windows defaults to <code>%PROGRAMFILES%\\CAST\\CASTStorageService&lt;version&gt;</code>, with the data directory controlled by the <code>DBDATADIR</code> installer variable. Full per-folder paths are at CAST\'s reference: ' +
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/windows/" target="_blank" rel="noopener">storage-locations/windows</a> — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
+    } else if(a.platform === 'kubernetes'){
+      storageHtml = '<h4>Storage locations</h4><p>On Kubernetes, storage is provisioned as persistent volumes/StorageClasses rather than host paths — for Azure/AKS, CAST defaults to Azure Disks (block storage) per node, with an optional move to Azure Files when running multiple analysis-node pods. See CAST\'s cloud reference: ' +
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/cloud/" target="_blank" rel="noopener">storage-locations/cloud</a> — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
+    }
+
+    var osRows = [];
+    if(a.platform === 'docker' || a.platform === 'podman'){
+      osRows.push(['Host OS', 'Linux, 64-bit (x64) only, glibc ≥ 2.28 — Server Core / non-glibc distros not supported']);
+      osRows.push(['Supported distributions', 'RHEL-family: RHEL 8, RHEL 9, Rocky Linux 8, Rocky Linux 9 · Debian-family: Debian 11, Debian 12, Ubuntu 22.04 LTS, Ubuntu 24.04 LTS']);
+      if(a.platform === 'docker'){
+        osRows.push(['Docker Engine / Compose', 'Docker Compose v2.x+ (the version embedded in current Docker Engine) — the installer runs "docker compose" (no hyphen); the legacy standalone "docker-compose" v1.x is <b>not</b> compatible']);
+        osRows.push(['Installing user', 'Must be in the <b>sudoers</b> list — the Docker installer requires sudo privileges']);
+      } else {
+        osRows.push(['Podman', '<b>Beta support</b> per CAST — the installer itself still relies on a "docker compose"-compatible CLI to create containers/networks/volumes/shares, so confirm your Podman + podman-compose combination provides that compatibility before relying on it for production']);
+        osRows.push(['Installing user', 'Can install as a <b>non-root user</b>, no sudo required. Containers are tied to that user\'s login session by default — run <code>loginctl enable-linger &lt;user&gt;</code> or they stop when the user logs out']);
+      }
+      osRows.push(['/tmp requirement', 'The installer uses <code>/tmp</code> during installation and needs it mounted with <b>exec</b> permission — if your hardening baseline mounts <code>/tmp</code> <code>noexec</code> (common on RHEL/CIS-hardened images), remount it <code>exec</code> or point the installer at an alternate temp dir with exec allowed']);
+      osRows.push(['SELinux', 'Treat enforcing mode on RHEL/Rocky as a risk for bind-mounted volumes (missing <code>:z</code>/<code>:Z</code> context) — verify against <a href="https://doc.castsoftware.com/imaging/install/requirements/software/" target="_blank" rel="noopener">requirements/software</a>']);
+      if(a.topology === 'multi'){
+        osRows.push(['UID/GID alignment', 'Not explicitly confirmed for Linux from what this tool could reach, but SMB-mounted shares typically fix ownership via mount-time <code>uid=</code>/<code>gid=</code> options — plan for a consistent service account/UID across every machine mounting <code>/opt/cast/shared</code>, the same way CAST documents for the Windows service account case']);
+      }
+    } else if(a.platform === 'windows'){
+      osRows.push(['Host OS', 'Windows Server 2016, 2019, or 2022, 64-bit (<b>Server Core is not supported</b>, Desktop Experience required); Windows 10/11 64-bit is also listed as supported']);
+      osRows.push(['Installing user', 'Requires <b>Full Control</b> permissions (directly or via group membership) on the root folder where CAST Imaging components are installed']);
+      if(a.topology === 'multi'){
+        osRows.push(['Service account / UID alignment', 'For shared network services (deploy/delivery/common-data folders), use a dedicated service account whose credentials are consistent across every machine — the Windows Service that accesses the share runs as that account, so it must resolve and authenticate identically everywhere']);
+      }
+    } else if(a.platform === 'kubernetes'){
+      osRows.push(['Cluster tooling', 'A running Kubernetes cluster with <code>helm</code> and <code>kubectl</code> available — CAST installs via Helm charts; confirm your cluster\'s Kubernetes version against CAST\'s current release notes (not pinned down by this tool)']);
+    }
+    var osHtml = osRows.length ? ('<h4>Operating system / runtime versions</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Requirement</th></tr></thead><tbody>' +
+      osRows.map(function(r){ return '<tr><td>'+esc(r[0])+'</td><td>'+r[1]+'</td></tr>'; }).join('') +
+      '</tbody></table></div>') : '';
+
+    sizingHtml += osHtml + storageHtml + '<h4>Client-side requirements</h4><div class="tbl-wrap"><table><thead><tr><th>Profile</th><th>Requirement</th></tr></thead><tbody>' +
+      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs</td></tr>' +
+      '<tr><td>Delivery / analyst workstation</td><td>Same as above, plus local disk for source checkouts, a compatible JDK (≥ 17 LTS and ≤ 21, 64-bit, with <code>JAVA_HOME</code> set), and SCM client tools for the repositories selected in Section 8</td></tr>' +
+      '</tbody></table></div>';
+
+    var dbHtml = '<h3>2. Database requirements</h3>' +
+      '<h4>PostgreSQL (RDBMS)</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
+      '<tr><td>Engine</td><td>PostgreSQL — port 5432 (the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data)</td></tr>' +
+      '<tr><td>Version</td><td>' +
+        (a.dbHosting==='colocated'
+          ? 'The bundled '+((a.platform==='docker'||a.platform==='podman')?'Docker':'')+' image ships <b>PostgreSQL 15</b> — pinned by CAST, nothing for you to choose.'
+          : 'You provision PostgreSQL yourself: on Windows, install from EnterpriseDB; on Linux, from the distribution\'s official PostgreSQL repository (or run it in Docker). CAST currently recommends <b>PostgreSQL 18.x</b> for a self-provisioned instance.') +
+        ' The legacy <b>CAST Storage Service is end-of-life</b> — deployments still on it must migrate to standard PostgreSQL. Confirm the full supported/minimum version range against <a href="https://doc.castsoftware.com/imaging/install/requirements/db/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/db</a> before provisioning'+(a.dbHosting!=='colocated' ? ' your '+esc(LABELS.dbHosting[a.dbHosting]).toLowerCase()+' instance' : '')+'.</td></tr>' +
+      '<tr><td>Hosting</td><td>'+esc(LABELS.dbHosting[a.dbHosting])+
+        (a.dbHosting==='colocated' && (a.scale==='standard'||a.scale==='enterprise') ? ' — <b>not recommended</b> at this scale; move to a dedicated or managed instance' : '') +
+      '</td></tr>' +
+      '<tr><td>Character set</td><td>UTF-8 required; case-sensitive collation as specified by CAST for your CAST Imaging release</td></tr>' +
+      '<tr><td>High availability</td><td>' + (a.scale==='enterprise' ? 'Required — use a managed/clustered instance with replication' : 'Optional — plan regular automated backups regardless') + '</td></tr>' +
+      '</tbody></table></div>' +
+      '<h4>Neo4j (graph store)</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
+      (hasNeo4j(a) ?
+        '<tr><td>Requirement</td><td>Bundled with imaging-viewer — not a user-selectable engine; an ETL loads analysis results from PostgreSQL into Neo4j for the Viewer</td></tr>' +
+        '<tr><td>Ports</td><td>7687 (Bolt) / 6362 (backup)</td></tr>' +
+        '<tr><td>Hosting</td><td>' + (a.topology==='multi' && a.neo4jDedicated ? '<b>Deployed on its own dedicated machine</b> per your topology answer.' : 'Co-located with imaging-viewer.') + '</td></tr>' +
+        '<tr><td>Memory</td><td><b>16 GB RAM minimum, 32 GB recommended</b> — defaults to a 12 GB initial/maximum JVM heap, tunable via <code>imaging-viewer/.env</code></td></tr>'
+        : '<tr><td>Requirement</td><td>Not required — your scenario ('+esc(LABELS.scenario[a.scenario])+') excludes the Viewer.</td></tr>') +
+      '</tbody></table></div>';
+
+    var portRows = buildPortRows(a);
+
+    var netHtml = '<h3>3. Network ports &amp; FQDN allowlist — tailored to your answers</h3>' +
+      '<p>Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.</p>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Protocol</th><th>Reason</th><th></th></tr></thead><tbody>' +
+      portRows.map(function(r){
+        return '<tr><td>'+esc(r.src)+'</td><td>'+esc(r.dst)+'</td><td>'+esc(r.port)+'</td><td>'+esc(r.proto)+'</td><td>'+esc(r.purpose)+(r.note?' <span class="hint">— '+esc(r.note)+'</span>':'')+'</td><td>'+tagHtml(r.tag)+'</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+
+    var httpsHtml = '<h3>4. HTTPS / TLS</h3>' +
+      '<div class="callout info"><b>HTTPS is recommended, not mandatory.</b> CAST Imaging can be served over plain HTTP; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment.</div>' +
+      '<ul>' +
+      '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : '.') + '</li>' +
+      '<li>TLS termination: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — decide before install day; this determines the firewall path in Section 3.' : '.') + '</li>' +
+      '<li>If you enable HTTPS, the customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
+      '<li>If HTTPS is enabled, disable plain HTTP (port 8090 — CAST Imaging Web\'s actual HTTP port, not the standard port 80) once it is confirmed working, or keep only an HTTPS→redirect rule.</li>' +
+      ((a.platform === 'docker' || a.platform === 'podman') && a.reverseProxy === 'nginx' ?
+        '<li>On '+(a.platform==='podman'?'Podman':'Docker')+', CAST\'s documented approach is a dedicated Nginx vHost <code>.conf</code> file with <code>ssl_certificate</code> / <code>ssl_certificate_key</code> directives, <code>ssl_protocols TLSv1.2</code> or higher, and server cipher preference enabled — not a CAST-specific certificate variable.</li>' +
+        '<li><b>The private key must not be encrypted</b> ("BEGIN ENCRYPTED PRIVATE KEY") — CAST\'s bundled Nginx does not support encrypted keys; strip the passphrase before use.</li>' +
+        '<li>Self-signed certificates must be installed/trusted on every workstation that accesses CAST Imaging, or users will see browser warnings.</li>' +
+        '<li>Behind any reverse proxy: forward <code>X-Forwarded-For</code>, <code>X-Forwarded-Proto</code>, <code>X-Forwarded-Host</code>, and set <code>KC_PROXY=edge</code>, <code>KC_PROXY_HEADERS=xforwarded</code>, <code>PROXY_ADDRESS_FORWARDING=true</code> in <code>cast_imaging_services/.env</code> (and <code>cast_imaging_viewer/.env</code> if the Viewer is deployed) — otherwise redirects and asset URLs will be generated wrong.</li>' +
+        '<li>Serving CAST Imaging under a URL path prefix (e.g. <code>https://host/imaging</code>) additionally requires setting <code>APP_CONTEXT</code> and editing <code>cast_imaging_services/docker-compose.override.yml</code> — see CAST\'s reverse-proxy-with-context-URL reference.</li>'
+        : '') +
+      '</ul>';
+
+    var authHtml = '<h3>5. Authentication prerequisites</h3>';
+    if(a.auth === 'local'){
+      authHtml += '<ul><li>No external identity provider required.</li><li>Plan initial admin password rotation and manual account lifecycle management.</li><li>Recommended even alongside SSO: keep a break-glass local admin account.</li></ul>';
+    } else if(a.auth === 'saml'){
+      authHtml += '<ul>' +
+        '<li>Gather IdP metadata (or manually: Entity ID, SSO URL, signing certificate) from your identity team.</li>' +
+        '<li>Register CAST Imaging as a Service Provider at the IdP.</li>' +
+        '<li>Agree attribute/claim mapping (email, name, groups → CAST Imaging roles) before go-live.</li>' +
+        '<li>Network: HTTPS (443) reachable between browser ⇄ IdP and CAST Imaging ⇄ IdP (see Section 3).</li>' +
+        '<li>Keep a local break-glass administrator account in case of IdP outage.</li>' +
+        '</ul>';
+    } else {
+      authHtml += '<ul>' +
+        '<li>LDAP(S) server hostname/port, and a bind (service) account with read access.</li>' +
+        '<li>Base DN(s) for user and group search.</li>' +
+        '<li>Group-to-role mapping agreed with the directory team.</li>' +
+        '<li>If using LDAPS (port 636), the CA certificate must be trusted by the CAST Imaging host.</li>' +
+        '</ul>';
+    }
+
+    var extendHtml = '<h3>6. CAST Extend access &amp; licensing</h3><ul>' +
+      (a.egress === 'airgapped'
+        ? '<li>Deploy a <b>CAST Extend Local Update Server</b> inside your network — it is the only component requiring outbound internet access (to <code>extend.castsoftware.com</code>, port 443); all CAST Imaging nodes then pull from it internally.</li>'
+        : '<li>Allow outbound HTTPS (443) from the CAST Imaging node to <code>extend.castsoftware.com</code>' + (a.egress==='proxy' ? ' via your configured proxy' : '') + '.</li>') +
+      '<li>Generate an <b>API key from the CAST Extend website</b> and configure it in CAST Imaging / CAST Extend client to authenticate extension downloads.</li>' +
+      '<li>Obtain a valid <b>CAST Imaging license file</b> from your CAST account team; confirm it covers the modules you selected (MCP/AI: '+(a.mcp?'<b>yes</b>':'no')+'; Highlight integration: '+(a.highlight?'<b>yes</b>':'no')+').</li>' +
+      '<li>Store the license file and the API key in a secrets store — not in plain configuration files under version control.</li>' +
+      '</ul>';
+
+    var mcpHtml = '';
+    if(a.mcp){
+      mcpHtml = '<h3>{N}. MCP Servers (AI features) — enabled</h3><ul>' +
+        '<li>Deploy the CAST Imaging MCP Server alongside a reachable CAST Imaging instance.</li>' +
+        '<li>Front it with <b>Gatekeeper</b> for tool/application-level authorization policy.</li>' +
+        '<li>Configure the <b>OAuth module</b> against an OAuth2/OIDC provider (can reuse your SAML/LDAP IdP if OIDC-capable) so MCP clients authenticate as the requesting user.</li>' +
+        '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> (no wildcards).</li>' +
+        '<li>Sizing: ~2 vCPU / 4 GB RAM per MCP service (already added to Section 1).</li>' +
+        '</ul>';
+    }
+
+    var checklist = [];
+    checklist.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(LABELS.topology[a.topology])+')');
+    checklist.push('<code>curl</code> installed on every machine that runs the installer — required for the installer\'s own service health checks (CAST requirements precheck)');
+    if(a.platform === 'docker') checklist.push('Installing user confirmed in the sudoers list on every machine');
+    if(a.platform === 'podman') checklist.push('Rootless install plan confirmed, including <code>loginctl enable-linger</code> for the installing user so containers survive logout');
+    if(a.platform === 'docker' || a.platform === 'podman') checklist.push('/tmp confirmed mounted with exec permission on every machine (remount or redirect if your hardening baseline sets noexec)');
+    if(a.topology === 'multi' && hasAnalysis(a)) checklist.push('Network connectivity correctly configured between the core node and every analysis-node machine ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)');
+    if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) checklist.push('Network connectivity correctly configured between imaging-viewer and the dedicated Neo4j machine (Bolt port 7687)');
+    if(a.topology === 'multi') checklist.push('Shared network folder (NAS/SAN, SMB only) provisioned and mounted as /opt/cast/shared on every machine before install');
+    checklist.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
+    checklist.push('TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and TLS termination configured ('+esc(LABELS.reverseProxy[a.reverseProxy])+')');
+    checklist.push('All firewall rules from Section 3 opened before install day');
+    checklist.push(a.egress === 'airgapped' ? 'CAST Extend Local Update Server deployed and reachable' : 'Outbound access to extend.castsoftware.com confirmed' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
+    if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes') checklist.push(a.egress === 'airgapped' ? 'CAST\'s Docker Hub images mirrored into a reachable internal registry' : 'Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST\'s images');
+    checklist.push('CAST Extend API key generated and stored securely');
+    checklist.push('CAST Imaging license file obtained, covering the selected modules');
+    if(a.auth === 'saml') checklist.push('SAML metadata exchanged and CAST Imaging registered as a Service Provider at the IdP');
+    if(a.auth === 'ldap') checklist.push('LDAP bind account, base DN(s), and group mapping confirmed');
+    if(a.mcp) checklist.push('MCP Server + Gatekeeper + OAuth module deployed; LLM provider FQDN allowlisted');
+    if(a.highlight) checklist.push('CAST Highlight FQDNs allowlisted (cloud/auth/binaries)');
+    if(a.platform === 'kubernetes') checklist.push('Cluster namespace, RBAC, StorageClass, and Ingress/TLS secret prepared');
+    checklist.push('End-user and delivery workstation requirements communicated to stakeholders');
+
+    var optionalSections = [mcpHtml].filter(function(h){ return h; });
+    var nextNum = 7;
+    var optionalHtml = optionalSections.map(function(h){ return h.replace('{N}', String(nextNum++)); }).join('');
+    var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist for your profile</h3><ul class="checklist">' +
+      checklist.map(function(c){ return '<li>'+c+'</li>'; }).join('') + '</ul>';
+
+    document.getElementById('results-content').innerHTML =
+      sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + optionalHtml + checklistHtml;
+  }
+
+  document.getElementById('form-pane').addEventListener('input', render);
+  document.getElementById('form-pane').addEventListener('change', render);
+  render();
+})();
+</script>
+</body>
+</html>
