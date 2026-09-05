@@ -484,9 +484,10 @@
         rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for the extensions catalog — technology analyzers used during analysis (no direct internet egress)', tag:'mandatory'});
       }
     } else {
-      rows.push({src:'imaging-services', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Product updates and licensing artifacts', tag:'mandatory'});
+      var extendProxyNote = a.egress==='proxy' ? ' via your configured proxy' : '';
+      rows.push({src:'imaging-services', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Product updates and licensing artifacts'+extendProxyNote, tag:'mandatory'});
       if(hasAnalysis(a)){
-        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Extensions catalog — technology analyzers used during analysis', tag:'mandatory'});
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Extensions catalog — technology analyzers used during analysis'+extendProxyNote, tag:'mandatory'});
       }
     }
     if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes'){
@@ -497,7 +498,9 @@
       }
     }
     if(a.highlight){
-      var highlightNote = 'Highlight integration selected' + (a.egress === 'airgapped' ? ' — this is an external SaaS with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or Highlight must be dropped' : '');
+      var highlightNote = 'Highlight integration selected' +
+        (a.egress === 'airgapped' ? ' — this is an external SaaS with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or Highlight must be dropped' :
+         a.egress === 'proxy' ? ' — reaches this external SaaS via your configured proxy' : '');
       rows.push({src:'imaging-services', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote});
       rows.push({src:'imaging-services', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote});
       if(hasAnalysis(a)){
@@ -507,7 +510,9 @@
 
     if(a.mcp){
       rows.push({src:'MCP client (Claude Desktop / IDE / CI pipeline)', dst:'MCP Server (behind Gatekeeper)', port:'443 (exact port not confirmed — verify against your CAST Imaging release)', proto:'HTTPS', purpose:'Primary inbound path for MCP tool calls — Gatekeeper enforces authorization in front of the MCP Server', tag:'mandatory', note:'AI/MCP selected'});
-      rows.push({src:'MCP Server', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'Calls to the configured LLM provider for AI-assisted / MCP natural-language features', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+(a.egress === 'airgapped' ? ' — this is an external API with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or an internal-only LLM gateway' : '')});
+      rows.push({src:'MCP Server', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'Calls to the configured LLM provider for AI-assisted / MCP natural-language features', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+
+        (a.egress === 'airgapped' ? ' — this is an external API with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or an internal-only LLM gateway' :
+         a.egress === 'proxy' ? ' — reaches this external API via your configured proxy' : '')});
       rows.push({src:'MCP Gatekeeper', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — this may be the same embedded Keycloak already listed above, or a separate IdP if the OAuth module is pointed elsewhere', tag:'conditional', note:'AI/MCP selected'});
     }
 
