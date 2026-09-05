@@ -5,6 +5,17 @@ description: Audit and fix a section of index.html, the interactive CAST Imaging
 
 # CAST Imaging tool audit
 
+## Goal
+
+This tool derives recommendations from CAST Imaging's published documentation structure and
+standard CAST deployment practices — that sentence is index.html's own validation notice to its
+users, and it is the bar every claim in the file has to clear. This skill's job is to keep that
+promise true: every fact the tool asserts (a port, a supported engine, a mandatory-vs-optional
+label, a component name) should trace back to a CAST doc, a directly-confirmed correction, or a
+clearly-labeled inference — never to an invented plausible-sounding detail. When you can't verify
+something, the fix is to say so in the tool's own text (see the "not independently verified"
+precedent already in the file), not to silently assert it.
+
 index.html is a single-file, client-side requirements builder: a questionnaire on the left (platform, scenario, topology, database hosting, egress, auth, integrations...) drives JS in `render()` that generates sizing tables, a network-port/FQDN matrix, and prerequisite checklists on the right. Every section is supposed to react correctly to every combination of answers. Because it's one big file that's grown incrementally, the most valuable thing you can do when asked to "check X" is hunt for places where a row or number reflects a *stale* assumption instead of the *current* combination of answers on screen.
 
 This is a repeatable audit-and-fix loop, not a one-off task — apply it fresh each time, even for a topic you've checked before, since fixes elsewhere in the file can introduce new inconsistencies.

@@ -353,22 +353,22 @@
     poc:{
       single:{cpu:4, ram:32, disk:256},
       core:{cpu:2, ram:16, disk:256}, analysis:{cpu:2, ram:16, disk:256}, neo4j:{cpu:2, ram:16, disk:256},
-      singleNote:'', multiNote:''
+      singleNote:''
     },
     small:{
       single:{cpu:8, ram:32, disk:300},
       core:{cpu:4, ram:32, disk:256}, analysis:{cpu:4, ram:32, disk:256}, neo4j:{cpu:4, ram:32, disk:256},
-      singleNote:'', multiNote:''
+      singleNote:''
     },
     standard:{
       single:{cpu:12, ram:48, disk:400},
       core:{cpu:8, ram:32, disk:256}, analysis:{cpu:8, ram:32, disk:'500+'}, neo4j:{cpu:8, ram:32, disk:256},
-      singleNote:' (not recommended for production — prefer multi-machine)', multiNote:''
+      singleNote:' (not recommended for production — prefer multi-machine)'
     },
     enterprise:{
       single:{cpu:16, ram:64, disk:600},
       core:{cpu:16, ram:64, disk:400}, analysis:{cpu:16, ram:64, disk:'1000+'}, neo4j:{cpu:8, ram:64, disk:400},
-      singleNote:' (strongly discouraged at this scale — use multi-machine/Kubernetes)', multiNote:''
+      singleNote:' (strongly discouraged at this scale — use multi-machine/Kubernetes)'
     }
   };
 
