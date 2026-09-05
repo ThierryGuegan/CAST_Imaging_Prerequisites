@@ -28,6 +28,12 @@ Find every place in index.html that touches the topic you were asked about — t
 
 The user's info comes from `doc.castsoftware.com`. In this environment that domain is blocked at the network egress level for direct fetch — expect `WebFetch` to fail with `EGRESS_BLOCKED` on every attempt, not just some. Don't waste more than one try confirming that before falling back to `WebSearch`, which reaches the same content via cached snippets and usually surfaces enough to work with.
 
+Don't guess which doc page might be relevant — `references/documentation-map.md` maps every
+section of index.html to the specific `doc.castsoftware.com` page(s) that should back its
+claims (plus which pages are already cited as live links inside the file itself). Read it before
+searching so you're verifying against the right page on the first try, not a plausible-sounding
+wrong one.
+
 Hold every claim to a clear bar:
 - **Confirmed** — a search snippet states it directly. Fine to assert as fact.
 - **Reasonable inference** — implied by confirmed facts plus general technical knowledge (e.g., rootless Podman can't bind privileged ports — that's general Linux behavior, not something you need CAST to confirm). Fine to include, but say why you believe it.
