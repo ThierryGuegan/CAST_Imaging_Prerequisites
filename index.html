@@ -432,7 +432,10 @@
     var unitWord = isK8s ? 'pod' : 'machine';
     var dbPort = '5432';
     var dbLabel = 'PostgreSQL';
-    var dbDest = 'PostgreSQL (' + (a.topology === 'multi' ? 'co-located with the ' + coreWord : (isK8s ? 'co-located with all pods' : 'co-located on the single host')) + ')';
+    var dbDest = 'PostgreSQL (' +
+      (a.dbHosting === 'dedicated' ? 'dedicated database server' :
+       a.dbHosting === 'managed' ? 'managed/clustered DBaaS' :
+       a.topology === 'multi' ? 'co-located with the ' + coreWord : (isK8s ? 'co-located with all pods' : 'co-located on the single host')) + ')';
     var adminRows;
     if(isK8s){
       adminRows = [{src:'kubectl / CI pipelines', dst:'Kubernetes API server', port:'6443', proto:'TCP', purpose:'Cluster administration and CAST deployment/upgrade via Helm/manifests', tag:'mandatory'}];
@@ -446,7 +449,7 @@
       {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'},
       {src:'End-user browser', dst:'CAST Imaging Web', port:'80', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'}
     ].concat(adminRows).concat([
-      {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory'}
+      {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened' : undefined)}
     ]);
 
     if(a.topology === 'multi' && hasAnalysis(a)){
