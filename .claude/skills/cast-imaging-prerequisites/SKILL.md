@@ -1,6 +1,6 @@
 ---
 name: cast-imaging-prerequisites
-description: Audit and fix a section of index.html, the interactive CAST Imaging deployment-requirements builder in this repo. Use this whenever the user says "check the network ports for X", "check the hardware sizing for X", "check X" for any platform/scenario/section of the tool (docker, podman, kubernetes, windows, authentication, MCP, source code access, email, extensions, database, HTTPS, etc.), or otherwise asks you to review, audit, verify, or double-check part of the requirements builder against CAST's documentation. Also use it any time you're about to edit index.html's JS logic for correctness, since it captures the verify-fix-test-ship loop this repo expects.
+description: Audit and fix a section of index.html, the interactive CAST Imaging deployment-requirements builder in this repo — or build index.html from scratch if it's missing or you're asked to rebuild/regenerate/recreate it. Use this whenever the user says "check the network ports for X", "check the hardware sizing for X", "check X" for any platform/scenario/section of the tool (docker, podman, kubernetes, windows, authentication, MCP, source code access, email, extensions, database, HTTPS, etc.), asks you to review, audit, verify, or double-check part of the requirements builder against CAST's documentation, or asks you to build/rebuild/regenerate/scaffold/recreate the tool (including "build a new index.html from scratch"). Also use it any time you're about to edit index.html's JS logic for correctness, since it captures both the tool's architecture and the verify-fix-test-ship loop this repo expects.
 ---
 
 # CAST Imaging tool audit
@@ -19,6 +19,21 @@ precedent already in the file), not to silently assert it.
 index.html is a single-file, client-side requirements builder: a questionnaire on the left (platform, scenario, topology, database hosting, egress, auth, integrations...) drives JS in `render()` that generates sizing tables, a network-port/FQDN matrix, and prerequisite checklists on the right. Every section is supposed to react correctly to every combination of answers. Because it's one big file that's grown incrementally, the most valuable thing you can do when asked to "check X" is hunt for places where a row or number reflects a *stale* assumption instead of the *current* combination of answers on screen.
 
 This is a repeatable audit-and-fix loop, not a one-off task — apply it fresh each time, even for a topic you've checked before, since fixes elsewhere in the file can introduce new inconsistencies.
+
+## 0. Building index.html from scratch
+
+If index.html doesn't exist, or you've been asked to rebuild/regenerate/recreate it, don't start
+from a blank page and improvise the architecture — read `references/architecture-spec.md` first.
+It documents the layout, the questionnaire sections, the state model, the `has*(a)` predicate
+pattern, the sizing and ports-matrix data shapes, and the confidence-labeling convention this tool
+has converged on through many audit passes. Building to that spec means your first draft starts
+from the same discipline an audit would otherwise have to impose after the fact.
+
+A from-scratch build is not exempt from anything below — steps 1 through 6 still apply to what you
+just wrote. Treat your own new file exactly like a section under audit: verify its claims against
+`references/documentation-map.md`, hunt it for the same bug shapes in step 3, and run the same
+Playwright regression sweep in step 5 before shipping. The spec describes *shape*; it doesn't
+replace fact-checking the *content* you fill that shape with.
 
 ## 1. Read before you judge
 
