@@ -488,9 +488,11 @@
     }
     if(a.highlight){
       var highlightNote = 'Highlight integration selected' + (a.egress === 'airgapped' ? ' — this is an external SaaS with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or Highlight must be dropped' : '');
-      rows.push({src:'CAST Imaging', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote});
-      rows.push({src:'CAST Imaging', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote});
-      rows.push({src:'CAST Imaging', dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote});
+      rows.push({src:'imaging-services', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote});
+      rows.push({src:'imaging-services', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote});
+      if(hasAnalysis(a)){
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote});
+      }
     }
 
     if(a.mcp){
