@@ -81,6 +81,13 @@ Print the rendered table/section text for a couple of representative combination
 
 ## 6. Ship it: commit, catch the branch up, then PR
 
+If your fix changed any fact the tool asserts (a port, a label, a version, a gating condition —
+anything a reader would act on), bump `TOOL_VERSION` near the top of the `<script>` block to
+today's date before committing. It's the footer's "Tool content last updated" marker, and it
+exists so a reader can tell how stale the content might be — it goes stale itself the moment a
+real fix ships without updating it. Skip the bump only for changes that don't touch content (CSS,
+refactors, comments).
+
 Work happens on the existing branch for this task (check `git branch` / recent commits if unsure which one). Commit with a message that explains *why* the change matters, ending with:
 
 ```

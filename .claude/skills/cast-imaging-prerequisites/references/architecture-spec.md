@@ -192,6 +192,17 @@ optional section, add its (empty-string-by-default) variable to the `optionalSec
 the order you want it numbered — order in that array is numbering order, not declaration order
 elsewhere in the function.
 
+## Content freshness marker
+
+A `TOOL_VERSION` constant near the top of the `<script>` block (a plain date string) is displayed
+in the footer as "Tool content last updated {date}" — set once by a small function alongside
+`stampGeneratedDate()`. This is deliberately separate from the "Generated {timestamp}" line near
+the top of the results pane: that one just reflects the viewer's own clock at page-load time and
+says nothing about the content, while `TOOL_VERSION` is a human-maintained marker of when a fact
+in the tool last actually changed. Bump it to today's date whenever a content-affecting fix ships
+(see `SKILL.md` step 6) — a stale `TOOL_VERSION` is worse than none, since it actively tells the
+reader the content is fresher than it is.
+
 Wire `render()` to fire on both `input` and `change` events delegated from the form pane (covers
 text/select/radio/checkbox uniformly), plus once on load.
 

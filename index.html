@@ -317,7 +317,8 @@
     <div id="results-content"></div>
 
     <footer class="doc-footer">
-      CAST Imaging — Requirements Builder · Internal planning tool · Regenerated live in your browser.
+      CAST Imaging — Requirements Builder · Internal planning tool · Regenerated live in your browser
+      · <span id="tool-version"></span>
     </footer>
   </main>
 
@@ -325,6 +326,12 @@
 
 <script>
 (function(){
+
+  // Bump this to today's date whenever a content-affecting edit ships (a fact, port, or
+  // label changes — not a pure refactor). This is the tool's own "last verified" marker,
+  // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
+  // clock and tells you nothing about how fresh the underlying content is.
+  var TOOL_VERSION = '2026-09-05';
 
   var LABELS = {
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
@@ -548,6 +555,9 @@
     var dateStr = now.toLocaleDateString(undefined, {year:'numeric', month:'long', day:'numeric'});
     var timeStr = now.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
     el.textContent = 'Generated ' + dateStr + ' at ' + timeStr;
+
+    var vEl = document.getElementById('tool-version');
+    if(vEl) vEl.textContent = 'Tool content last updated ' + TOOL_VERSION;
   }
 
   function render(){
