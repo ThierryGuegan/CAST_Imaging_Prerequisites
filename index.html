@@ -461,7 +461,7 @@
     ]);
 
     if(a.topology === 'multi' && hasAnalysis(a)){
-      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'443 or 80 (matches '+coreWord+' HTTP/HTTPS setting)', proto:'HTTP/HTTPS', purpose:'Each analysis-node registers against imaging-services and exchanges analysis jobs/results — required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
+      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'443 or 8090 (matches '+coreWord+' HTTP/HTTPS setting)', proto:'HTTP/HTTPS', purpose:'Each analysis-node registers against imaging-services and exchanges analysis jobs/results — required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
     }
     if(a.topology === 'multi' && (a.platform === 'docker' || a.platform === 'podman')){
       rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The /opt/cast/shared parent folder must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 8'});
@@ -728,7 +728,7 @@
       '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : '.') + '</li>' +
       '<li>TLS termination: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — decide before install day; this determines the firewall path in Section 3.' : '.') + '</li>' +
       '<li>If you enable HTTPS, the customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
-      '<li>If HTTPS is enabled, disable plain HTTP (port 80) once it is confirmed working, or keep only an HTTPS→redirect rule on port 80.</li>' +
+      '<li>If HTTPS is enabled, disable plain HTTP (port 8090 — CAST Imaging Web\'s actual HTTP port, not the standard port 80) once it is confirmed working, or keep only an HTTPS→redirect rule.</li>' +
       ((a.platform === 'docker' || a.platform === 'podman') && a.reverseProxy === 'nginx' ?
         '<li>On '+(a.platform==='podman'?'Podman':'Docker')+', CAST\'s documented approach is a dedicated Nginx vHost <code>.conf</code> file with <code>ssl_certificate</code> / <code>ssl_certificate_key</code> directives, <code>ssl_protocols TLSv1.2</code> or higher, and server cipher preference enabled — not a CAST-specific certificate variable.</li>' +
         '<li><b>The private key must not be encrypted</b> ("BEGIN ENCRYPTED PRIVATE KEY") — CAST\'s bundled Nginx does not support encrypted keys; strip the passphrase before use.</li>' +
