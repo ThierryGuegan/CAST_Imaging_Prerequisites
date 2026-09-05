@@ -48,6 +48,21 @@ be a search-and-fix pass, not a rename in isolation.
    sub-blocks that only show when relevant (analysis-node count when topology is multi and the
    scenario includes analysis; a Neo4j-dedicated-machine checkbox when topology is multi and the
    scenario includes the Viewer).
+
+   The scenario `<select>` has exactly these four `value`s — don't infer a different set from the
+   predicates alone; the predicates are derived from these four, not the other way around:
+
+   | `value` | Meaning | Components | `hasAnalysis` | `hasViewer` | `hasDashboards` |
+   |---|---|---|---|---|---|
+   | `full` | Everything | imaging-services, analysis-node, imaging-viewer, dashboards | ✓ | ✓ | ✓ |
+   | `viewer-readonly` | Browse existing results only | imaging-services, imaging-viewer, dashboards (no analysis-node) | | ✓ | ✓ |
+   | `dashboards-only` | KPIs only, no graph drill-down | imaging-services, dashboards (no Viewer, no analysis-node) | | | ✓ |
+   | `analysis-only` | Headless, API/CI-driven | imaging-services, analysis-node (no UI at all) | ✓ | | |
+
+   `hasNeo4j(a)` is just `hasViewer(a)` (Neo4j only exists to serve the Viewer, so don't give it
+   an independent definition). If you ever add a fifth scenario, add its row to this table first,
+   then work out which predicates it should satisfy — don't reverse-engineer a scenario from
+   predicate behavior you want.
 2. **Project scale** — application count band (drives sizing baseline) and concurrent-user band
    (drives a RAM/CPU bonus on the UI-serving node, only when the scenario actually has a UI).
 3. **Database** — RDBMS is a fixed fact (PostgreSQL only — CAST doesn't support alternatives, so
@@ -150,10 +165,32 @@ Every non-obvious factual claim needs an implicit or explicit confidence level, 
 `render()` is one function that reads `state()`, builds a handful of HTML string fragments
 (`sizingHtml`, `dbHtml`, `netHtml`, `httpsHtml`, `authHtml`, `extendHtml`, optional section HTML,
 `checklistHtml`), concatenates them, and sets `#results-content.innerHTML` once. Section numbers
-in headings (`<h3>3. Network ports...`) are hand-maintained except for the truly optional trailing
-sections (MCP), which use a `{N}` placeholder resolved by a running counter — follow that pattern
-if you add another optional section rather than hand-numbering it, since optional sections can
-appear or vanish based on answers.
+in headings (`<h3>3. Network ports...`) are hand-maintained (1 through 6 are always present, so
+they're always the same number) except for the truly optional trailing sections, which use a
+`{N}` placeholder resolved by a running counter. The exact mechanic, in order:
+
+```js
+var mcpHtml = '';
+if(a.mcp){ mcpHtml = '<h3>{N}. MCP Servers (AI features) — enabled</h3>...'; }
+
+var optionalSections = [mcpHtml].filter(function(h){ return h; });   // build strings first, filter blanks
+var nextNum = 7;                                                      // one past the last fixed section (6)
+var optionalHtml = optionalSections.map(function(h){
+  return h.replace('{N}', String(nextNum++));                        // resolve {N} left-to-right, advancing the counter
+}).join('');
+var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist...';  // whatever nextNum ended on
+```
+
+Each optional section's own logic (e.g. `if(a.mcp){...}`) decides whether its string exists at
+all — build the string with a literal `{N}` placeholder in it *before* you know whether it'll be
+included, put it in the `optionalSections` array alongside the other optional section variables,
+filter out the empty ones, and only then resolve the placeholders by mapping the array with an
+incrementing counter that starts at (fixed section count + 1). The checklist heading always uses
+whatever `nextNum` ended on after that map runs — never hardcode the checklist's number, since it
+has to shift depending on how many optional sections actually rendered. If you add a second
+optional section, add its (empty-string-by-default) variable to the `optionalSections` array in
+the order you want it numbered — order in that array is numbering order, not declaration order
+elsewhere in the function.
 
 Wire `render()` to fire on both `input` and `change` events delegated from the form pane (covers
 text/select/radio/checkbox uniformly), plus once on load.
