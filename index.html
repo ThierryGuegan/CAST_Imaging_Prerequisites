@@ -448,7 +448,9 @@
     var podmanPortNote = a.platform === 'podman' ? ' — rootless Podman can\'t bind ports below 1024 by default; either lower net.ipv4.ip_unprivileged_port_start, grant CAP_NET_BIND_SERVICE, or publish to a high port and front it with something that can bind 80/443' : '';
     var rows = [
       {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'+podmanPortNote},
-      {src:'End-user browser', dst:'CAST Imaging Web', port:'80', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'+podmanPortNote}
+      {src:'End-user browser', dst:'CAST Imaging Web', port:'8090', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled — CAST Imaging Web listens on 8090, not the standard port 80', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'+podmanPortNote},
+      {src:'End-user browser', dst:'Keycloak', port:'8096', proto:'HTTP/HTTPS', purpose:'CAST Imaging\'s embedded authentication/SSO broker — the browser is redirected here to sign in, whatever identity source (local, SAML, LDAP) is configured', tag:'mandatory', note:(a.reverseProxy !== 'undecided' ? 'If fronted by a reverse proxy, the proxy must forward this port/path too, not just CAST Imaging Web — otherwise sign-in breaks' : undefined)},
+      {src:'End-user browser', dst:'Eureka', port:'8098', proto:'HTTP/HTTPS', purpose:'Service discovery/registry endpoint the browser/frontend accesses directly', tag:'mandatory', note:(a.reverseProxy !== 'undecided' ? 'If fronted by a reverse proxy, the proxy must forward this port/path too' : undefined)}
     ].concat(adminRows).concat([
       {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened' : undefined)}
     ]);
@@ -503,10 +505,10 @@
     }
 
     if(a.auth === 'saml'){
-      rows.push({src:'CAST Imaging', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'SSO metadata exchange and assertion validation', tag:'mandatory', note:'SAML selected'});
+      rows.push({src:'Keycloak', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'SSO metadata exchange and assertion validation — brokered through CAST\'s embedded Keycloak, not imaging-services directly', tag:'mandatory', note:'SAML selected'});
     }
     if(a.auth === 'ldap'){
-      rows.push({src:'CAST Imaging', dst:'LDAP / Active Directory server', port:'389 / 636 (LDAPS)', proto:'TCP', purpose:'Directory lookup and authentication', tag:'mandatory', note:'LDAP selected'});
+      rows.push({src:'Keycloak', dst:'LDAP / Active Directory server', port:'389 / 636 (LDAPS)', proto:'TCP', purpose:'Directory lookup and authentication — brokered through CAST\'s embedded Keycloak, not imaging-services directly', tag:'mandatory', note:'LDAP selected'});
     }
     if(a.email){
       rows.push({src:'CAST Imaging', dst:'SMTP relay', port:'25 / 587 / 465', proto:'TCP', purpose:'Notification emails', tag:'optional', note:'Email notifications selected'});
