@@ -447,12 +447,16 @@
     }
 
     var podmanPortNote = a.platform === 'podman' ? ' — rootless Podman can\'t bind ports below 1024 by default; either lower net.ipv4.ip_unprivileged_port_start, grant CAP_NET_BIND_SERVICE, or publish to a high port and front it with something that can bind 80/443' : '';
-    var rows = [
+    var hasUi = hasDashboards(a) || hasViewer(a);
+    var rows = (hasUi ? [
       {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'+podmanPortNote},
       {src:'End-user browser', dst:'CAST Imaging Web', port:'8090', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled — CAST Imaging Web listens on 8090, not the standard port 80', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'+podmanPortNote},
       {src:'End-user browser', dst:'Keycloak', port:'8096', proto:'HTTP/HTTPS', purpose:'CAST Imaging\'s embedded authentication/SSO broker — the browser is redirected here to sign in, whatever identity source (local, SAML, LDAP) is configured', tag:'mandatory', note:(a.reverseProxy !== 'undecided' ? 'If fronted by a reverse proxy, the proxy must forward this port/path too, not just CAST Imaging Web — otherwise sign-in breaks' : undefined)},
       {src:'End-user browser', dst:'Eureka', port:'8098', proto:'HTTP/HTTPS', purpose:'Service discovery/registry endpoint the browser/frontend accesses directly', tag:'mandatory', note:(a.reverseProxy !== 'undecided' ? 'If fronted by a reverse proxy, the proxy must forward this port/path too' : undefined)}
-    ].concat(adminRows).concat([
+    ] : [
+      {src:'API client / CI pipeline', dst:'imaging-services', port:'443 or 8090 (matches your HTTPS/HTTP choice)', proto:'HTTP/HTTPS', purpose:'This scenario has no Viewer/Dashboards UI — imaging-services is consumed programmatically via CAST\'s REST APIs (delivery, analysis triggering, results retrieval) rather than through a browser', tag:'mandatory', note:'Headless scenario — no browser-facing ports (CAST Imaging Web UI, Keycloak, Eureka) are needed'},
+      {src:'API client / CI pipeline', dst:'Keycloak', port:'8096', proto:'HTTP/HTTPS', purpose:'Token issuance for API authentication — CAST\'s REST APIs may still require a Keycloak-issued OAuth2 token even without a human browser session', tag:'conditional', note:'Reasonable inference, not confirmed against your CAST Imaging release — check your API authentication docs before excluding this port'}
+    ]).concat(adminRows).concat([
       {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened' : undefined)}
     ]);
 
