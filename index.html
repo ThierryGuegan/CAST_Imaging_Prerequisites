@@ -561,6 +561,7 @@
   }
 
   function render(){
+    stampGeneratedDate();
     var a = state();
 
     document.getElementById('mcp-sub').className = 'sub-block' + (a.mcp ? ' show' : '');
@@ -823,7 +824,6 @@
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
-  stampGeneratedDate();
   render();
 })();
 </script>
