@@ -28,9 +28,12 @@ document states has to earn that sentence — see the Goal section of `SKILL.md`
 - `.layout` — flex row containing:
   - `.form-pane` (fixed width, sticky, scrolls independently) — the questionnaire, organized into
     numbered `<fieldset>` sections (see below).
-  - `.results-pane` (flex:1, scrolls independently) — profile chips, a validation-notice callout,
-    a `#results-content` div that `render()` overwrites wholesale on every change, and a
-    print/PDF button.
+  - `.results-pane` (flex:1, scrolls independently) — a "Generated {date} at {time}" timestamp,
+    profile chips, a validation-notice callout, a `#results-content` div that `render()` overwrites
+    wholesale on every change, and a print/PDF button. The timestamp is set from inside `render()`
+    (see Content freshness marker below), not just once at load — it exists to tell the reader when
+    the *currently-displayed* content was produced, which is only true if it updates every time the
+    content actually changes.
 - A `@media print` block hides the form pane and toolbar so "Print / Save as PDF" produces a clean
   document of just the generated content.
 - Dark theme by CSS custom properties on `:root`; no light/dark toggle needed since this is a
@@ -160,14 +163,48 @@ Every non-obvious factual claim needs an implicit or explicit confidence level, 
   confirmed — verify against your CAST Imaging release"`. Never silently omit an unverifiable
   detail if a reader would reasonably expect it to be covered — flag the gap instead of hiding it.
 
+## Output document sections (fixed, in order)
+
+The results pane always has exactly these six sections, in this order, before any optional
+section or the checklist. Don't invent a different taxonomy (e.g. a separate "profile" section,
+or a "network egress" section split out from ports/extend) — a blind rebuild done from an earlier
+draft of this spec did exactly that, because only the *numbering mechanic* below was documented,
+not *what the six fixed sections actually are*. Egress, HTTPS, and auth are questionnaire
+*inputs* that reshape content inside several of these sections — they are not sections of their
+own.
+
+1. **Hardware sizing for your profile** (`sizingHtml`) — the composed sizing table, OS/runtime
+   version requirements, storage locations, and client-side (end-user + delivery workstation)
+   requirements.
+2. **Database requirements** (`dbHtml`) — PostgreSQL configuration/version/hosting, and Neo4j
+   requirements when the scenario includes the Viewer.
+3. **Network ports & FQDN allowlist** (`netHtml`) — the full `buildPortRows(a)` table. This is
+   where egress mode (direct/proxy/air-gapped) actually shows its effects — as row content and
+   notes, not as a separate section.
+4. **HTTPS / TLS** (`httpsHtml`) — certificate source, termination point, and any platform-specific
+   reverse-proxy configuration detail.
+5. **Authentication prerequisites** (`authHtml`) — prerequisites for whichever of Local/SAML/LDAP
+   was selected.
+6. **CAST Extend access & licensing** (`extendHtml`) — outbound access to CAST's extension/update
+   service (direct or via the air-gapped Local Update Server), generating an **API key from the
+   CAST Extend website**, obtaining a **CAST Imaging license file** that covers the selected
+   optional modules, and storing both outside plain configuration files. This section's content
+   doesn't map onto any single questionnaire answer the way the others do, which makes it the
+   easiest of the six to forget entirely when building bottom-up from the state model — write it
+   deliberately, don't expect it to fall out of the `has*(a)` predicates.
+
+After these six, truly optional sections (MCP when `a.mcp` is set — CAST Highlight and email
+notifications are *not* separate sections; they add conditional rows to the ports matrix and stay
+there) get appended, followed by the checklist.
+
 ## Rendering
 
-`render()` is one function that reads `state()`, builds a handful of HTML string fragments
-(`sizingHtml`, `dbHtml`, `netHtml`, `httpsHtml`, `authHtml`, `extendHtml`, optional section HTML,
-`checklistHtml`), concatenates them, and sets `#results-content.innerHTML` once. Section numbers
-in headings (`<h3>3. Network ports...`) are hand-maintained (1 through 6 are always present, so
-they're always the same number) except for the truly optional trailing sections, which use a
-`{N}` placeholder resolved by a running counter. The exact mechanic, in order:
+`render()` is one function that reads `state()`, builds the HTML string fragments above plus any
+optional section HTML and `checklistHtml`, concatenates them, and sets `#results-content.innerHTML`
+once. Section numbers in headings (`<h3>3. Network ports...`) are hand-maintained (1 through 6 are
+always present, so they're always the same number) except for the truly optional trailing
+sections, which use a `{N}` placeholder resolved by a running counter. The exact mechanic, in
+order:
 
 ```js
 var mcpHtml = '';
@@ -195,13 +232,16 @@ elsewhere in the function.
 ## Content freshness marker
 
 A `TOOL_VERSION` constant near the top of the `<script>` block (a plain date string) is displayed
-in the footer as "Tool content last updated {date}" — set once by a small function alongside
-`stampGeneratedDate()`. This is deliberately separate from the "Generated {timestamp}" line near
-the top of the results pane: that one just reflects the viewer's own clock at page-load time and
-says nothing about the content, while `TOOL_VERSION` is a human-maintained marker of when a fact
-in the tool last actually changed. Bump it to today's date whenever a content-affecting fix ships
-(see `SKILL.md` step 6) — a stale `TOOL_VERSION` is worse than none, since it actively tells the
-reader the content is fresher than it is.
+in the footer as "Tool content last updated {date}", via a small `stampGeneratedDate()` function
+called from the *top of `render()` itself* — not just once at page load. It has to re-run on every
+regeneration for the same reason the "Generated {timestamp}" line in the layout above does: a tool
+whose whole premise is "regenerates live on every answer" can't have either timestamp go stale the
+moment the user actually interacts with it. `TOOL_VERSION` and the "Generated" timestamp answer
+different questions — one says when a fact in the tool was last verified/changed by a maintainer,
+the other says when the currently-displayed content was produced — but both need to update on
+every render for their own label to stay true. Bump `TOOL_VERSION` to today's date whenever a
+content-affecting fix ships (see `SKILL.md` step 6) — a stale `TOOL_VERSION` is worse than none,
+since it actively tells the reader the content is fresher than it is.
 
 Wire `render()` to fire on both `input` and `change` events delegated from the form pane (covers
 text/select/radio/checkbox uniformly), plus once on load.

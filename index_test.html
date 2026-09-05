@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAST Imaging Requirements Builder</title>
+<style>
+  :root{
+    --bg:#12151c;
+    --bg-alt:#1a1e28;
+    --panel:#1e2330;
+    --border:#2c3242;
+    --text:#e6e9f0;
+    --text-dim:#9aa3b8;
+    --accent:#5b9dff;
+    --accent-dim:#2f4a73;
+    --ok:#3ecf8e;
+    --warn:#e0a63e;
+    --danger:#e05a5a;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;
+    line-height:1.5;
+  }
+  .app-header{
+    padding:20px 28px;
+    background:var(--bg-alt);
+    border-bottom:1px solid var(--border);
+  }
+  .app-header h1{
+    margin:0 0 4px 0;
+    font-size:20px;
+    letter-spacing:.2px;
+  }
+  .app-header p{
+    margin:0;
+    color:var(--text-dim);
+    font-size:13.5px;
+  }
+  .layout{
+    display:flex;
+    align-items:flex-start;
+    height:calc(100vh - 78px);
+  }
+  .form-pane{
+    width:400px;
+    min-width:340px;
+    flex:0 0 400px;
+    height:100%;
+    overflow-y:auto;
+    border-right:1px solid var(--border);
+    padding:16px;
+    background:var(--bg-alt);
+  }
+  .results-pane{
+    flex:1;
+    height:100%;
+    overflow-y:auto;
+    padding:20px 28px 60px;
+  }
+  fieldset{
+    border:1px solid var(--border);
+    border-radius:8px;
+    margin:0 0 14px 0;
+    padding:12px 14px 14px;
+    background:var(--panel);
+  }
+  legend{
+    font-weight:600;
+    font-size:13px;
+    padding:0 6px;
+    color:var(--accent);
+  }
+  label{
+    display:block;
+    margin:8px 0 4px;
+    font-size:12.5px;
+    color:var(--text-dim);
+  }
+  label.inline{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin:6px 0;
+    color:var(--text);
+  }
+  select, input[type=number]{
+    width:100%;
+    background:var(--bg);
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:6px 8px;
+    font-size:13px;
+  }
+  .radio-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin:4px 0 2px;
+  }
+  .radio-row label{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    margin:0;
+    color:var(--text);
+    font-size:13px;
+  }
+  .sub-block{
+    margin-top:10px;
+    padding:8px 10px;
+    border-left:2px solid var(--accent-dim);
+    background:rgba(91,157,255,.06);
+    border-radius:0 6px 6px 0;
+  }
+  .hint{
+    font-size:12px;
+    color:var(--text-dim);
+    font-style:italic;
+    margin-top:6px;
+  }
+  .chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:14px;
+  }
+  .chip{
+    background:var(--accent-dim);
+    color:var(--text);
+    border-radius:999px;
+    padding:4px 10px;
+    font-size:12px;
+  }
+  .callout{
+    border:1px solid var(--accent-dim);
+    background:rgba(91,157,255,.08);
+    border-radius:8px;
+    padding:10px 14px;
+    margin-bottom:16px;
+    font-size:13px;
+  }
+  .callout.floor{
+    border-color:var(--warn);
+    background:rgba(224,166,62,.08);
+  }
+  .callout.unverified{
+    border-color:var(--danger);
+    background:rgba(224,90,90,.08);
+    font-size:12.5px;
+    color:var(--text-dim);
+  }
+  #results-content h3{
+    margin:26px 0 8px;
+    font-size:16px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:6px;
+  }
+  #results-content h3:first-child{ margin-top:0; }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin:8px 0 4px;
+    font-size:12.5px;
+  }
+  th, td{
+    border:1px solid var(--border);
+    padding:6px 8px;
+    text-align:left;
+    vertical-align:top;
+  }
+  th{
+    background:var(--bg-alt);
+    color:var(--text-dim);
+    font-weight:600;
+  }
+  code{
+    font-family:var(--mono);
+    background:var(--bg);
+    padding:1px 5px;
+    border-radius:4px;
+    font-size:12px;
+  }
+  .tag{
+    display:inline-block;
+    border-radius:5px;
+    padding:2px 7px;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.3px;
+    text-transform:uppercase;
+  }
+  .tag-mandatory{ background:rgba(224,90,90,.2); color:#ff8b8b; }
+  .tag-conditional{ background:rgba(224,166,62,.2); color:#f0bb63; }
+  .tag-optional{ background:rgba(91,157,255,.2); color:#8fbaff; }
+  .tag-recommended{ background:rgba(62,207,142,.2); color:#6fe0ac; }
+  ul{ margin:6px 0; padding-left:20px; }
+  li{ margin:3px 0; }
+  .toolbar{
+    margin:14px 0 20px;
+  }
+  button.print-btn{
+    background:var(--accent);
+    color:#0b1220;
+    border:none;
+    border-radius:6px;
+    padding:8px 16px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  button.print-btn:hover{ filter:brightness(1.08); }
+  footer.tool-footer{
+    margin-top:40px;
+    padding-top:12px;
+    border-top:1px solid var(--border);
+    color:var(--text-dim);
+    font-size:11.5px;
+  }
+  a{ color:var(--accent); }
+
+  @media print{
+    .form-pane, .toolbar{ display:none !important; }
+    .layout{ height:auto; display:block; }
+    .results-pane{ height:auto; overflow:visible; padding:0; }
+    body{ background:#fff; color:#000; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>CAST Imaging Requirements Builder</h1>
+  <p>Answer a few questions and generate the exact ports, sizing, and prerequisites checklist for <strong>your</strong> deployment — not a generic checklist.</p>
+</header>
+
+<div class="layout">
+  <div class="form-pane" id="form-pane">
+
+    <fieldset>
+      <legend>1. Platform &amp; topology</legend>
+
+      <label>Host platform</label>
+      <div class="radio-row">
+        <label><input type="radio" name="platform" value="docker" checked> Docker</label>
+        <label><input type="radio" name="platform" value="podman"> Podman</label>
+        <label><input type="radio" name="platform" value="kubernetes"> Kubernetes</label>
+        <label><input type="radio" name="platform" value="windows"> Windows Server</label>
+      </div>
+
+      <label for="scenario">Deployment scenario</label>
+      <select id="scenario">
+        <option value="full">Full (analysis + Viewer + dashboards)</option>
+        <option value="viewer-readonly">Viewer read-only (browse existing results)</option>
+        <option value="dashboards-only">Dashboards only (KPIs, no drill-down)</option>
+        <option value="analysis-only">Analysis only (headless, API/CI-driven)</option>
+      </select>
+
+      <label>Topology</label>
+      <div class="radio-row">
+        <label><input type="radio" name="topology" value="single" checked> Single machine</label>
+        <label><input type="radio" name="topology" value="multi"> Multi-machine</label>
+      </div>
+
+      <div class="sub-block" id="analysisNodeBlock">
+        <label for="analysisNodeCount">Number of analysis-node machines</label>
+        <input type="number" id="analysisNodeCount" min="1" value="1">
+      </div>
+
+      <div class="sub-block" id="neo4jBlock">
+        <label class="inline"><input type="checkbox" id="dedicatedNeo4j"> Run Neo4j on its own dedicated machine</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2. Project scale</legend>
+      <label for="appCount">Application count</label>
+      <select id="appCount">
+        <option value="small">Small (&lt; 10 applications)</option>
+        <option value="medium" selected>Medium (10–50 applications)</option>
+        <option value="large">Large (50+ applications)</option>
+      </select>
+
+      <label for="userCount">Concurrent users (UI-facing scenarios only)</label>
+      <select id="userCount">
+        <option value="low" selected>Low (&lt; 10 concurrent)</option>
+        <option value="medium">Medium (10–50 concurrent)</option>
+        <option value="high">High (50+ concurrent)</option>
+      </select>
+    </fieldset>
+
+    <fieldset>
+      <legend>3. Database</legend>
+      <p style="margin:4px 0 8px;color:var(--text-dim);font-size:12.5px;">
+        CAST Imaging requires <strong>PostgreSQL</strong> — no alternative RDBMS is supported, so this isn't a choice.
+      </p>
+      <label for="dbHosting">Hosting model</label>
+      <select id="dbHosting">
+        <option value="colocated">Co-located (same machine as imaging-services)</option>
+        <option value="dedicated">Dedicated database machine</option>
+        <option value="managed">Managed / cloud database service</option>
+      </select>
+    </fieldset>
+
+    <fieldset>
+      <legend>4. Network egress</legend>
+      <div class="radio-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
+        <label class="inline"><input type="radio" name="egress" value="direct" checked> Direct outbound internet access</label>
+        <label class="inline"><input type="radio" name="egress" value="proxy"> Via corporate proxy</label>
+        <label class="inline"><input type="radio" name="egress" value="airgapped"> Air-gapped (no outbound access)</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>5. HTTPS</legend>
+      <label for="certSource">Certificate source</label>
+      <select id="certSource">
+        <option value="self-signed">Self-signed</option>
+        <option value="internal-ca" selected>Internal / corporate CA</option>
+        <option value="public-ca">Public CA</option>
+      </select>
+      <label for="tlsTermination">TLS termination point</label>
+      <select id="tlsTermination">
+        <option value="app">On the application (Keycloak/imaging-services) itself</option>
+        <option value="reverse-proxy" selected>At a reverse proxy / load balancer in front</option>
+      </select>
+    </fieldset>
+
+    <fieldset>
+      <legend>6. Authentication</legend>
+      <div class="radio-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
+        <label class="inline"><input type="radio" name="auth" value="local" checked> Local (built-in accounts)</label>
+        <label class="inline"><input type="radio" name="auth" value="saml"> SAML</label>
+        <label class="inline"><input type="radio" name="auth" value="ldap"> LDAP</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>7. Optional integrations</legend>
+      <label class="inline"><input type="checkbox" id="mcp"> MCP / AI features</label>
+      <div class="sub-block" id="llmBlock">
+        <label for="llmProvider">LLM provider</label>
+        <select id="llmProvider">
+          <option value="openai">OpenAI (hosted)</option>
+          <option value="azure-openai">Azure OpenAI</option>
+          <option value="anthropic">Anthropic (hosted)</option>
+          <option value="other">Other / self-hosted</option>
+        </select>
+      </div>
+
+      <label class="inline"><input type="checkbox" id="highlight"> CAST Highlight integration</label>
+      <label class="inline"><input type="checkbox" id="email"> Email notifications</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>8. Source code access</legend>
+      <label class="inline"><input type="checkbox" id="srcHttps"> HTTPS (Git / SVN / DevOps over HTTPS)</label>
+      <label class="inline"><input type="checkbox" id="srcSmb"> SMB (network share)</label>
+      <div class="hint" id="srcHint"></div>
+    </fieldset>
+
+  </div>
+
+  <div class="results-pane">
+    <div class="toolbar">
+      <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+    <div class="chips" id="profile-chips"></div>
+    <div class="callout" id="validation-notice"></div>
+    <div id="results-content"></div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------
+   TOOL_VERSION: human-maintained "content last updated" marker.
+   Bump this to today's date whenever a content-affecting fix ships.
+   Deliberately re-stamped inside render() (not just once at load) so
+   that the footer never silently drifts from what render() actually
+   produced on a given pass.
+   --------------------------------------------------------------------- */
+var TOOL_VERSION = '2026-09-05';
+
+/* =======================================================================
+   STATE
+   ======================================================================= */
+function state(){
+  var platformEl = document.querySelector('input[name="platform"]:checked');
+  var topologyEl = document.querySelector('input[name="topology"]:checked');
+  var egressEl = document.querySelector('input[name="egress"]:checked');
+  var authEl = document.querySelector('input[name="auth"]:checked');
+
+  return {
+    platform: platformEl ? platformEl.value : 'docker',
+    scenario: document.getElementById('scenario').value,
+    topology: topologyEl ? topologyEl.value : 'single',
+    analysisNodeCount: parseInt(document.getElementById('analysisNodeCount').value, 10) || 1,
+    dedicatedNeo4j: document.getElementById('dedicatedNeo4j').checked,
+
+    appCount: document.getElementById('appCount').value,
+    userCount: document.getElementById('userCount').value,
+
+    dbHosting: document.getElementById('dbHosting').value,
+
+    egress: egressEl ? egressEl.value : 'direct',
+
+    certSource: document.getElementById('certSource').value,
+    tlsTermination: document.getElementById('tlsTermination').value,
+
+    auth: authEl ? authEl.value : 'local',
+
+    mcp: document.getElementById('mcp').checked,
+    llmProvider: document.getElementById('llmProvider').value,
+    highlight: document.getElementById('highlight').checked,
+    email: document.getElementById('email').checked,
+
+    srcHttps: document.getElementById('srcHttps').checked,
+    srcSmb: document.getElementById('srcSmb').checked
+  };
+}
+
+/* =======================================================================
+   has*(a) PREDICATES — exactly as specified. hasNeo4j is defined purely
+   in terms of hasViewer; it has no independent scenario check.
+   ======================================================================= */
+function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-only'; }
+function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
+function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
+function hasNeo4j(a){ return hasViewer(a); }
+
+function isK8s(a){ return a.platform === 'kubernetes'; }
+function isMulti(a){ return a.topology === 'multi'; }
+function unitWord(a){ return isK8s(a) ? 'pod' : 'machine'; }
+function coreWord(a){ return isK8s(a) ? 'imaging-services pod' : 'core machine'; }
+
+/* =======================================================================
+   SIZING
+   Baselines per scale band. Component lists are built by has*()-driven
+   helpers, never hardcoded per-scenario. Disk and RAM floors are
+   asserted separately as callouts (see sizingCallouts) rather than
+   silently baked into any one row's numbers.
+
+   NOTE ON SPECIFIC NUMBERS: none of architecture-spec.md,
+   documentation-map.md or SKILL.md gives a specific CPU count, RAM
+   figure, or disk floor in GB. Every number below is therefore an
+   internal PLANNING HEURISTIC, explicitly labeled as such (per
+   documentation-map.md §2's own instruction: "Sizing bands aren't
+   CAST-published tiers — treat as internal planning heuristics, not
+   doc-sourced facts"), not a value sourced from CAST documentation.
+   Swap these placeholders for real figures from
+   doc.castsoftware.com/imaging/install/requirements/hardware/ and
+   .../disk/ before relying on this tool for a real deployment.
+   ======================================================================= */
+var SIZING = {
+  small: {
+    single:   { cpu: 4,  ram: 16, disk: 256 },
+    core:     { cpu: 4,  ram: 12, disk: 150 },
+    analysis: { cpu: 4,  ram: 8,  disk: 150 },
+    neo4j:    { cpu: 2,  ram: 8,  disk: 100 }
+  },
+  medium: {
+    single:   { cpu: 8,  ram: 32, disk: 256 },
+    core:     { cpu: 6,  ram: 16, disk: 200 },
+    analysis: { cpu: 8,  ram: 16, disk: 250 },
+    neo4j:    { cpu: 4,  ram: 16, disk: 150 },
+    singleNote: 'At medium scale, all-in-one is workable for evaluation but a distributed topology is recommended once multiple analysis jobs run concurrently.'
+  },
+  large: {
+    single:   { cpu: 16, ram: 64, disk: 256 },
+    core:     { cpu: 8,  ram: 24, disk: 256 },
+    analysis: { cpu: 12, ram: 32, disk: 400 },
+    neo4j:    { cpu: 8,  ram: 32, disk: 250 },
+    singleNote: 'All-in-one is discouraged at large scale — a single machine will contend for CPU/RAM across analysis, Viewer/Neo4j and the database simultaneously.'
+  }
+};
+
+// Absolute per-node disk floor. Unverifiable here (documentation-map.md
+// names "256GB floor" as the thing to go verify at
+// install/requirements/disk/ — it does not itself hand us the number as
+// fact, so this file is only allowed to assert it as the spec-provided
+// working figure and flag it as needing doc confirmation).
+var DISK_FLOOR_GB = 256;
+// RAM floors differ by topology; exact figures are unverifiable here,
+// so they are asserted structurally (multi-machine floor is lower per
+// node than the standalone floor) without inventing specific GB numbers
+// beyond the one figure the SIZING table itself already uses.
+var RAM_FLOOR_STANDALONE_GB = SIZING.small.single.ram; // lowest baseline used for the all-in-one shape
+var RAM_FLOOR_DISTRIBUTED_GB = SIZING.small.core.ram;  // lowest baseline used for a distributed core node
+
+function coreComponentList(a){
+  var list = ['imaging-services'];
+  if(hasDashboards(a)) list.push('dashboards');
+  return list;
+}
+function analysisComponentList(a){
+  var list = [];
+  if(hasAnalysis(a)) list.push('analysis-node');
+  return list;
+}
+function viewerComponentList(a){
+  var list = [];
+  if(hasViewer(a)) list.push('imaging-viewer');
+  if(hasNeo4j(a)) list.push('Neo4j');
+  return list;
+}
+function singleMachineComponentList(a){
+  return coreComponentList(a).concat(analysisComponentList(a)).concat(viewerComponentList(a));
+}
+
+function uiBonus(a){
+  // A UI-serving node gets an extra RAM/CPU allowance for concurrent
+  // users, but only when the scenario actually has a UI at all.
+  if(!hasViewer(a) && !hasDashboards(a)) return { cpu: 0, ram: 0 };
+  if(a.userCount === 'high')   return { cpu: 4, ram: 8 };
+  if(a.userCount === 'medium') return { cpu: 2, ram: 4 };
+  return { cpu: 0, ram: 0 };
+}
+
+function sizingRows(a){
+  var band = SIZING[a.appCount] || SIZING.medium;
+  var rows = [];
+
+  if(!isMulti(a)){
+    var comps = singleMachineComponentList(a);
+    var bonus = uiBonus(a);
+    rows.push({
+      role: 'All-in-one ' + unitWord(a),
+      components: comps.join(', '),
+      cpu: band.single.cpu + bonus.cpu,
+      ram: band.single.ram + bonus.ram,
+      disk: Math.max(band.single.disk, DISK_FLOOR_GB)
+    });
+  } else {
+    var coreBonus = (hasViewer(a) || hasDashboards(a)) ? uiBonus(a) : { cpu: 0, ram: 0 };
+    rows.push({
+      role: coreWord(a),
+      components: coreComponentList(a).join(', '),
+      cpu: band.core.cpu + coreBonus.cpu,
+      ram: Math.max(band.core.ram + coreBonus.ram, RAM_FLOOR_DISTRIBUTED_GB),
+      disk: Math.max(band.core.disk, DISK_FLOOR_GB)
+    });
+
+    if(hasAnalysis(a)){
+      for(var i = 1; i <= a.analysisNodeCount; i++){
+        rows.push({
+          role: 'Analysis ' + unitWord(a) + ' #' + i,
+          components: analysisComponentList(a).join(', '),
+          cpu: band.analysis.cpu,
+          ram: Math.max(band.analysis.ram, RAM_FLOOR_DISTRIBUTED_GB),
+          disk: Math.max(band.analysis.disk, DISK_FLOOR_GB)
+        });
+      }
+    }
+
+    if(hasViewer(a)){
+      if(a.dedicatedNeo4j){
+        rows.push({
+          role: 'Neo4j ' + unitWord(a) + ' (dedicated)',
+          components: 'Neo4j',
+          cpu: band.neo4j.cpu,
+          ram: Math.max(band.neo4j.ram, RAM_FLOOR_DISTRIBUTED_GB),
+          disk: Math.max(band.neo4j.disk, DISK_FLOOR_GB)
+        });
+        rows.push({
+          role: 'Viewer ' + unitWord(a),
+          components: 'imaging-viewer',
+          cpu: 2,
+          ram: Math.max(4, RAM_FLOOR_DISTRIBUTED_GB),
+          disk: Math.max(50, DISK_FLOOR_GB)
+        });
+      } else {
+        rows.push({
+          role: 'Viewer + Neo4j ' + unitWord(a),
+          components: viewerComponentList(a).join(', '),
+          cpu: band.neo4j.cpu,
+          ram: Math.max(band.neo4j.ram, RAM_FLOOR_DISTRIBUTED_GB),
+          disk: Math.max(band.neo4j.disk, DISK_FLOOR_GB)
+        });
+      }
+    }
+  }
+
+  if(a.dbHosting === 'dedicated'){
+    rows.push({
+      role: 'Database ' + unitWord(a) + ' (dedicated PostgreSQL)',
+      components: 'PostgreSQL',
+      cpu: 4,
+      ram: Math.max(8, RAM_FLOOR_DISTRIBUTED_GB),
+      disk: Math.max(DISK_FLOOR_GB, band.core.disk)
+    });
+  } else if(a.dbHosting === 'managed'){
+    rows.push({
+      role: 'Database (managed service)',
+      components: 'PostgreSQL (managed)',
+      cpu: '— (provider-managed)',
+      ram: '— (provider-managed)',
+      disk: 'Sized per provider service tier — not independently verified here'
+    });
+  }
+
+  return { band: band, rows: rows };
+}
+
+/* =======================================================================
+   PORTS / FQDN MATRIX
+   ======================================================================= */
+function buildPortRows(a){
+  var rows = [];
+  var multi = isMulti(a);
+
+  // --- Always-true baseline: admin access + DB access ---
+  rows.push({
+    src: 'Administrator workstation',
+    dst: 'imaging-services ' + unitWord(a),
+    port: '22 (SSH) / platform admin port',
+    proto: 'TCP',
+    purpose: 'Administrative access for install/maintenance.',
+    tag: 'mandatory',
+    note: 'Exact port depends on platform/OS — not confirmed for every platform here; verify against your CAST install guide for ' + a.platform + '.'
+  });
+
+  rows.push({
+    src: 'imaging-services',
+    dst: multi ? 'Database ' + unitWord(a) : 'co-located PostgreSQL',
+    port: '5432 (PostgreSQL default)',
+    proto: 'TCP',
+    purpose: 'Application database access.',
+    tag: 'mandatory',
+    note: '5432 is PostgreSQL\'s own documented default, not a CAST-specific fact — confirm CAST hasn\'t been configured to use a non-default port in your environment.'
+  });
+
+  if(a.dbHosting === 'managed'){
+    rows.push({
+      src: 'imaging-services',
+      dst: 'Managed PostgreSQL service endpoint',
+      port: '5432 (or provider default — not confirmed)',
+      proto: 'TCP (TLS strongly recommended)',
+      purpose: 'Application database access to a cloud-managed instance.',
+      tag: 'mandatory',
+      note: 'Managed-service port/TLS requirements vary by cloud provider — exact value not independently verified here.'
+    });
+  }
+
+  // --- Platform-specific admin API / orchestration ports ---
+  if(isK8s(a)){
+    rows.push({
+      src: 'Administrator workstation',
+      dst: 'Kubernetes API server',
+      port: '6443 (Kubernetes API default)',
+      proto: 'TCP',
+      purpose: 'kubectl / cluster administration access.',
+      tag: 'mandatory',
+      note: '6443 is Kubernetes\' own documented default, generic to any cluster — not a CAST-specific port; confirm against your cluster\'s actual API port.'
+    });
+  }
+
+  if(a.platform === 'podman'){
+    rows.push({
+      src: 'Administrator workstation',
+      dst: 'imaging-services ' + unitWord(a),
+      port: 'Any port bound below 1024 requires care',
+      proto: 'TCP',
+      purpose: 'Rootless Podman cannot bind privileged (<1024) ports without extra configuration.',
+      tag: 'conditional',
+      note: 'Reasonable inference: rootless containers cannot bind privileged ports — this is general Linux/Podman behavior, not something specific to CAST, so treat any port below 1024 referenced elsewhere in this matrix as needing a rootless-Podman workaround (port remap or CAP_NET_BIND_SERVICE) when running rootless.'
+    });
+  }
+
+  // --- Core web/UI access, gated on whether there is any UI at all ---
+  if(hasViewer(a) || hasDashboards(a)){
+    rows.push({
+      src: 'End-user browser',
+      dst: 'imaging-services / reverse proxy ' + unitWord(a),
+      port: '443 (HTTPS)',
+      proto: 'TCP',
+      purpose: 'Web UI access (' + [hasViewer(a) ? 'Viewer' : null, hasDashboards(a) ? 'Dashboards' : null].filter(Boolean).join(' + ') + ').',
+      tag: 'mandatory',
+      note: a.platform === 'podman' ? 'Reasonable inference: rootless Podman cannot bind privileged ports (<1024) — 443 may need to be remapped or bound via CAP_NET_BIND_SERVICE.' : ''
+    });
+  } else {
+    // headless / analysis-only replacement row for the browser rows above
+    rows.push({
+      src: 'CI/CD system or API client',
+      dst: 'imaging-services ' + unitWord(a),
+      port: '443 (HTTPS, REST API)',
+      proto: 'TCP',
+      purpose: 'Headless API/CI-driven access — no browser session in this scenario.',
+      tag: 'mandatory',
+      note: (a.platform === 'podman' ? 'Reasonable inference: rootless Podman cannot bind privileged ports (<1024) — 443 may need to be remapped or bound via CAP_NET_BIND_SERVICE. ' : '') + 'Reasonable inference: CAST\'s REST APIs likely still require a Keycloak-issued OAuth2 token even without a human browser session — not independently verified here.'
+    });
+  }
+
+  // Keycloak — all auth modes are brokered through it, per architecture-spec.
+  rows.push({
+    src: hasViewer(a) || hasDashboards(a) ? 'End-user browser' : 'CI/CD system or API client',
+    dst: 'Embedded Keycloak (' + coreWord(a) + ')',
+    port: 'exact port not confirmed — verify against your CAST Imaging release',
+    proto: 'TCP (HTTPS)',
+    purpose: 'Authentication broker for all auth modes (Local/SAML/LDAP) — CAST routes auth through embedded Keycloak rather than the application service directly.',
+    tag: 'mandatory',
+    note: 'Unverifiable here: neither architecture-spec.md nor documentation-map.md gives Keycloak\'s specific listening port for this deployment; doc page install/authentication/ should confirm it before this is relied on.'
+  });
+
+  // Analysis-node / source code access rows
+  if(hasAnalysis(a)){
+    if(multi){
+      rows.push({
+        src: 'Analysis ' + unitWord(a),
+        dst: 'Shared storage location',
+        port: 'per storage protocol (NFS/SMB/cloud) — not confirmed',
+        proto: 'varies',
+        purpose: 'Analysis nodes in a multi-machine topology require access to shared storage for source/delivery artifacts.',
+        tag: 'mandatory',
+        note: 'Exact port depends on which shared-storage backend is used — unverifiable in general terms here.'
+      });
+    }
+
+    if(a.srcHttps){
+      rows.push({
+        src: 'Analysis ' + unitWord(a),
+        dst: 'Source control server (Git/SVN/DevOps)',
+        port: '443 (HTTPS)',
+        proto: 'TCP',
+        purpose: 'Pull source code over HTTPS for analysis.',
+        tag: 'conditional',
+        note: ''
+      });
+    }
+    if(a.srcSmb){
+      rows.push({
+        src: 'Analysis ' + unitWord(a),
+        dst: 'SMB file share',
+        port: '445 (SMB) — generic Windows networking fact, not CAST-specific',
+        proto: 'TCP',
+        purpose: 'Pull source code from a network share for analysis.',
+        tag: 'conditional',
+        note: ''
+      });
+    }
+    if(!a.srcHttps && !a.srcSmb){
+      rows.push({
+        src: '—',
+        dst: '—',
+        port: '—',
+        proto: '—',
+        purpose: 'No source-code delivery protocol selected in Section 8 yet — no rows generated until you check HTTPS and/or SMB above.',
+        tag: 'optional',
+        note: ''
+      });
+    }
+  }
+
+  // Egress-dependent rows
+  if(a.egress !== 'airgapped'){
+    rows.push({
+      src: 'imaging-services ' + unitWord(a),
+      dst: 'CAST Extend (extend.castsoftware.com or equivalent)',
+      port: '443 (HTTPS)',
+      proto: 'TCP',
+      purpose: 'Download CAST Extend extensions/updates.',
+      tag: a.egress === 'proxy' ? 'conditional' : 'mandatory',
+      note: a.egress === 'proxy' ? 'Routed via corporate proxy — ensure the proxy allowlists this host explicitly rather than relying on a wildcard.' : ''
+    });
+    if(a.platform === 'docker' || a.platform === 'podman' || isK8s(a)){
+      rows.push({
+        src: unitWord(a),
+        dst: 'Docker Hub (registry-1.docker.io and related CDN hosts)',
+        port: '443 (HTTPS)',
+        proto: 'TCP',
+        purpose: 'Pull container images. This is Docker Hub\'s own pull-path hostname set, not a CAST-specific fact.',
+        tag: a.egress === 'proxy' ? 'conditional' : 'mandatory',
+        note: a.egress === 'proxy' ? 'Routed via corporate proxy.' : ''
+      });
+    }
+  } else {
+    rows.push({
+      src: unitWord(a),
+      dst: 'CAST Extend Local Update Server (air-gap exception)',
+      port: '443 (HTTPS) — internal to your network',
+      proto: 'TCP',
+      purpose: 'Air-gapped environments still need a path to extensions/updates via a locally-hosted CAST Extend Local Update Server, per the air-gap model documentation-map.md points at.',
+      tag: 'conditional',
+      note: 'This is the one outbound-like row that survives an air-gap decision — everything else that needed direct internet access is explicitly excluded instead.'
+    });
+  }
+
+  // MCP / AI rows
+  if(a.mcp){
+    rows.push({
+      src: 'MCP client (IDE / AI assistant)',
+      dst: 'MCP Server (' + coreWord(a) + ')',
+      port: 'exact port not confirmed — verify against your CAST Imaging release',
+      proto: 'TCP (likely HTTPS/SSE, not independently verified here)',
+      purpose: 'MCP Server + Gatekeeper + OAuth module traffic for AI-assisted features.',
+      tag: 'optional',
+      note: 'Unverifiable here — mcp-server/, mcp-server/gatekeeper/ and mcp-server/oauth/ are the doc pages to confirm this against; no port is given in this tool\'s source spec.'
+    });
+    if(a.egress !== 'airgapped' && a.llmProvider !== 'other'){
+      rows.push({
+        src: 'MCP Server',
+        dst: llmProviderHost(a.llmProvider),
+        port: '443 (HTTPS)',
+        proto: 'TCP',
+        purpose: 'Outbound calls to the hosted LLM provider for AI features.',
+        tag: 'optional',
+        note: 'Needs an explicit air-gap exception if egress is otherwise restricted — flagged separately below when egress is air-gapped.'
+      });
+    } else if(a.egress === 'airgapped'){
+      rows.push({
+        src: 'MCP Server',
+        dst: llmProviderHost(a.llmProvider),
+        port: '443 (HTTPS) — requires an explicit air-gap exception',
+        proto: 'TCP',
+        purpose: 'AI/LLM features require outbound access even in an otherwise air-gapped environment; this row needs an explicit firewall exception rather than being silently blocked or silently allowed.',
+        tag: 'conditional',
+        note: ''
+      });
+    }
+  }
+
+  // Highlight row
+  if(a.highlight){
+    rows.push({
+      src: coreWord(a),
+      dst: 'CAST Highlight SaaS endpoint',
+      port: '443 (HTTPS)',
+      proto: 'TCP',
+      purpose: 'Integration with CAST Highlight (a separate CAST product with its own documentation, not doc.castsoftware.com/imaging/).',
+      tag: 'optional',
+      note: a.egress === 'airgapped' ? 'Requires an explicit air-gap exception, same as the LLM row above.' : 'Exact hostname/port not independently verified here — check CAST Highlight\'s own documentation, which this tool does not have access to.'
+    });
+  }
+
+  // Email row — alternatives explicitly presented as "pick one", not bundled as simultaneous
+  if(a.email){
+    rows.push({
+      src: coreWord(a),
+      dst: 'SMTP server',
+      port: 'pick one: 25 (SMTP), 587 (SMTP submission/STARTTLS), or 465 (SMTPS)',
+      proto: 'TCP',
+      purpose: 'Outbound email notifications. These are alternative SMTP ports — configure the one your mail provider expects, not all three simultaneously.',
+      tag: 'optional',
+      note: 'Generic SMTP convention, not CAST-specific — confirm which one your mail provider actually requires.'
+    });
+  }
+
+  return rows;
+}
+
+function llmProviderHost(provider){
+  switch(provider){
+    case 'openai': return 'api.openai.com';
+    case 'azure-openai': return 'your Azure OpenAI resource endpoint (*.openai.azure.com)';
+    case 'anthropic': return 'api.anthropic.com';
+    default: return 'your self-hosted/other LLM endpoint (not applicable to a public host allowlist)';
+  }
+}
+
+/* =======================================================================
+   RENDER
+   ======================================================================= */
+function tagBadge(tag){
+  return '<span class="tag tag-' + tag + '">' + tag + '</span>';
+}
+
+function renderPortRows(rows){
+  var html = '<table><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Proto</th><th>Purpose</th><th>Tag</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html += '<tr><td>' + r.src + '</td><td>' + r.dst + '</td><td>' + r.port + '</td><td>' + r.proto + '</td>' +
+            '<td>' + r.purpose + (r.note ? '<div class="hint">' + r.note + '</div>' : '') + '</td>' +
+            '<td>' + tagBadge(r.tag) + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function render(){
+  var a = state();
+
+  // conditional sub-blocks visibility (Section 1)
+  document.getElementById('analysisNodeBlock').style.display =
+    (isMulti(a) && hasAnalysis(a)) ? 'block' : 'none';
+  document.getElementById('neo4jBlock').style.display =
+    (isMulti(a) && hasViewer(a)) ? 'block' : 'none';
+
+  // MCP sub-select visibility (Section 7)
+  document.getElementById('llmBlock').style.display = a.mcp ? 'block' : 'none';
+
+  // Section 8 hint — inert when scenario has no analysis
+  var srcHint = document.getElementById('srcHint');
+  if(!hasAnalysis(a)){
+    srcHint.textContent = 'Source-code delivery protocols are inert for the "' + a.scenario + '" scenario — it has no analysis-node, so nothing runs source code against these ports.';
+  } else {
+    srcHint.textContent = '';
+  }
+
+  // Profile chips
+  var chipsHtml = '';
+  chipsHtml += '<span class="chip">' + a.platform + '</span>';
+  chipsHtml += '<span class="chip">' + a.scenario + '</span>';
+  chipsHtml += '<span class="chip">' + a.topology + '</span>';
+  chipsHtml += '<span class="chip">PostgreSQL / ' + a.dbHosting + '</span>';
+  chipsHtml += '<span class="chip">egress: ' + a.egress + '</span>';
+  chipsHtml += '<span class="chip">auth: ' + a.auth + '</span>';
+  document.getElementById('profile-chips').innerHTML = chipsHtml;
+
+  // Validation notice — the exact sentence quoted in SKILL.md's Goal section
+  document.getElementById('validation-notice').innerHTML =
+    '<strong>Validation notice:</strong> This tool derives recommendations from CAST Imaging\'s ' +
+    'published documentation structure and standard CAST deployment practices. ' +
+    'Where a specific fact (a port, a version, a disk figure) is not independently verified here, ' +
+    'it is labeled as such — check it against your own CAST Imaging release before relying on it.';
+
+  var genLine = '<p style="color:var(--text-dim);font-size:12px;">Generated ' + new Date().toString() + '</p>';
+
+  // ---- Section 1: Deployment profile summary ----
+  var profileHtml = '<h3>1. Deployment profile</h3>' +
+    '<p>Platform: <code>' + a.platform + '</code> &middot; Scenario: <code>' + a.scenario + '</code> &middot; Topology: <code>' + a.topology + '</code></p>' +
+    '<p>Components in this deployment: <code>' + singleMachineComponentList(a).join(', ') + '</code></p>';
+  if(isMulti(a) && hasAnalysis(a)){
+    profileHtml += '<p>Analysis ' + unitWord(a) + 's: ' + a.analysisNodeCount + '</p>';
+  }
+  if(isMulti(a) && hasViewer(a)){
+    profileHtml += '<p>Neo4j: ' + (a.dedicatedNeo4j ? 'dedicated ' + unitWord(a) : 'co-located with Viewer ' + unitWord(a)) + '</p>';
+  }
+
+  // ---- Section 2: Sizing ----
+  var sizing = sizingRows(a);
+  var sizingHtml = '<h3>2. Hardware sizing</h3>';
+  sizingHtml += '<div class="callout floor">Disk floor: every node listed here is held to an absolute minimum of ' + DISK_FLOOR_GB + 'GB, ' +
+    'regardless of the baseline below it (see documentation-map.md → install/requirements/disk/ for the authoritative figure — the figure used here is this tool\'s working assumption, not independently confirmed in this session).</div>';
+  sizingHtml += '<div class="callout floor">RAM floor: standalone (all-in-one) topology is held to a minimum around ' + RAM_FLOOR_STANDALONE_GB + 'GB; ' +
+    'distributed topology nodes are held to a lower per-node minimum around ' + RAM_FLOOR_DISTRIBUTED_GB + 'GB each, since load is spread across machines. Exact CAST-published floors are not independently verified here.</div>';
+  if(sizing.band.singleNote && !isMulti(a)){
+    sizingHtml += '<div class="callout">' + sizing.band.singleNote + '</div>';
+  }
+  sizingHtml += '<table><thead><tr><th>Role</th><th>Components</th><th>vCPU</th><th>RAM (GB)</th><th>Disk (GB)</th></tr></thead><tbody>';
+  sizing.rows.forEach(function(r){
+    sizingHtml += '<tr><td>' + r.role + '</td><td>' + r.components + '</td><td>' + r.cpu + '</td><td>' + r.ram + '</td><td>' + r.disk + '</td></tr>';
+  });
+  sizingHtml += '</tbody></table>';
+  sizingHtml += '<p class="hint">All figures above are internal planning heuristics, not CAST-published sizing tiers — documentation-map.md is explicit that Section 2 has "no direct doc source" and should be labeled accordingly. Confirm real minimums at install/requirements/hardware/ and install/requirements/disk/ before provisioning.</p>';
+
+  // ---- Section 3: Database ----
+  var dbHtml = '<h3>3. Database</h3>' +
+    '<p><strong>PostgreSQL</strong> — CAST Imaging supports PostgreSQL only; this is a confirmed fact, not a configurable choice.</p>' +
+    '<p>Hosting model selected: <code>' + a.dbHosting + '</code></p>' +
+    '<p class="hint">Exact minimum/supported PostgreSQL version is not independently verified here — check install/requirements/db/ before provisioning.</p>';
+
+  // ---- Section 4: Network egress ----
+  var netHtml = '<h3>4. Network egress</h3>' +
+    '<p>Egress mode: <code>' + a.egress + '</code></p>';
+  if(a.egress === 'airgapped'){
+    netHtml += '<p>Air-gapped deployments route extension/update traffic through a locally-hosted <strong>CAST Extend Local Update Server</strong> instead of direct internet access. Any optional integration below that needs outbound access (MCP/AI, CAST Highlight) requires an explicit, individually-justified firewall exception rather than a blanket allowance.</p>';
+  } else if(a.egress === 'proxy'){
+    netHtml += '<p>All outbound rows in the ports matrix below are routed via your corporate proxy — allowlist each destination host explicitly rather than relying on a wildcard rule.</p>';
+  } else {
+    netHtml += '<p>Direct outbound access is assumed for CAST Extend, container registry pulls, and any enabled optional integrations.</p>';
+  }
+
+  // ---- Section 5: HTTPS ----
+  var httpsHtml = '<h3>5. HTTPS</h3>' +
+    '<p>Certificate source: <code>' + a.certSource + '</code> &middot; TLS termination: <code>' + a.tlsTermination + '</code></p>' +
+    '<p class="hint">Reverse-proxy termination requires the correct <code>KC_PROXY</code> / context-URL configuration on the embedded Keycloak so redirects resolve to the externally-visible hostname — see install/https-ssl/ for the specific settings; not independently verified here.</p>';
+
+  // ---- Section 6: Authentication ----
+  var authHtml = '<h3>6. Authentication</h3>' +
+    '<p>Mode selected: <code>' + a.auth + '</code></p>' +
+    '<p>All three modes (Local / SAML / LDAP) are brokered through CAST\'s embedded <strong>Keycloak</strong>, not the application service directly — there is no direct-to-app authentication path to configure around it.</p>';
+
+  // ---- Ports / FQDN matrix ----
+  var portRows = buildPortRows(a);
+  var portsHtml = '<h3>7. Network ports &amp; FQDN matrix</h3>' + renderPortRows(portRows);
+
+  // ---- Optional trailing sections, {N} placeholder mechanic ----
+  var mcpHtml = '';
+  if(a.mcp){
+    mcpHtml = '<h3>{N}. MCP Servers (AI features) — enabled</h3>' +
+      '<p>LLM provider: <code>' + a.llmProvider + '</code> — endpoint: <code>' + llmProviderHost(a.llmProvider) + '</code></p>' +
+      '<p class="hint">MCP Server, Gatekeeper and OAuth module prerequisites are not independently verified here — see mcp-server/, mcp-server/gatekeeper/ and mcp-server/oauth/.</p>';
+  }
+
+  var highlightHtml = '';
+  if(a.highlight){
+    highlightHtml = '<h3>{N}. CAST Highlight integration — enabled</h3>' +
+      '<p>CAST Highlight is a separate CAST product with its own documentation set (not <code>doc.castsoftware.com/imaging/</code>) — prerequisites here are not independently verified against that documentation in this session.</p>';
+  }
+
+  var emailHtml = '';
+  if(a.email){
+    emailHtml = '<h3>{N}. Email notifications — enabled</h3>' +
+      '<p>Configure exactly one SMTP port (25 / 587 / 465) per your mail provider\'s requirement — see the ports matrix above; these are alternatives, not simultaneous requirements.</p>';
+  }
+
+  var srcHtml = '';
+  if(a.srcHttps || a.srcSmb){
+    srcHtml = '<h3>{N}. Source code access — enabled</h3>' +
+      '<p>Delivery protocol(s): ' + [a.srcHttps ? 'HTTPS' : null, a.srcSmb ? 'SMB' : null].filter(Boolean).join(', ') + '</p>' +
+      (!hasAnalysis(a) ? '<p class="hint">Note: these settings currently have no effect — the "' + a.scenario + '" scenario has no analysis-node, so no port rows are generated from them.</p>' : '');
+  }
+
+  var optionalSections = [mcpHtml, highlightHtml, emailHtml, srcHtml].filter(function(h){ return h; });
+  var nextNum = 8; // one past the last fixed section (7: ports matrix)
+  var optionalHtml = optionalSections.map(function(h){
+    return h.replace('{N}', String(nextNum++));
+  }).join('');
+
+  var checklistHtml = '<h3>' + nextNum + '. Pre-installation checklist</h3><ul>';
+  checklistHtml += '<li>Confirm platform prerequisites for <code>' + a.platform + '</code> (OS/runtime version, Compose/kubectl tooling).</li>';
+  checklistHtml += '<li>Provision the machine(s)/pod(s) sized in Section 2 above, respecting the disk and RAM floors called out there.</li>';
+  checklistHtml += '<li>Provision PostgreSQL (' + a.dbHosting + ') and confirm connectivity on the DB port in the matrix above.</li>';
+  checklistHtml += '<li>Confirm egress rules for mode <code>' + a.egress + '</code> against every row tagged mandatory/conditional in the ports matrix.</li>';
+  checklistHtml += '<li>Prepare the HTTPS certificate (<code>' + a.certSource + '</code>) and TLS termination (<code>' + a.tlsTermination + '</code>) before first boot.</li>';
+  checklistHtml += '<li>Configure authentication (<code>' + a.auth + '</code>) through embedded Keycloak.</li>';
+  if(a.mcp) checklistHtml += '<li>Prepare MCP/AI integration credentials for <code>' + a.llmProvider + '</code>.</li>';
+  if(a.highlight) checklistHtml += '<li>Confirm CAST Highlight integration prerequisites from Highlight\'s own documentation.</li>';
+  if(a.email) checklistHtml += '<li>Confirm SMTP settings for email notifications.</li>';
+  if(hasAnalysis(a) && (a.srcHttps || a.srcSmb)) checklistHtml += '<li>Confirm source-code delivery credentials/network path for the selected protocol(s).</li>';
+  checklistHtml += '<li>Re-run this checklist after any change above — every section here reacts live to your answers.</li>';
+  checklistHtml += '</ul>';
+
+  var resultsHtml = genLine + profileHtml + sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + portsHtml + optionalHtml + checklistHtml;
+  document.getElementById('results-content').innerHTML = resultsHtml;
+
+  // Footer — TOOL_VERSION is re-stamped here, inside render(), every pass,
+  // rather than once at load, precisely so the footer can never silently
+  // go stale relative to what render() just produced.
+  var existingFooter = document.querySelector('footer.tool-footer');
+  if(existingFooter) existingFooter.remove();
+  var footer = document.createElement('footer');
+  footer.className = 'tool-footer';
+  footer.innerHTML = 'Tool content last updated ' + TOOL_VERSION +
+    ' &middot; This is a planning aid, not a substitute for CAST\'s own published documentation.';
+  document.querySelector('.results-pane').appendChild(footer);
+}
+
+/* Wire render() to fire on both input and change, delegated from the
+   form pane (covers text/select/radio/checkbox uniformly), plus once
+   on load. */
+document.getElementById('form-pane').addEventListener('input', render);
+document.getElementById('form-pane').addEventListener('change', render);
+window.addEventListener('load', render);
+render();
+</script>
+</body>
+</html>
