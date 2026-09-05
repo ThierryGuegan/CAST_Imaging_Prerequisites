@@ -1,5 +1,5 @@
 ---
-name: cast-imaging-tool-audit
+name: cast-imaging-prerequisites
 description: Audit and fix a section of index.html, the interactive CAST Imaging deployment-requirements builder in this repo. Use this whenever the user says "check the network ports for X", "check the hardware sizing for X", "check X" for any platform/scenario/section of the tool (docker, podman, kubernetes, windows, authentication, MCP, source code access, email, extensions, database, HTTPS, etc.), or otherwise asks you to review, audit, verify, or double-check part of the requirements builder against CAST's documentation. Also use it any time you're about to edit index.html's JS logic for correctness, since it captures the verify-fix-test-ship loop this repo expects.
 ---
 
