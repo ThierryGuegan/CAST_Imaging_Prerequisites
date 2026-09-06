@@ -331,7 +331,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-05';
+  var TOOL_VERSION = '2026-09-06';
 
   var LABELS = {
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
@@ -802,7 +802,7 @@
     checklist.push('TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and TLS termination configured ('+esc(LABELS.reverseProxy[a.reverseProxy])+')');
     checklist.push('All firewall rules from Section 3 opened before install day');
     checklist.push(a.egress === 'airgapped' ? 'CAST Extend Local Update Server deployed and reachable' : 'Outbound access to extend.castsoftware.com confirmed' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
-    if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes') checklist.push(a.egress === 'airgapped' ? 'CAST\'s Docker Hub images mirrored into a reachable internal registry' : 'Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST\'s images');
+    if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes') checklist.push(a.egress === 'airgapped' ? 'CAST\'s Docker Hub images mirrored into a reachable internal registry' : 'Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST\'s images' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
     checklist.push('CAST Extend API key generated and stored securely');
     checklist.push('CAST Imaging license file obtained, covering the selected modules');
     if(a.auth === 'saml') checklist.push('SAML metadata exchanged and CAST Imaging registered as a Service Provider at the IdP');
