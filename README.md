@@ -69,3 +69,15 @@ Concretely, the skill:
   fast.
 
 See the skill's `SKILL.md` for the full workflow.
+
+### `index_ref.html` and `index_test.html`
+
+These are **frozen snapshots from one validation run**, not live copies of the tool — do
+not edit them, and do not treat them as ground truth going forward. `index_ref.html` was
+a copy of `index.html` at that point in time; `index_test.html` was built from scratch by
+an agent with access to *only* the skill's three reference files, to check whether the
+skill alone is sufficient to reproduce the real tool. That comparison found a real gap
+(the six fixed output sections weren't enumerated anywhere, so the blind build invented
+its own taxonomy and never produced a "CAST Extend access & licensing" section at all),
+which is now fixed in `architecture-spec.md`. Both files are kept only as a record of
+that finding — `index.html` has moved on since and these two intentionally have not.
