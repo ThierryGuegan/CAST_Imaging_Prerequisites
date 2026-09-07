@@ -83,6 +83,9 @@
     padding:9px 16px;border-radius:7px;font-size:13px;border:none;cursor:pointer;}
   .btn.secondary{background:transparent;border:1px solid var(--border);color:#cfd8e2;}
   .btn:hover{filter:brightness(1.08);}
+  .btn-print{padding:13px 26px;font-size:15px;border-radius:9px;
+    box-shadow:0 3px 14px rgba(62,166,255,.45);letter-spacing:.01em;}
+  .btn-print:hover{box-shadow:0 4px 18px rgba(62,166,255,.6);transform:translateY(-1px);}
 
   footer.doc-footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--border);color:var(--text-dim);font-size:11.5px;}
 
@@ -303,7 +306,7 @@
     <div class="profile-chips" id="profile-chips"></div>
 
     <div class="toolbar no-print">
-      <button class="btn secondary" onclick="window.print()">🖨 Print / Save as PDF</button>
+      <button class="btn btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
     </div>
 
     <div class="callout warn no-print">
@@ -331,7 +334,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-06';
+  var TOOL_VERSION = '2026-09-07';
 
   var LABELS = {
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
@@ -795,6 +798,8 @@
     if(a.platform === 'docker') checklist.push('Installing user confirmed in the sudoers list on every machine');
     if(a.platform === 'podman') checklist.push('Rootless install plan confirmed, including <code>loginctl enable-linger</code> for the installing user so containers survive logout');
     if(a.platform === 'docker' || a.platform === 'podman') checklist.push('/tmp confirmed mounted with exec permission on every machine (remount or redirect if your hardening baseline sets noexec)');
+    if(a.platform === 'windows') checklist.push('Installing user confirmed to have <b>Full Control</b> permissions (directly or via group membership) on the root install folder on every machine');
+    if(a.platform === 'kubernetes') checklist.push('Installing user/service account confirmed to have sufficient cluster rights (namespace creation, Helm release management) — separate from the CAST-service RBAC below');
     if(a.topology === 'multi' && hasAnalysis(a)) checklist.push('Network connectivity correctly configured between the core node and every analysis-node machine ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)');
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) checklist.push('Network connectivity correctly configured between imaging-viewer and the dedicated Neo4j machine (Bolt port 7687)');
     if(a.topology === 'multi') checklist.push('Shared network folder (NAS/SAN, SMB only) provisioned and mounted as /opt/cast/shared on every machine before install');
