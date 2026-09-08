@@ -553,6 +553,10 @@
     if(viewerBox && viewerApiBox) svg += line(viewerBox.cx, yRouted+boxH, viewerApiBox.cx, ySupport, FLOW, 'ah-flow');
 
     var pgBox = byKey(dataRow, 'pg'), etlBox = byKey(dataRow, 'etl'), neo4jBox = byKey(dataRow, 'neo4j');
+    if(analysisBox){
+      svg += line(analysisBox.cx-24, ySupport+boxH, pgBox.cx-24, yData, FLOW, 'ah-flow');
+      svg += label(analysisBox.cx-70, (ySupport+boxH+yData)/2, 'writes :2285', FLOW);
+    }
     if(etlBox){
       svg += line(pgBox.x+pgBox.w, yData+boxH/2, etlBox.x, yData+boxH/2, FLOW, 'ah-flow');
       svg += line(etlBox.x+etlBox.w, yData+boxH/2, neo4jBox.x, yData+boxH/2, FLOW, 'ah-flow');
