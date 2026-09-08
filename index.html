@@ -223,21 +223,22 @@
     </fieldset>
 
     <fieldset>
-      <legend>5 · HTTPS</legend>
+      <legend>5 · Reverse proxy &amp; HTTPS</legend>
       <div class="q">
-        <label class="qlabel">TLS certificate source</label>
-        <select id="certSource">
-          <option value="ca-issued" selected>CA-issued (internal/corporate CA, public CA, or ACME/Let's Encrypt)</option>
-          <option value="self-signed">Self-signed (POC only)</option>
-        </select>
-      </div>
-      <div class="q">
-        <label class="qlabel">TLS termination point</label>
+        <label class="qlabel">Reverse proxy (mandatory prerequisite)</label>
         <select id="reverseProxy">
           <option value="nginx" selected>External reverse proxy (Nginx / Apache / HAProxy / F5)</option>
           <option value="ingress">Kubernetes Ingress controller</option>
           <option value="iis">IIS with ARR (Windows)</option>
           <option value="undecided">Not decided yet</option>
+        </select>
+        <p class="hint" style="margin-top:6px;">A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is a <b>mandatory prerequisite</b> for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing. "Not decided yet" is a valid answer while planning, but must be resolved before install day.</p>
+      </div>
+      <div class="q">
+        <label class="qlabel">TLS certificate source</label>
+        <select id="certSource">
+          <option value="ca-issued" selected>CA-issued (internal/corporate CA, public CA, or ACME/Let's Encrypt)</option>
+          <option value="self-signed">Self-signed (POC only)</option>
         </select>
       </div>
     </fieldset>
@@ -345,7 +346,7 @@
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
     egress:{direct:'Direct outbound', proxy:'Via proxy', airgapped:'Air-gapped'},
     certSource:{'ca-issued':'CA-issued', 'self-signed':'Self-signed'},
-    reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', iis:'IIS + ARR', undecided:'TLS termination undecided'},
+    reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', iis:'IIS + ARR', undecided:'Not decided yet'},
     auth:{local:'Local accounts', saml:'SAML 2.0 SSO', ldap:'LDAP / Active Directory'},
     llmProvider:{anthropic:'Anthropic API', openai:'OpenAI API', 'azure-openai':'Azure OpenAI', other:'Custom / internal LLM gateway'}
   };
@@ -764,11 +765,12 @@
       }).join('') +
       '</tbody></table></div>';
 
-    var httpsHtml = '<h3>4. HTTPS / TLS</h3>' +
-      '<div class="callout info"><b>HTTPS is recommended, not mandatory.</b> CAST Imaging can be served over plain HTTP; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment.</div>' +
+    var httpsHtml = '<h3>4. Reverse Proxy &amp; HTTPS / TLS</h3>' +
+      '<div class="callout warn"><b>A reverse proxy is a mandatory prerequisite.</b> A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is required for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing.</div>' +
+      '<div class="callout info"><b>HTTPS itself is recommended, not mandatory.</b> CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment.</div>' +
       '<ul>' +
+      '<li>Reverse proxy: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — <b>must be decided and deployed before install day</b>; this determines the firewall path in Section 3.' : '.') + '</li>' +
       '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : '.') + '</li>' +
-      '<li>TLS termination: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — decide before install day; this determines the firewall path in Section 3.' : '.') + '</li>' +
       '<li>If you enable HTTPS, the customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
       '<li>If HTTPS is enabled, disable plain HTTP (port 8090 — Gateway\'s actual HTTP port, not the standard port 80) once it is confirmed working, or keep only an HTTPS→redirect rule.</li>' +
       ((a.platform === 'docker' || a.platform === 'podman') && a.reverseProxy === 'nginx' ?
@@ -832,7 +834,8 @@
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) checklist.push('Network connectivity correctly configured between imaging-viewer and the dedicated Neo4j machine (Bolt port 7687)');
     if(a.topology === 'multi') checklist.push('Shared network folder (NAS/SAN, SMB only) provisioned and mounted as /opt/cast/shared on every machine before install');
     checklist.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
-    checklist.push('TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and TLS termination configured ('+esc(LABELS.reverseProxy[a.reverseProxy])+')');
+    checklist.push('Reverse proxy deployed in front of Gateway — <b>mandatory prerequisite</b> ('+esc(LABELS.reverseProxy[a.reverseProxy])+(a.reverseProxy==='undecided' ? ' — must be decided and deployed before install day' : '')+')');
+    checklist.push('TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and configured on the reverse proxy');
     checklist.push('All firewall rules from Section 3 opened before install day');
     checklist.push(a.egress === 'airgapped' ? 'CAST Extend Local Update Server deployed and reachable' : 'Outbound access to extend.castsoftware.com confirmed' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
     if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes') checklist.push(a.egress === 'airgapped' ? 'CAST\'s Docker Hub images mirrored into a reachable internal registry' : 'Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST\'s images' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
