@@ -472,6 +472,9 @@
 
     var y = 16;
     var browserRow = layoutRow([{key:'browser', label:'Browser', sub:'end user'}]); var yBrowser = y; y += boxH+gapY;
+    var testerBox = {x: browserRow[0].x+browserRow[0].w+60, w: 220};
+    testerBox.cx = testerBox.x + testerBox.w/2;
+    testerBox.label = 'Tester / admin workstation'; testerBox.sub = 'setup/testing phase only';
     var proxyRow = layoutRow([{key:'proxy', label:'Reverse proxy', sub:esc(LABELS.reverseProxy[a.reverseProxy])}]); var yProxy = y; y += boxH+gapY;
     var gatewayRow = layoutRow([{key:'gw', label:'Gateway', sub:':8090 — sole entry point'}]); var yGateway = y; y += boxH+gapY;
 
@@ -534,7 +537,7 @@
       return '<text x="'+x+'" y="'+y+'" text-anchor="middle" font-size="10.5" fill="'+color+'" paint-order="stroke" stroke="var(--panel-alt)" stroke-width="4" stroke-linejoin="round">'+esc(text)+'</text>';
     }
 
-    var FLOW = 'var(--text-dim)', ROUTE = 'var(--accent)', SHARED = 'var(--accent-2)';
+    var FLOW = 'var(--text-dim)', ROUTE = 'var(--accent)', SHARED = 'var(--accent-2)', TESTONLY = 'var(--warn)';
     var svg = '';
 
     // connectors
@@ -542,6 +545,17 @@
     svg += label(browserRow[0].cx+64, yBrowser+boxH+18, a.certSource==='none' ? 'HTTP :80' : 'HTTPS :443', FLOW);
     svg += line(proxyRow[0].cx, yProxy+boxH, gatewayRow[0].cx, yGateway, FLOW, 'ah-flow');
     svg += label(gatewayRow[0].cx+58, yProxy+boxH+18, 'HTTP :8090', FLOW);
+
+    var ssoBox = byKey(routedRow, 'sso'), adminBox = byKey(routedRow, 'admin');
+    var testerHasUi = hasDashboards(a) || hasViewer(a);
+    svg += line(testerBox.cx, yBrowser+boxH, gatewayRow[0].cx+40, yGateway, TESTONLY, 'ah-test', true);
+    svg += label(testerBox.cx+10, (yBrowser+boxH+yGateway)/2, ':8090', TESTONLY);
+    if(testerHasUi){
+      svg += line(testerBox.cx, yBrowser+boxH, ssoBox.cx, yRouted, TESTONLY, 'ah-test', true);
+      svg += label(testerBox.cx+40, (yBrowser+boxH+yRouted)/2+18, ':8096', TESTONLY);
+    }
+    svg += line(testerBox.cx, yBrowser+boxH, adminBox.cx, yRouted, TESTONLY, 'ah-test', true);
+    svg += label(testerBox.cx+70, (yBrowser+boxH+yRouted)/2+34, ':8098', TESTONLY);
 
     routedRow.forEach(function(b){
       svg += line(gatewayRow[0].cx, yGateway+boxH, b.cx, yRouted, ROUTE, 'ah-route', true);
@@ -603,6 +617,7 @@
 
     // boxes (drawn after connectors so they sit on top)
     svg += box(browserRow[0], yBrowser);
+    svg += box(testerBox, yBrowser, {stroke:'var(--warn)', dash:true, labelColor:'var(--warn)'});
     svg += box(proxyRow[0], yProxy, {stroke:'var(--warn)', strokeWidth:1.6});
     svg += box(gatewayRow[0], yGateway, {fill:'var(--accent)', stroke:'var(--accent)', labelColor:'#04101c', subColor:'#04101c'});
     routedRow.forEach(function(b){ svg += box(b, yRouted); });
@@ -610,8 +625,8 @@
     dataRow.forEach(function(b){ svg += box(b, yData); });
 
     var defs = '<defs>' +
-      ['flow','route','shared'].map(function(k){
-        var color = k==='flow' ? FLOW : (k==='route' ? ROUTE : SHARED);
+      ['flow','route','shared','test'].map(function(k){
+        var color = k==='flow' ? FLOW : (k==='route' ? ROUTE : (k==='shared' ? SHARED : TESTONLY));
         return '<marker id="ah-'+k+'" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="'+color+'"/></marker>';
       }).join('') +
       '</defs>';
@@ -620,11 +635,12 @@
 
     return '<figure class="arch-diagram-frame">' +
       '<svg viewBox="0 0 '+W+' '+totalH+'" role="img" aria-label="'+esc(ariaLabel)+'">' + defs + '<g font-family="Segoe UI, Roboto, sans-serif">' + svg + '</g></svg>' +
-      '<figcaption>Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it.'+extendNote+sharedNote+'</figcaption>' +
+      '<figcaption>Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it. The three amber paths from the tester/admin workstation exist only to validate Gateway'+(testerHasUi?', SSO Service':'')+' and Control Panel directly during setup/testing — close them before production go-live.'+extendNote+sharedNote+'</figcaption>' +
       '</figure>' +
       '<div class="arch-legend">' +
       '<span><i style="border-color:'+FLOW+'"></i>Direct internal call</span>' +
       '<span><i class="dash" style="border-color:'+ROUTE+'"></i>Gateway path-routing</span>' +
+      '<span><i class="dash" style="border-color:'+TESTONLY+'"></i>Setup/testing-only bypass</span>' +
       (sharedRow ? '<span><i class="dash" style="border-color:'+SHARED+'"></i>Shared-storage read/write</span>' : '') +
       '</div>';
   }
