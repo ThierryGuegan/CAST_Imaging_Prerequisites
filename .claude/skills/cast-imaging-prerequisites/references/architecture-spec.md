@@ -173,12 +173,17 @@ not *what the six fixed sections actually are*. Egress, HTTPS, and auth are ques
 *inputs* that reshape content inside several of these sections — they are not sections of their
 own.
 
-1. **Hardware sizing for your profile** (`sizingHtml`) — the composed sizing table, a **named
-   components table** (every container/service by name and port — Gateway, Console, Auth
-   service, SSO Service, Control Panel, analysis-node, Viewer, Viewer-APIs, ETL service,
-   AI-service, Dashboards, Neo4j, PostgreSQL, extend-proxy — gated by the same `has*(a)`
-   predicates as everything else), OS/runtime version requirements, storage locations, and
-   client-side (end-user + delivery workstation) requirements.
+1. **Hardware sizing for your profile** (`sizingHtml`) — the composed sizing table, an inline SVG
+   **architecture diagram** (`buildArchitectureDiagram(a)` — boxes/arrows for Browser → mandatory
+   reverse proxy → Gateway, Gateway's internal path-routing fan-out, the supporting services,
+   PostgreSQL → ETL → Neo4j, and the shared-storage mount when `a.topology==='multi'`; every row is
+   laid out dynamically from the same `has*(a)` gates as the table below it, so boxes that don't
+   apply to the current answers are omitted and the remaining ones re-center, not just dimmed) and
+   the **named components table** it illustrates (every container/service by name and port —
+   Gateway, Console, Auth service, SSO Service, Control Panel, analysis-node, Viewer, Viewer-APIs,
+   ETL service, AI-service, Dashboards, Neo4j, PostgreSQL, extend-proxy — gated by the same
+   `has*(a)` predicates as everything else), OS/runtime version requirements, storage locations,
+   and client-side (end-user + delivery workstation) requirements.
 2. **Database requirements** (`dbHtml`) — PostgreSQL configuration/version/hosting, and Neo4j
    requirements when the scenario includes the Viewer.
 3. **Network ports & FQDN allowlist** (`netHtml`) — the full `buildPortRows(a)` table. This is

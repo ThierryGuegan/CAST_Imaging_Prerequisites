@@ -80,6 +80,14 @@
   .checklist li input[type=checkbox]{margin-top:3px;flex:0 0 auto;width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
   .checklist li label:has(input:checked) span{color:var(--text-dim);text-decoration:line-through;}
 
+  .arch-diagram-frame{background:var(--panel-alt);border:1px solid var(--border);border-radius:10px;padding:14px 14px 8px;margin:14px 0;overflow-x:auto;}
+  .arch-diagram-frame svg{display:block;width:100%;height:auto;min-width:760px;}
+  .arch-diagram-frame figcaption{font-size:11.5px;color:var(--text-dim);margin:10px 2px 4px;line-height:1.5;}
+  .arch-legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin:10px 2px 0;padding:10px 12px;background:var(--code-bg);border:1px solid var(--border);border-radius:8px;font-size:11.5px;color:var(--text-dim);}
+  .arch-legend span{display:inline-flex;align-items:center;gap:7px;}
+  .arch-legend i{display:inline-block;width:22px;height:0;border-top-width:2px;border-top-style:solid;}
+  .arch-legend i.dash{border-top-style:dashed;}
+
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 22px;}
   .btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#04101c;font-weight:700;
     padding:9px 16px;border-radius:7px;font-size:13px;border:none;cursor:pointer;}
@@ -445,6 +453,136 @@
 
   function esc(s){ return String(s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 
+  function buildArchitectureDiagram(a){
+    var W = 1260, boxH = 60, gapY = 34;
+
+    function layoutRow(items, w){
+      w = w || 180;
+      var gap = 16, n = items.length;
+      var total = n*w + (n-1)*gap;
+      var startX = (W - total) / 2;
+      return items.map(function(it, i){
+        var x = startX + i*(w+gap);
+        return {key:it.key, label:it.label, sub:it.sub, x:x, w:w, cx:x+w/2};
+      });
+    }
+    function byKey(row, key){ for(var i=0;i<row.length;i++){ if(row[i].key===key) return row[i]; } return null; }
+
+    var y = 16;
+    var browserRow = layoutRow([{key:'browser', label:'Browser', sub:'end user'}]); var yBrowser = y; y += boxH+gapY;
+    var proxyRow = layoutRow([{key:'proxy', label:'Reverse proxy', sub:esc(LABELS.reverseProxy[a.reverseProxy])}]); var yProxy = y; y += boxH+gapY;
+    var gatewayRow = layoutRow([{key:'gw', label:'Gateway', sub:':8090 — sole entry point'}]); var yGateway = y; y += boxH+gapY;
+
+    var routedItems = [
+      {key:'console', label:'Console', sub:'/console · :8091'},
+      {key:'auth', label:'Auth service', sub:'/oauth2 · :8092'},
+      {key:'sso', label:'SSO Service', sub:'/auth · :8096'},
+      {key:'admin', label:'Control Panel', sub:'/admin · :8098'}
+    ];
+    if(hasViewer(a)) routedItems.push({key:'viewer', label:'Viewer', sub:'/imaging · :8083'});
+    if(hasDashboards(a)) routedItems.push({key:'dash', label:'Dashboards', sub:'/dashboards · :8097'});
+    var routedRow = layoutRow(routedItems); var yRouted = y; y += boxH+gapY;
+
+    var supportItems = [];
+    if(hasAnalysis(a)) supportItems.push({key:'analysis', label:'Analysis-node(s)', sub:':8089'});
+    supportItems.push({key:'ai', label:'AI-service', sub:'ai-manager · :8082'});
+    if(hasViewer(a)) supportItems.push({key:'viewerapi', label:'Viewer-APIs', sub:'imaging-apis · :8070'});
+    var supportRow = layoutRow(supportItems); var ySupport = y; y += boxH+gapY;
+
+    var dataItems = [{key:'pg', label:'PostgreSQL', sub:'default :2285'}];
+    if(hasNeo4j(a)){
+      dataItems.push({key:'etl', label:'ETL service', sub:':9001'});
+      dataItems.push({key:'neo4j', label:'Neo4j', sub:'Bolt :7687 · HTTP :7474'});
+    }
+    var dataRow = layoutRow(dataItems); var yData = y; y += boxH+gapY;
+
+    var sharedRow = null, ySharedRow = null;
+    if(a.topology === 'multi'){
+      sharedRow = layoutRow([{key:'shared', label:'Shared network storage', sub:'/opt/cast/shared · SMB :445'}], 460); ySharedRow = y; y += boxH;
+    }
+
+    var totalH = y + 18;
+
+    function box(b, yy, opts){
+      opts = opts || {};
+      var fill = opts.fill || 'var(--panel-alt)';
+      var stroke = opts.stroke || 'var(--border)';
+      var sw = opts.strokeWidth || 1.3;
+      var dash = opts.dash ? ' stroke-dasharray="4 3"' : '';
+      return '<rect x="'+b.x+'" y="'+yy+'" width="'+b.w+'" height="'+boxH+'" rx="8" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"'+dash+'/>' +
+        '<text x="'+b.cx+'" y="'+(yy+boxH/2-5)+'" text-anchor="middle" font-weight="600" font-size="12" fill="'+(opts.labelColor||'#fff')+'">'+esc(b.label)+'</text>' +
+        '<text x="'+b.cx+'" y="'+(yy+boxH/2+12)+'" text-anchor="middle" font-size="10" fill="'+(opts.subColor||'var(--text-dim)')+'">'+b.sub+'</text>';
+    }
+    function line(x1,y1,x2,y2,color,marker,dashed){
+      return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="1.5"'+(dashed?' stroke-dasharray="5 4"':'')+' marker-end="url(#'+marker+')"/>';
+    }
+    function label(x,y,text,color){
+      return '<text x="'+x+'" y="'+y+'" text-anchor="middle" font-size="10" fill="'+color+'">'+esc(text)+'</text>';
+    }
+
+    var FLOW = 'var(--text-dim)', ROUTE = 'var(--accent)', SHARED = 'var(--accent-2)';
+    var svg = '';
+
+    // connectors
+    svg += line(browserRow[0].cx, yBrowser+boxH, proxyRow[0].cx, yProxy, FLOW, 'ah-flow');
+    svg += line(proxyRow[0].cx, yProxy+boxH, gatewayRow[0].cx, yGateway, FLOW, 'ah-flow');
+    svg += label(gatewayRow[0].cx+58, yProxy+boxH+18, 'HTTP :8090', FLOW);
+
+    routedRow.forEach(function(b){
+      svg += line(gatewayRow[0].cx, yGateway+boxH, b.cx, yRouted, ROUTE, 'ah-route', true);
+    });
+
+    var analysisBox = byKey(supportRow, 'analysis'), aiBox = byKey(supportRow, 'ai'), viewerApiBox = byKey(supportRow, 'viewerapi');
+    var viewerBox = byKey(routedRow, 'viewer');
+    if(analysisBox) svg += line(gatewayRow[0].cx, yGateway+boxH, analysisBox.cx, ySupport, ROUTE, 'ah-route', true);
+    if(aiBox) svg += line(gatewayRow[0].cx, yGateway+boxH, aiBox.cx, ySupport, ROUTE, 'ah-route', true);
+    if(viewerBox && viewerApiBox) svg += line(viewerBox.cx, yRouted+boxH, viewerApiBox.cx, ySupport, FLOW, 'ah-flow');
+
+    var pgBox = byKey(dataRow, 'pg'), etlBox = byKey(dataRow, 'etl'), neo4jBox = byKey(dataRow, 'neo4j');
+    if(etlBox){
+      svg += line(pgBox.x+pgBox.w, yData+boxH/2, etlBox.x, yData+boxH/2, FLOW, 'ah-flow');
+      svg += line(etlBox.x+etlBox.w, yData+boxH/2, neo4jBox.x, yData+boxH/2, FLOW, 'ah-flow');
+    }
+    if(viewerBox && neo4jBox){
+      svg += line(viewerBox.cx+20, yRouted+boxH, neo4jBox.cx, yData, FLOW, 'ah-flow');
+    }
+
+    var sharedNote = '';
+    if(sharedRow){
+      svg += box(sharedRow[0], ySharedRow, {stroke:'var(--accent-2)', dash:true, labelColor:'var(--accent-2)'});
+      if(analysisBox) svg += line(analysisBox.cx, ySupport+boxH, sharedRow[0].cx-80, ySharedRow, SHARED, 'ah-shared', true);
+      if(neo4jBox) svg += line(neo4jBox.cx, yData+boxH, sharedRow[0].cx+80, ySharedRow, SHARED, 'ah-shared', true);
+      sharedNote = ' Every CAST Imaging machine mounts this share read/write (including the core node) — only representative lines are drawn.';
+    }
+
+    // boxes (drawn after connectors so they sit on top)
+    svg += box(browserRow[0], yBrowser);
+    svg += box(proxyRow[0], yProxy, {stroke:'var(--warn)', strokeWidth:1.6});
+    svg += box(gatewayRow[0], yGateway, {fill:'var(--accent)', stroke:'var(--accent)', labelColor:'#04101c', subColor:'#04101c'});
+    routedRow.forEach(function(b){ svg += box(b, yRouted); });
+    supportRow.forEach(function(b){ svg += box(b, ySupport); });
+    dataRow.forEach(function(b){ svg += box(b, yData); });
+
+    var defs = '<defs>' +
+      ['flow','route','shared'].map(function(k){
+        var color = k==='flow' ? FLOW : (k==='route' ? ROUTE : SHARED);
+        return '<marker id="ah-'+k+'" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="'+color+'"/></marker>';
+      }).join('') +
+      '</defs>';
+
+    var ariaLabel = 'Diagram of the CAST Imaging components active for your current answers: the browser reaches Gateway on port 8090 only, through the mandatory reverse proxy; Gateway internally path-routes to ' + routedItems.map(function(r){return r.label;}).join(', ') + '; ' + (analysisBox||aiBox||viewerApiBox ? 'supporting services (' + supportItems.map(function(r){return r.label;}).join(', ') + ') sit behind it; ' : '') + 'PostgreSQL' + (etlBox ? ' feeds Neo4j through an ETL service' : ' is the sole data store') + '.';
+
+    return '<figure class="arch-diagram-frame">' +
+      '<svg viewBox="0 0 '+W+' '+totalH+'" role="img" aria-label="'+esc(ariaLabel)+'">' + defs + '<g font-family="Segoe UI, Roboto, sans-serif">' + svg + '</g></svg>' +
+      '<figcaption>Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it.'+sharedNote+'</figcaption>' +
+      '</figure>' +
+      '<div class="arch-legend">' +
+      '<span><i style="border-color:'+FLOW+'"></i>Direct internal call</span>' +
+      '<span><i class="dash" style="border-color:'+ROUTE+'"></i>Gateway path-routing</span>' +
+      (sharedRow ? '<span><i class="dash" style="border-color:'+SHARED+'"></i>Shared-storage read/write</span>' : '') +
+      '</div>';
+  }
+
   // ---- Port / FQDN matrix rows, each with a show(a) predicate ----
   function buildPortRows(a){
     var isK8s = a.platform === 'kubernetes';
@@ -684,6 +822,7 @@
 
     sizingHtml += '<h4>Named components (architecture overview)</h4>' +
       '<p>All components below other than Gateway communicate over CAST\'s internal container network and are not individually customer-firewall-configurable in a single- or co-located multi-machine topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j machines) where a real firewall path is required. Source: CAST\'s architecture reference diagram and <a href="https://doc.castsoftware.com/imaging/install/requirements/hardware/#tcp-ports" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports)</a>.</p>' +
+      buildArchitectureDiagram(a) +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Port(s)</th><th>Role</th></tr></thead><tbody>' +
       componentRows.map(function(r){ return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+r[2]+'</td></tr>'; }).join('') +
       '</tbody></table></div>';
