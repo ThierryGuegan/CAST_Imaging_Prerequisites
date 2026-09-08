@@ -498,6 +498,14 @@
     }
     var dataRow = layoutRow(dataItems); var yData = y; y += boxH+gapY;
 
+    var extendRow = null, yExtendRow = null;
+    if(a.egress === 'airgapped'){
+      extendRow = layoutRow([
+        {key:'extend', label:'Extend Local Server', sub:'extend-proxy · :8085'},
+        {key:'extendtarget', label:'extend.castsoftware.com', sub:'outbound only · :443'}
+      ], 220); yExtendRow = y; y += boxH+gapY;
+    }
+
     var sharedRow = null, ySharedRow = null;
     if(a.topology === 'multi'){
       sharedRow = layoutRow([{key:'shared', label:'Shared network storage', sub:'/opt/cast/shared · SMB :445'}], 460); ySharedRow = y; y += boxH;
@@ -527,6 +535,7 @@
 
     // connectors
     svg += line(browserRow[0].cx, yBrowser+boxH, proxyRow[0].cx, yProxy, FLOW, 'ah-flow');
+    svg += label(browserRow[0].cx+64, yBrowser+boxH+18, a.certSource==='none' ? 'HTTP :80' : 'HTTPS :443', FLOW);
     svg += line(proxyRow[0].cx, yProxy+boxH, gatewayRow[0].cx, yGateway, FLOW, 'ah-flow');
     svg += label(gatewayRow[0].cx+58, yProxy+boxH+18, 'HTTP :8090', FLOW);
 
@@ -547,6 +556,17 @@
     }
     if(viewerBox && neo4jBox){
       svg += line(viewerBox.cx+20, yRouted+boxH, neo4jBox.cx, yData, FLOW, 'ah-flow');
+    }
+
+    var extendNote = '';
+    if(extendRow){
+      var extendBox = extendRow[0], extendTargetBox = extendRow[1];
+      svg += box(extendBox, yExtendRow, {stroke:'var(--accent-2)'});
+      svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
+      svg += line(extendBox.x+extendBox.w, yExtendRow+boxH/2, extendTargetBox.x, yExtendRow+boxH/2, FLOW, 'ah-flow');
+      svg += line(aiBox.cx, ySupport+boxH, extendBox.cx-16, yExtendRow, FLOW, 'ah-flow');
+      if(analysisBox) svg += line(analysisBox.cx, ySupport+boxH, extendBox.cx+16, yExtendRow, FLOW, 'ah-flow');
+      extendNote = ' The Extend Local Server is reached internally on :8085 by the core node and any analysis-node(s); it is the only component with outbound internet access.';
     }
 
     var sharedNote = '';
@@ -576,7 +596,7 @@
 
     return '<figure class="arch-diagram-frame">' +
       '<svg viewBox="0 0 '+W+' '+totalH+'" role="img" aria-label="'+esc(ariaLabel)+'">' + defs + '<g font-family="Segoe UI, Roboto, sans-serif">' + svg + '</g></svg>' +
-      '<figcaption>Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it.'+sharedNote+'</figcaption>' +
+      '<figcaption>Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it.'+extendNote+sharedNote+'</figcaption>' +
       '</figure>' +
       '<div class="arch-legend">' +
       '<span><i style="border-color:'+FLOW+'"></i>Direct internal call</span>' +
