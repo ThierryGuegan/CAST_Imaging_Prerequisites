@@ -597,7 +597,7 @@
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L'+marginX+','+(yGateway+boxH/2)+' L'+marginX+','+(ySharedRow+boxH/2)+' L'+sharedRow[0].x+','+(ySharedRow+boxH/2)+'" fill="none" stroke="'+SHARED+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-shared)"/>';
       svg += label(marginX+52, (yGateway+boxH/2+ySharedRow+boxH/2)/2, 'core node', SHARED);
       if(analysisBox) svg += line(analysisBox.cx, ySupport+boxH, sharedRow[0].cx-80, ySharedRow, SHARED, 'ah-shared', true);
-      if(neo4jBox) svg += line(neo4jBox.cx, yData+boxH, sharedRow[0].cx+80, ySharedRow, SHARED, 'ah-shared', true);
+      if(neo4jBox && a.neo4jDedicated) svg += line(neo4jBox.cx, yData+boxH, sharedRow[0].cx+80, ySharedRow, SHARED, 'ah-shared', true);
       sharedNote = ' Every CAST Imaging machine mounts this share read/write (including the core node) — only representative lines are drawn.';
     }
 
