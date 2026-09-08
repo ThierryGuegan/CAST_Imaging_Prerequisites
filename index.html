@@ -546,7 +546,10 @@
     var analysisBox = byKey(supportRow, 'analysis'), aiBox = byKey(supportRow, 'ai'), viewerApiBox = byKey(supportRow, 'viewerapi');
     var viewerBox = byKey(routedRow, 'viewer');
     if(analysisBox) svg += line(gatewayRow[0].cx, yGateway+boxH, analysisBox.cx, ySupport, ROUTE, 'ah-route', true);
-    if(aiBox) svg += line(gatewayRow[0].cx, yGateway+boxH, aiBox.cx, ySupport, ROUTE, 'ah-route', true);
+    if(aiBox){
+      svg += '<line x1="'+gatewayRow[0].cx+'" y1="'+(yGateway+boxH)+'" x2="'+aiBox.cx+'" y2="'+ySupport+'" stroke="'+ROUTE+'" stroke-width="1.5" stroke-dasharray="2 3" opacity=".55" marker-end="url(#ah-route)"/>';
+      svg += label(aiBox.cx+70, ySupport-8, 'link not confirmed', ROUTE);
+    }
     if(viewerBox && viewerApiBox) svg += line(viewerBox.cx, yRouted+boxH, viewerApiBox.cx, ySupport, FLOW, 'ah-flow');
 
     var pgBox = byKey(dataRow, 'pg'), etlBox = byKey(dataRow, 'etl'), neo4jBox = byKey(dataRow, 'neo4j');
@@ -565,7 +568,8 @@
       svg += box(extendBox, yExtendRow, {stroke:'var(--accent-2)'});
       svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
       svg += line(extendBox.x+extendBox.w, yExtendRow+boxH/2, extendTargetBox.x, yExtendRow+boxH/2, FLOW, 'ah-flow');
-      svg += line(aiBox.cx, ySupport+boxH, extendBox.cx-16, yExtendRow, FLOW, 'ah-flow');
+      svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-flow)"/>';
+      svg += label(60, yExtendRow+boxH/2-8, 'core node', FLOW);
       if(analysisBox) svg += line(analysisBox.cx, ySupport+boxH, extendBox.cx+16, yExtendRow, FLOW, 'ah-flow');
       extendNote = ' The Extend Local Server is reached internally on :8085 by the core node and any analysis-node(s); it is the only component with outbound internet access.';
     }
