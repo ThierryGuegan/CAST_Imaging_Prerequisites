@@ -508,7 +508,7 @@
 
     var sharedRow = null, ySharedRow = null;
     if(a.topology === 'multi'){
-      sharedRow = layoutRow([{key:'shared', label:'Shared network storage', sub:'/opt/cast/shared · SMB :445'}], 460); ySharedRow = y; y += boxH;
+      sharedRow = layoutRow([{key:'shared', label:'Shared network storage', sub:'default: /opt/cast/shared (configurable) · SMB :445'}], 460); ySharedRow = y; y += boxH;
     }
 
     var totalH = y + 18;
@@ -555,7 +555,8 @@
       svg += line(etlBox.x+etlBox.w, yData+boxH/2, neo4jBox.x, yData+boxH/2, FLOW, 'ah-flow');
     }
     if(viewerBox && neo4jBox){
-      svg += line(viewerBox.cx+20, yRouted+boxH, neo4jBox.cx, yData, FLOW, 'ah-flow');
+      var bulgeX = Math.max(viewerApiBox ? viewerApiBox.x+viewerApiBox.w : 0, neo4jBox.x+neo4jBox.w) + 30;
+      svg += '<path d="M'+(viewerBox.x+viewerBox.w)+','+(yRouted+boxH)+' C '+bulgeX+','+(yRouted+boxH)+' '+bulgeX+','+yData+' '+(neo4jBox.x+neo4jBox.w)+','+yData+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
     }
 
     var extendNote = '';
@@ -650,7 +651,7 @@
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
     }
     if(a.topology === 'multi' && (a.platform === 'docker' || a.platform === 'podman')){
-      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The /opt/cast/shared parent folder must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 9'});
+      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The shared parent folder (<code>/opt/cast/shared</code> by default — the path is configurable at install time) must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 9'});
     } else if(a.topology === 'multi' && a.platform === 'windows'){
       rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (deploy/delivery/common-data)', port:'445', proto:'SMB', purpose:'Windows file shares for the deploy/delivery/common-data folders, accessed under a service account whose credentials are consistent across every machine (see Section 1)', tag:'mandatory', note:'Exact folder layout not verified against CAST\'s Windows documentation — confirmed concept, not confirmed paths'});
     }
@@ -1010,7 +1011,7 @@
     if(a.platform === 'docker' || a.platform === 'podman') everyMachine.push('/tmp confirmed mounted with exec permission (remount or redirect if your hardening baseline sets noexec)');
     if(a.platform === 'windows') everyMachine.push('Installing user confirmed to have <b>Full Control</b> permissions (directly or via group membership) on the root install folder');
     if(a.platform === 'kubernetes') everyMachine.push('Installing user/service account confirmed to have sufficient cluster rights (namespace creation, Helm release management) — separate from the CAST-service RBAC below');
-    if(a.topology === 'multi') everyMachine.push('Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared before install');
+    if(a.topology === 'multi') everyMachine.push('Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared (default path — configurable) before install');
     var everyMachineScope;
     if(a.topology === 'multi'){
       var machineList = ['core node'];
