@@ -18,9 +18,10 @@ asking the user to paste the page content directly.
 | §3 Database — disk floors, storage locations | 256GB floor, RAM floors, per-platform storage paths | `install/requirements/disk/`, `install/requirements/disk/storage-locations/`, `install/requirements/disk/storage-locations/docker/`, `install/requirements/disk/storage-locations/windows/`, `install/requirements/disk/storage-locations/cloud/` |
 | §3 Database — hardware sizing | CPU/RAM baselines | `install/requirements/hardware/` |
 | §3 Database — OS/software versions | Supported distros, glibc, Docker Compose version, JDK version | `install/requirements/software/` |
-| §4 Network egress | Air-gapped / CAST Extend Local Update Server model | `install/global/` (general install prerequisites) |
+| §1 Named components / §3 Network ports — exact ports and container names (Gateway, Console, Auth service, SSO Service, Control Panel, Viewer, Viewer-APIs, ETL service, AI-service, Dashboards, Neo4j, PostgreSQL, extend-proxy) | The definitive TCP port list per component | `install/requirements/hardware/#tcp-ports` — confirmed against CAST's own architecture reference diagram (user-supplied); notably PostgreSQL's default is **2285**, not the community default 5432, and Gateway:8090 is the single customer-facing entry point (everything else is internal-only, path-routed through Gateway) |
+| §4 Network egress | Air-gapped / CAST Extend Local Update Server model (extend-proxy container, port 8085 internally) | `install/global/` (general install prerequisites) |
 | §5 HTTPS | Certificate requirements, reverse-proxy configuration, `KC_PROXY`/context-URL settings | `install/https-ssl/` |
-| §6 Authentication | Local / SAML / LDAP setup, Keycloak's role as the embedded broker | `install/authentication/`, `install/authentication/local/`, `install/authentication/saml/`, `install/authentication/ldap/` |
+| §6 Authentication | Local / SAML / LDAP setup, brokered through the embedded SSO Service (8096, /auth) and Auth service (8092, /oauth2) — not "Keycloak"; that was this tool's own earlier guess at the underlying broker's identity, superseded by the architecture diagram's own component names | `install/authentication/`, `install/authentication/local/`, `install/authentication/saml/`, `install/authentication/ldap/` |
 | §7 Optional integrations — MCP / AI | MCP Server, Gatekeeper, OAuth module | `mcp-server/`, `mcp-server/imaging/`, `mcp-server/gatekeeper/`, `mcp-server/oauth/` |
 | §7 Optional integrations — CAST Highlight | SaaS integration prerequisites (not covered under `install/imaging/` — this is a separate CAST product's docs) | CAST Highlight's own documentation, not `doc.castsoftware.com/imaging/` |
 | §8 Source code access | Git/SVN/DevOps/SMB delivery prerequisites | `install/global/docker/reference/config-examples/`, `install/requirements/disk/storage-locations/` |
@@ -34,6 +35,7 @@ cites one, that's the exact page whose content the surrounding text claims to re
 - `install/requirements/db/`
 - `install/requirements/software/`
 - `install/requirements/disk/storage-locations/` (+ `/docker/`, `/windows/`, `/cloud/` variants)
+- `install/requirements/hardware/#tcp-ports` (the "Named components (architecture overview)" table in §1 and most of the port numbers in §3)
 
 ## Using this map
 

@@ -173,9 +173,12 @@ not *what the six fixed sections actually are*. Egress, HTTPS, and auth are ques
 *inputs* that reshape content inside several of these sections — they are not sections of their
 own.
 
-1. **Hardware sizing for your profile** (`sizingHtml`) — the composed sizing table, OS/runtime
-   version requirements, storage locations, and client-side (end-user + delivery workstation)
-   requirements.
+1. **Hardware sizing for your profile** (`sizingHtml`) — the composed sizing table, a **named
+   components table** (every container/service by name and port — Gateway, Console, Auth
+   service, SSO Service, Control Panel, analysis-node, Viewer, Viewer-APIs, ETL service,
+   AI-service, Dashboards, Neo4j, PostgreSQL, extend-proxy — gated by the same `has*(a)`
+   predicates as everything else), OS/runtime version requirements, storage locations, and
+   client-side (end-user + delivery workstation) requirements.
 2. **Database requirements** (`dbHtml`) — PostgreSQL configuration/version/hosting, and Neo4j
    requirements when the scenario includes the Viewer.
 3. **Network ports & FQDN allowlist** (`netHtml`) — the full `buildPortRows(a)` table. This is

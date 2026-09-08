@@ -334,7 +334,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-07';
+  var TOOL_VERSION = '2026-09-08';
 
   var LABELS = {
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
@@ -441,7 +441,7 @@
     var isK8s = a.platform === 'kubernetes';
     var coreWord = isK8s ? 'core pods' : 'core node';
     var unitWord = isK8s ? 'pod' : 'machine';
-    var dbPort = '5432';
+    var dbPort = '2285 (default, configurable)';
     var dbLabel = 'PostgreSQL';
     var dbDest = 'PostgreSQL (' +
       (a.dbHosting === 'dedicated' ? 'dedicated database server' :
@@ -459,19 +459,17 @@
     var podmanPortNote = a.platform === 'podman' ? ' — rootless Podman can\'t bind ports below 1024 by default; either lower net.ipv4.ip_unprivileged_port_start, grant CAP_NET_BIND_SERVICE, or publish to a high port and front it with something that can bind 80/443' : '';
     var hasUi = hasDashboards(a) || hasViewer(a);
     var rows = (hasUi ? [
-      {src:'End-user browser', dst:'CAST Imaging Web', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'+podmanPortNote},
-      {src:'End-user browser', dst:'CAST Imaging Web', port:'8090', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or redirect to HTTPS if enabled — CAST Imaging Web listens on 8090, not the standard port 80', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'+podmanPortNote},
-      {src:'End-user browser', dst:'Keycloak', port:'8096', proto:'HTTP/HTTPS', purpose:'CAST Imaging\'s embedded authentication/SSO broker — the browser is redirected here to sign in, whatever identity source (local, SAML, LDAP) is configured', tag:'mandatory', note:(a.reverseProxy !== 'undecided' ? 'If fronted by a reverse proxy, the proxy must forward this port/path too, not just CAST Imaging Web — otherwise sign-in breaks' : undefined)},
-      {src:'End-user browser', dst:'Eureka', port:'8098', proto:'HTTP/HTTPS', purpose:'Service discovery/registry endpoint the browser/frontend accesses directly', tag:'mandatory', note:(a.reverseProxy !== 'undecided' ? 'If fronted by a reverse proxy, the proxy must forward this port/path too' : undefined)}
+      {src:'End-user browser', dst:'Gateway', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access — Gateway is CAST Imaging\'s single customer-facing entry point; it internally routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards) to every other UI service, so this is the only port that needs to be reachable', tag:'recommended', note:'HTTPS is recommended but not mandatory — CAST Imaging can also be served over plain HTTP'+podmanPortNote},
+      {src:'End-user browser', dst:'Gateway', port:'8090', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or the port your reverse proxy forwards to — Gateway listens on 8090, not the standard port 80', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'+podmanPortNote+' — per CAST\'s architecture reference, this is the only port that needs to be exposed/opened inbound to users'}
     ] : [
-      {src:'API client / CI pipeline', dst:'imaging-services', port:'443 or 8090 (matches your HTTPS/HTTP choice)', proto:'HTTP/HTTPS', purpose:'This scenario has no Viewer/Dashboards UI — imaging-services is consumed programmatically via CAST\'s REST APIs (delivery, analysis triggering, results retrieval) rather than through a browser', tag:'mandatory', note:'Headless scenario — no browser-facing ports (CAST Imaging Web UI, Keycloak, Eureka) are needed'+podmanPortNote},
-      {src:'API client / CI pipeline', dst:'Keycloak', port:'8096', proto:'HTTP/HTTPS', purpose:'Token issuance for API authentication — CAST\'s REST APIs may still require a Keycloak-issued OAuth2 token even without a human browser session', tag:'conditional', note:'Reasonable inference, not confirmed against your CAST Imaging release — check your API authentication docs before excluding this port'}
+      {src:'API client / CI pipeline', dst:'Gateway', port:'443 or 8090 (matches your HTTPS/HTTP choice)', proto:'HTTP/HTTPS', purpose:'This scenario has no Viewer/Dashboards UI — imaging-services is consumed programmatically via CAST\'s REST APIs (delivery, analysis triggering, results retrieval) through the same Gateway entry point rather than through a browser', tag:'mandatory', note:'Headless scenario — no separate browser-facing UI ports are needed'+podmanPortNote},
+      {src:'API client / CI pipeline', dst:'Auth service', port:'8092', proto:'HTTP/HTTPS', purpose:'OAuth2 token issuance (/oauth2 path) for API authentication — CAST\'s REST APIs may still require a token even without a human browser session', tag:'conditional', note:'Reasonable inference from CAST\'s architecture reference, not independently confirmed for headless API-only use — check your API authentication docs before excluding this port'}
     ]).concat(adminRows).concat([
       {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened' : undefined)}
     ]);
 
     if(a.topology === 'multi' && hasAnalysis(a)){
-      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'443 or 8090 (matches '+coreWord+' HTTP/HTTPS setting)', proto:'HTTP/HTTPS', purpose:'Each analysis-node registers against imaging-services and exchanges analysis jobs/results — required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
+      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
     }
     if(a.topology === 'multi' && (a.platform === 'docker' || a.platform === 'podman')){
       rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The /opt/cast/shared parent folder must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 8'});
@@ -480,8 +478,9 @@
     }
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated){
       var neo4jDst = 'Neo4j (dedicated ' + (isK8s ? 'StatefulSet' : 'machine') + ')';
-      rows.push({src:'imaging-viewer', dst:neo4jDst, port:'7687', proto:'Bolt/TCP', purpose:'Graph database read/write for CAST Imaging Viewer — Neo4j\'s default Bolt port', tag:'mandatory', note:'Confirm against CAST\'s port reference if customized in your release'});
+      rows.push({src:'imaging-viewer', dst:neo4jDst, port:'7687', proto:'Bolt/TCP', purpose:'Graph database read/write for CAST Imaging Viewer — Neo4j\'s Bolt port per CAST\'s architecture reference', tag:'mandatory'});
       rows.push({src:'Backup/admin host', dst:neo4jDst, port:'6362', proto:'TCP', purpose:'Neo4j backup operations', tag:'conditional', note:'Only if backups are triggered from outside the Neo4j '+(isK8s?'pod':'machine')});
+      rows.push({src:'Backup/admin host', dst:neo4jDst, port:'7474', proto:'HTTP', purpose:'Neo4j\'s own browser-based admin/query interface — for direct database administration, not used by imaging-viewer itself', tag:'optional', note:'Only if you need to browse/query Neo4j directly outside the Viewer application'});
     }
 
     if(isK8s){
@@ -489,9 +488,9 @@
     }
     if(a.egress === 'airgapped'){
       rows.push({src:'CAST Extend Local Update Server', dst:'extend.castsoftware.com', port:'443', proto:'HTTPS', purpose:'Only outbound path for extensions, updates, licensing artifacts', tag:'mandatory'});
-      rows.push({src:'imaging-services', dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for product updates and licensing artifacts (no direct internet egress)', tag:'mandatory'});
+      rows.push({src:'imaging-services', dst:'CAST Extend Local Update Server (internal, extend-proxy container)', port:'8085', proto:'HTTPS', purpose:'Internal mirror for product updates and licensing artifacts (no direct internet egress) — 8085 is the extend-proxy container\'s own port per CAST\'s architecture reference', tag:'mandatory'});
       if(hasAnalysis(a)){
-        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'CAST Extend Local Update Server (internal)', port:'443', proto:'HTTPS', purpose:'Internal mirror for the extensions catalog — technology analyzers used during analysis (no direct internet egress)', tag:'mandatory'});
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'CAST Extend Local Update Server (internal, extend-proxy container)', port:'8085', proto:'HTTPS', purpose:'Internal mirror for the extensions catalog — technology analyzers used during analysis (no direct internet egress)', tag:'mandatory'});
       }
     } else {
       var extendProxyNote = a.egress==='proxy' ? ' via your configured proxy' : '';
@@ -523,7 +522,7 @@
       rows.push({src:'MCP Server', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'Calls to the configured LLM provider for AI-assisted / MCP natural-language features', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+
         (a.egress === 'airgapped' ? ' — this is an external API with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or an internal-only LLM gateway' :
          a.egress === 'proxy' ? ' — reaches this external API via your configured proxy' : '')});
-      rows.push({src:'MCP Gatekeeper', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — this may be the same embedded Keycloak already listed above, or a separate IdP if the OAuth module is pointed elsewhere', tag:'conditional', note:'AI/MCP selected'});
+      rows.push({src:'MCP Gatekeeper', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — this may be the same embedded Auth service (8092, /oauth2) already listed above, or a separate IdP if the OAuth module is pointed elsewhere', tag:'conditional', note:'AI/MCP selected'});
     }
 
     if(a.repoHttps && hasAnalysis(a)){
@@ -534,10 +533,10 @@
     }
 
     if(a.auth === 'saml'){
-      rows.push({src:'Keycloak', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'SSO metadata exchange and assertion validation — brokered through CAST\'s embedded Keycloak, not imaging-services directly', tag:'mandatory', note:'SAML selected'});
+      rows.push({src:'SSO Service', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'SSO metadata exchange and assertion validation — brokered through CAST\'s embedded SSO Service (port 8096, /auth path), not imaging-services directly', tag:'mandatory', note:'SAML selected'});
     }
     if(a.auth === 'ldap'){
-      rows.push({src:'Keycloak', dst:'LDAP / Active Directory server', port:'389 / 636 (LDAPS)', proto:'TCP', purpose:'Directory lookup and authentication — brokered through CAST\'s embedded Keycloak, not imaging-services directly', tag:'mandatory', note:'LDAP selected'});
+      rows.push({src:'SSO Service', dst:'LDAP / Active Directory server', port:'389 / 636 (LDAPS)', proto:'TCP', purpose:'Directory lookup and authentication — brokered through CAST\'s embedded SSO Service (port 8096, /auth path), not imaging-services directly', tag:'mandatory', note:'LDAP selected'});
     }
     if(a.email){
       rows.push({src:'imaging-services', dst:'SMTP relay', port:'25, 587, or 465', proto:'TCP', purpose:'Notification emails — pick the one port matching your relay\'s configuration (25 unauthenticated/relay-to-relay, 587 STARTTLS submission, 465 implicit TLS/SMTPS); opening all three is unnecessary', tag:'conditional', note:'Email notifications selected'});
@@ -651,6 +650,29 @@
     sizingHtml += '<div class="callout info">CAST\'s absolute floor is <b>256 GB free disk per node</b>, on SSD or equivalent high-IOPS storage (SAN configured with SSD) — the figures above already sit at or above that floor for your profile, but treat 256 GB as a hard minimum on any node regardless.</div>';
     sizingHtml += '<div class="callout info">CAST\'s RAM floor differs by topology: <b>32 GB minimum for a standalone/all-in-one machine</b> (everything on one host), versus <b>16 GB minimum per node in a distributed/multi-machine deployment</b> — 32 GB recommended per node there too. The figures above already respect these floors.</div>';
 
+    var componentRows = [
+      ['Gateway', '8090', 'Single customer-facing entry point — routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards) to every other service below. This is the only port that needs to be exposed/opened inbound to users.']
+    ];
+    componentRows.push(['Console', '8091', 'Delivery/administration console (path /console)']);
+    componentRows.push(['Auth service', '8092', 'OAuth2 token endpoint (path /oauth2)']);
+    componentRows.push(['SSO Service', '8096', 'Sign-in / SSO broker for Local, SAML, and LDAP identity sources (path /auth)']);
+    componentRows.push(['Control Panel (admin-center)', '8098–2381', 'Administration UI (path /admin)']);
+    if(hasAnalysis(a)) componentRows.push(['Analysis-node' + (isK8s?' pod(s)':'(s)'), '8089', 'Runs analyses; registers against the core services (see Section 3 for the machine/pod-to-machine/pod port)']);
+    if(hasViewer(a)) componentRows.push(['Viewer', '8083', 'Architecture/dependency graph UI (path /imaging)']);
+    if(hasViewer(a)) componentRows.push(['Viewer-APIs (imaging-apis)', '8070', 'REST API layer backing the Viewer']);
+    if(hasNeo4j(a)) componentRows.push(['ETL service', '9001', 'Loads analysis results from PostgreSQL into Neo4j for the Viewer']);
+    componentRows.push(['AI-service (ai-manager)', '8082', 'Present in CAST\'s reference architecture regardless of scenario — its exact relationship to the optional MCP/AI integration in Section 7 is not confirmed by the source diagram; treat as related, not confirmed identical']);
+    if(hasDashboards(a)) componentRows.push(['Dashboards', '8097', 'KPI dashboards UI (path /dashboards)']);
+    if(hasNeo4j(a)) componentRows.push(['Neo4j', '7687 / 7474 / 6362', 'Graph database for the Viewer (Bolt / HTTP browser interface / backup)']);
+    componentRows.push(['PostgreSQL', '2285 (default, configurable)', 'Shared relational database used by every component above that persists data']);
+    if(a.egress === 'airgapped') componentRows.push(['Extend Local Server (extend-proxy)', '8085', 'On-premises mirror of extend.castsoftware.com for air-gapped installs']);
+
+    sizingHtml += '<h4>Named components (architecture overview)</h4>' +
+      '<p>All components below other than Gateway communicate over CAST\'s internal container network and are not individually customer-firewall-configurable in a single- or co-located multi-machine topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j machines) where a real firewall path is required. Source: CAST\'s architecture reference diagram and <a href="https://doc.castsoftware.com/imaging/install/requirements/hardware/#tcp-ports" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports)</a>.</p>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Port(s)</th><th>Role</th></tr></thead><tbody>' +
+      componentRows.map(function(r){ return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+r[2]+'</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+
     var storageHtml = '';
     if(a.platform === 'docker' || a.platform === 'podman'){
       storageHtml = '<h4>Storage locations</h4><p>CAST Imaging uses <b>five main storage folders</b> per its documented model (deploy, delivery, common-data, plus database/graph data). On Docker/Podman, the confirmed defaults are:</p><ul>' +
@@ -705,7 +727,7 @@
 
     var dbHtml = '<h3>2. Database requirements</h3>' +
       '<h4>PostgreSQL (RDBMS)</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
-      '<tr><td>Engine</td><td>PostgreSQL — port 5432 (the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data)</td></tr>' +
+      '<tr><td>Engine</td><td>PostgreSQL — port <b>2285 by default</b> (configurable), not the PostgreSQL community default of 5432 — the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data. Per CAST\'s architecture reference, this port is used by every CAST Imaging component that reads/writes the database, not just imaging-services.</td></tr>' +
       '<tr><td>Version</td><td>' +
         (a.dbHosting==='colocated'
           ? 'The bundled '+((a.platform==='docker'||a.platform==='podman')?'Docker':'')+' image ships <b>PostgreSQL 15</b> — pinned by CAST, nothing for you to choose.'
@@ -720,7 +742,7 @@
       '<h4>Neo4j (graph store)</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
       (hasNeo4j(a) ?
         '<tr><td>Requirement</td><td>Bundled with imaging-viewer — not a user-selectable engine; an ETL loads analysis results from PostgreSQL into Neo4j for the Viewer</td></tr>' +
-        '<tr><td>Ports</td><td>7687 (Bolt) / 6362 (backup)</td></tr>' +
+        '<tr><td>Ports</td><td>7687 (Bolt, used by imaging-viewer) / 6362 (backup) / 7474 (Neo4j\'s own HTTP browser/admin interface, optional)</td></tr>' +
         '<tr><td>Hosting</td><td>' + (a.topology==='multi' && a.neo4jDedicated ? '<b>Deployed on its own dedicated machine</b> per your topology answer.' : 'Co-located with imaging-viewer.') + '</td></tr>' +
         '<tr><td>Memory</td><td><b>16 GB RAM minimum, 32 GB recommended</b> — defaults to a 12 GB initial/maximum JVM heap, tunable via <code>imaging-viewer/.env</code></td></tr>'
         : '<tr><td>Requirement</td><td>Not required — your scenario ('+esc(LABELS.scenario[a.scenario])+') excludes the Viewer.</td></tr>') +
@@ -742,7 +764,7 @@
       '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : '.') + '</li>' +
       '<li>TLS termination: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — decide before install day; this determines the firewall path in Section 3.' : '.') + '</li>' +
       '<li>If you enable HTTPS, the customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
-      '<li>If HTTPS is enabled, disable plain HTTP (port 8090 — CAST Imaging Web\'s actual HTTP port, not the standard port 80) once it is confirmed working, or keep only an HTTPS→redirect rule.</li>' +
+      '<li>If HTTPS is enabled, disable plain HTTP (port 8090 — Gateway\'s actual HTTP port, not the standard port 80) once it is confirmed working, or keep only an HTTPS→redirect rule.</li>' +
       ((a.platform === 'docker' || a.platform === 'podman') && a.reverseProxy === 'nginx' ?
         '<li>On '+(a.platform==='podman'?'Podman':'Docker')+', CAST\'s documented approach is a dedicated Nginx vHost <code>.conf</code> file with <code>ssl_certificate</code> / <code>ssl_certificate_key</code> directives, <code>ssl_protocols TLSv1.2</code> or higher, and server cipher preference enabled — not a CAST-specific certificate variable.</li>' +
         '<li><b>The private key must not be encrypted</b> ("BEGIN ENCRYPTED PRIVATE KEY") — CAST\'s bundled Nginx does not support encrypted keys; strip the passphrase before use.</li>' +
