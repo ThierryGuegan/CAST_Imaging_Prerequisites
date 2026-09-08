@@ -775,10 +775,13 @@
 
     var httpsHtml = '<h3>4. Reverse Proxy &amp; HTTPS / TLS</h3>' +
       '<div class="callout warn"><b>A reverse proxy is a mandatory prerequisite.</b> A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is required for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing.</div>' +
-      '<div class="callout info"><b>HTTPS/SSL itself is not mandatory, but highly recommended.</b> CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment — which in practice means almost every deployment beyond a fully offline POC.</div>' +
+      '<div class="callout info"><b>HTTPS/SSL itself is not mandatory, but highly recommended'+(a.auth==='saml' ? ' — except with SAML SSO (Section 7), where it is mandatory' : '')+'.</b> CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment — which in practice means almost every deployment beyond a fully offline POC.' + (a.auth==='saml' ? ' SAML SSO is the one exception: browsers and IdPs require an HTTPS redirect/callback URL, so HTTPS is a hard requirement whenever SAML is selected (Reasonable inference from standard SAML browser-redirect behavior, not a CAST-specific rule).' : '') + '</div>' +
+      (a.auth==='saml' && a.certSource==='none' ?
+        '<div class="callout danger"><b>Conflict: SAML SSO requires HTTPS, but "No HTTPS" is selected in this section.</b> Pick CA-issued or self-signed above before proceeding — CAST Imaging cannot complete the SAML browser-redirect flow over plain HTTP.</div>'
+        : '') +
       '<ul>' +
       '<li>Reverse proxy: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — <b>must be decided and deployed before install day</b>; this determines the firewall path in Section 3.' : '.') + '</li>' +
-      '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : (a.certSource==='none' ? ' — traffic between browser/client and the reverse proxy is unencrypted; reconsider once the deployment is reachable beyond a fully trusted, isolated network segment.' : '.')) + '</li>' +
+      '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : (a.certSource==='none' ? (a.auth==='saml' ? ' — <b>not valid with SAML SSO selected</b>; see the conflict above.' : ' — traffic between browser/client and the reverse proxy is unencrypted; reconsider once the deployment is reachable beyond a fully trusted, isolated network segment.') : '.')) + '</li>' +
       (a.certSource !== 'none' ?
         '<li>The customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
         '<li>Once HTTPS is confirmed working, disable plain HTTP (port 8090 — Gateway\'s actual HTTP port, not the standard port 80) at the reverse proxy, or keep only an HTTPS→redirect rule.</li>'
@@ -801,6 +804,7 @@
         '<li>Register CAST Imaging as a Service Provider at the IdP.</li>' +
         '<li>Agree attribute/claim mapping (email, name, groups → CAST Imaging roles) before go-live.</li>' +
         '<li>Network: HTTPS (443) reachable between browser ⇄ IdP and CAST Imaging ⇄ IdP (see Section 3).</li>' +
+        '<li><b>HTTPS on CAST Imaging itself is mandatory with SAML</b> (Section 6) — the browser/IdP redirect flow requires an HTTPS callback URL; plain HTTP is not a valid choice here.' + (a.certSource==='none' ? ' <b>Your current Section 6 selection ("No HTTPS") conflicts with this — change it before proceeding.</b>' : '') + '</li>' +
         '<li>Keep a local break-glass administrator account in case of IdP outage.</li>' +
         '</ul>';
     } else {
