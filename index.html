@@ -574,6 +574,8 @@
     }
 
     var pgBox = byKey(dataRow, 'pg'), etlBox = byKey(dataRow, 'etl'), neo4jBox = byKey(dataRow, 'neo4j');
+    svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L40,'+(yGateway+boxH/2)+' L40,'+(yData+boxH/2)+' L'+pgBox.x+','+(yData+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
+    svg += label(85, yData+boxH/2-8, 'core node :2285', FLOW);
     if(analysisBox){
       svg += line(analysisBox.cx-24, ySupport+boxH, pgBox.cx-24, yData, FLOW, 'ah-flow');
       svg += label(analysisBox.cx-70, (ySupport+boxH+yData)/2, 'writes :2285', FLOW);
