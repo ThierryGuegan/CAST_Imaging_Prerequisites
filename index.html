@@ -75,8 +75,10 @@
   .tag.recommended{background:rgba(62,166,255,.18);color:#7cc4ff;}
 
   .checklist{list-style:none;padding-left:0;}
-  .checklist li{padding:6px 0 6px 28px;position:relative;border-bottom:1px dashed var(--border);}
-  .checklist li:before{content:"☐";position:absolute;left:0;top:6px;color:var(--accent);font-size:15px;}
+  .checklist li{padding:2px 0;border-bottom:1px dashed var(--border);}
+  .checklist li label{display:flex;align-items:flex-start;gap:10px;padding:6px 2px;cursor:pointer;}
+  .checklist li input[type=checkbox]{margin-top:3px;flex:0 0 auto;width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
+  .checklist li label:has(input:checked) span{color:var(--text-dim);text-decoration:line-through;}
 
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 22px;}
   .btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#04101c;font-weight:700;
@@ -822,44 +824,106 @@
         '</ul>';
     }
 
-    var checklist = [];
-    checklist.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(LABELS.topology[a.topology])+')');
-    checklist.push('<code>curl</code> installed on every machine that runs the installer — required for the installer\'s own service health checks (CAST requirements precheck)');
-    if(a.platform === 'docker') checklist.push('Installing user confirmed in the sudoers list on every machine');
-    if(a.platform === 'podman') checklist.push('Rootless install plan confirmed, including <code>loginctl enable-linger</code> for the installing user so containers survive logout');
-    if(a.platform === 'docker' || a.platform === 'podman') checklist.push('/tmp confirmed mounted with exec permission on every machine (remount or redirect if your hardening baseline sets noexec)');
-    if(a.platform === 'windows') checklist.push('Installing user confirmed to have <b>Full Control</b> permissions (directly or via group membership) on the root install folder on every machine');
-    if(a.platform === 'kubernetes') checklist.push('Installing user/service account confirmed to have sufficient cluster rights (namespace creation, Helm release management) — separate from the CAST-service RBAC below');
-    if(a.topology === 'multi' && hasAnalysis(a)) checklist.push('Network connectivity correctly configured between the core node and every analysis-node machine ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)');
-    if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) checklist.push('Network connectivity correctly configured between imaging-viewer and the dedicated Neo4j machine (Bolt port 7687)');
-    if(a.topology === 'multi') checklist.push('Shared network folder (NAS/SAN, SMB only) provisioned and mounted as /opt/cast/shared on every machine before install');
-    checklist.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
-    checklist.push('Reverse proxy deployed in front of Gateway — <b>mandatory prerequisite</b> ('+esc(LABELS.reverseProxy[a.reverseProxy])+(a.reverseProxy==='undecided' ? ' — must be decided and deployed before install day' : '')+')');
-    checklist.push('TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and configured on the reverse proxy');
-    checklist.push('All firewall rules from Section 3 opened before install day');
-    checklist.push(a.egress === 'airgapped' ? 'CAST Extend Local Update Server deployed and reachable' : 'Outbound access to extend.castsoftware.com confirmed' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
-    if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes') checklist.push(a.egress === 'airgapped' ? 'CAST\'s Docker Hub images mirrored into a reachable internal registry' : 'Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST\'s images' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
-    checklist.push('CAST Extend API key generated and stored securely');
-    checklist.push('CAST Imaging license file obtained, covering the selected modules');
-    if(a.auth === 'saml') checklist.push('SAML metadata exchanged and CAST Imaging registered as a Service Provider at the IdP');
-    if(a.auth === 'ldap') checklist.push('LDAP bind account, base DN(s), and group mapping confirmed');
-    if(a.mcp) checklist.push('MCP Server + Gatekeeper + OAuth module deployed; LLM provider FQDN allowlisted');
-    if(a.highlight) checklist.push('CAST Highlight FQDNs allowlisted (cloud/auth/binaries)');
-    if(a.platform === 'kubernetes') checklist.push('Cluster namespace, RBAC, StorageClass, and Ingress/TLS secret prepared');
-    checklist.push('End-user and delivery workstation requirements communicated to stakeholders');
+    // ---- Checklist grouped by machine/role, each item independently checkable and persisted ----
+    var groups = [];
+
+    var everyMachine = [];
+    everyMachine.push('<code>curl</code> installed — required for the installer\'s own service health checks (CAST requirements precheck)');
+    if(a.platform === 'docker') everyMachine.push('Installing user confirmed in the <b>sudoers</b> list');
+    if(a.platform === 'podman') everyMachine.push('Rootless install plan confirmed, including <code>loginctl enable-linger</code> for the installing user so containers survive logout');
+    if(a.platform === 'docker' || a.platform === 'podman') everyMachine.push('/tmp confirmed mounted with exec permission (remount or redirect if your hardening baseline sets noexec)');
+    if(a.platform === 'windows') everyMachine.push('Installing user confirmed to have <b>Full Control</b> permissions (directly or via group membership) on the root install folder');
+    if(a.platform === 'kubernetes') everyMachine.push('Installing user/service account confirmed to have sufficient cluster rights (namespace creation, Helm release management) — separate from the CAST-service RBAC below');
+    if(a.topology === 'multi') everyMachine.push('Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared before install');
+    var everyMachineScope;
+    if(a.topology === 'multi'){
+      var machineList = ['core node'];
+      if(hasAnalysis(a)) machineList.push('analysis-node(s)');
+      if(hasNeo4j(a) && a.neo4jDedicated) machineList.push('Neo4j machine');
+      everyMachineScope = machineList.join(', ');
+    } else {
+      everyMachineScope = 'the single host';
+    }
+    groups.push({title:'Every server machine (' + everyMachineScope + ')', key:'every-machine', items:everyMachine});
+
+    var coreNode = [];
+    coreNode.push('Server(s) provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(LABELS.topology[a.topology])+')');
+    coreNode.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
+    coreNode.push('All firewall rules from Section 3 opened before install day');
+    coreNode.push(a.egress === 'airgapped' ? 'CAST Extend Local Update Server deployed and reachable' : 'Outbound access to extend.castsoftware.com confirmed' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
+    if(a.platform === 'docker' || a.platform === 'podman' || a.platform === 'kubernetes') coreNode.push(a.egress === 'airgapped' ? 'CAST\'s Docker Hub images mirrored into a reachable internal registry' : 'Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST\'s images' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
+    coreNode.push('CAST Extend API key generated and stored securely');
+    coreNode.push('CAST Imaging license file obtained, covering the selected modules');
+    if(a.auth === 'saml') coreNode.push('SAML metadata exchanged and CAST Imaging registered as a Service Provider at the IdP');
+    if(a.auth === 'ldap') coreNode.push('LDAP bind account, base DN(s), and group mapping confirmed');
+    if(a.mcp) coreNode.push('MCP Server + Gatekeeper + OAuth module deployed; LLM provider FQDN allowlisted');
+    if(a.highlight) coreNode.push('CAST Highlight FQDNs allowlisted (cloud/auth/binaries)');
+    if(a.platform === 'kubernetes') coreNode.push('Cluster namespace, RBAC, StorageClass, and Ingress/TLS secret prepared');
+    groups.push({title:'Core node (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+')', key:'core-node', items:coreNode});
+
+    if(a.topology === 'multi' && hasAnalysis(a)){
+      groups.push({title:'Analysis-node machine(s)', key:'analysis-node', items:[
+        'Network connectivity correctly configured to the core node ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)'
+      ]});
+    }
+
+    if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated){
+      groups.push({title:'Neo4j machine (dedicated)', key:'neo4j-machine', items:[
+        'Network connectivity correctly configured to imaging-viewer (Bolt port 7687)'
+      ]});
+    }
+
+    groups.push({title:'Reverse proxy', key:'reverse-proxy', items:[
+      'Reverse proxy deployed in front of Gateway — <b>mandatory prerequisite</b> ('+esc(LABELS.reverseProxy[a.reverseProxy])+(a.reverseProxy==='undecided' ? ' — must be decided and deployed before install day' : '')+')',
+      'TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and configured on the reverse proxy'
+    ]});
+
+    groups.push({title:'End-user workstation', key:'end-user-workstation', items:[
+      'Browser (Chrome / Edge / Firefox), 8 GB RAM, and 1920×1080 resolution requirements communicated to end users'
+    ]});
+
+    groups.push({title:'Delivery / analyst workstation', key:'delivery-workstation', items:[
+      'JDK (≥ 17 LTS and ≤ 21) and SCM client tools for the repositories selected in Section 8 communicated to delivery/analyst staff'
+    ]});
+
+    var checklistGroupsHtml = groups.map(function(g){
+      return '<h4>'+esc(g.title)+'</h4><ul class="checklist">' +
+        g.items.map(function(item, i){
+          var key = g.key + ':' + i;
+          return '<li><label><input type="checkbox" data-check-key="'+esc(key)+'"> <span>'+item+'</span></label></li>';
+        }).join('') + '</ul>';
+    }).join('');
 
     var optionalSections = [mcpHtml].filter(function(h){ return h; });
     var nextNum = 7;
     var optionalHtml = optionalSections.map(function(h){ return h.replace('{N}', String(nextNum++)); }).join('');
-    var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist for your profile</h3><ul class="checklist">' +
-      checklist.map(function(c){ return '<li>'+c+'</li>'; }).join('') + '</ul>';
+    var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist for your profile</h3>' +
+      '<p>Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers. Checked boxes are remembered in your browser as you tweak answers or reload the page.</p>' +
+      checklistGroupsHtml;
 
     document.getElementById('results-content').innerHTML =
       sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + optionalHtml + checklistHtml;
+
+    restoreChecklistState();
+  }
+
+  function checklistStorageKey(key){ return 'castImagingChecklist:' + key; }
+  function restoreChecklistState(){
+    var boxes = document.querySelectorAll('#results-content input[type=checkbox][data-check-key]');
+    boxes.forEach(function(box){
+      var val;
+      try { val = localStorage.getItem(checklistStorageKey(box.getAttribute('data-check-key'))); } catch(e){ val = null; }
+      box.checked = (val === '1');
+    });
   }
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
+  document.getElementById('results-content').addEventListener('change', function(e){
+    var box = e.target.closest('input[type=checkbox][data-check-key]');
+    if(!box) return;
+    try { localStorage.setItem(checklistStorageKey(box.getAttribute('data-check-key')), box.checked ? '1' : '0'); } catch(err){}
+  });
   render();
 })();
 </script>
