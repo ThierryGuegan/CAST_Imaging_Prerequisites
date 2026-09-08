@@ -494,7 +494,7 @@
     var dataItems = [{key:'pg', label:'PostgreSQL', sub:'default :2285'}];
     if(hasNeo4j(a)){
       dataItems.push({key:'etl', label:'ETL service', sub:':9001'});
-      dataItems.push({key:'neo4j', label:'Neo4j', sub:'Bolt :7687 · HTTP :7474'});
+      dataItems.push({key:'neo4j', label:'Neo4j', sub:'Bolt :7687 · :7474 · :6362'});
     }
     var dataRow = layoutRow(dataItems); var yData = y; y += boxH+gapY;
 
