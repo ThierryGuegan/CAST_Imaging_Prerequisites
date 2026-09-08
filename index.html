@@ -504,6 +504,10 @@
         {key:'extend', label:'Extend Local Server', sub:'extend-proxy · :8085'},
         {key:'extendtarget', label:'extend.castsoftware.com', sub:'outbound only · :443'}
       ], 220); yExtendRow = y; y += boxH+gapY;
+    } else {
+      extendRow = layoutRow([
+        {key:'extendtarget', label:'extend.castsoftware.com', sub:(a.egress==='proxy' ? 'via configured proxy · :443' : 'direct outbound · :443')}
+      ], 260); yExtendRow = y; y += boxH+gapY;
     }
 
     var sharedRow = null, ySharedRow = null;
@@ -569,7 +573,7 @@
     }
 
     var extendNote = '';
-    if(extendRow){
+    if(a.egress === 'airgapped'){
       var extendBox = extendRow[0], extendTargetBox = extendRow[1];
       svg += box(extendBox, yExtendRow, {stroke:'var(--accent-2)'});
       svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
@@ -578,6 +582,12 @@
       svg += label(60, yExtendRow+boxH/2-8, 'core node', FLOW);
       if(analysisBox) svg += line(analysisBox.cx, ySupport+boxH, extendBox.cx+16, yExtendRow, FLOW, 'ah-flow');
       extendNote = ' The Extend Local Server is reached internally on :8085 by the core node and any analysis-node(s); it is the only component with outbound internet access.';
+    } else if(extendRow){
+      var extendTargetBox = extendRow[0];
+      svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
+      svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendTargetBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
+      svg += label(60, yExtendRow+boxH/2-8, 'core node', FLOW);
+      extendNote = ' The core node reaches extend.castsoftware.com directly'+(a.egress==='proxy' ? ' via your configured proxy' : '')+' — the only outbound connection this deployment needs.';
     }
 
     var sharedNote = '';
