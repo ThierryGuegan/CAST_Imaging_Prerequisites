@@ -594,7 +594,7 @@
       svg += line(extendBox.x+extendBox.w, yExtendRow+boxH/2, extendTargetBox.x, yExtendRow+boxH/2, FLOW, 'ah-flow');
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-flow)"/>';
       svg += label(60, yExtendRow+boxH/2-8, 'core node', FLOW);
-      if(analysisBox) svg += line(analysisBox.cx, ySupport+boxH, extendBox.cx+16, yExtendRow, FLOW, 'ah-flow');
+      if(analysisBox) svg += line(analysisBox.cx-20, ySupport+boxH, extendBox.cx+16, yExtendRow, FLOW, 'ah-flow');
       extendNote = ' The Extend Local Server is reached internally on :8085 by the core node and any analysis-node(s); it is the only component with outbound internet access.';
     } else if(extendRow){
       var extendTargetBox = extendRow[0];
@@ -610,7 +610,7 @@
       var marginX = 20;
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L'+marginX+','+(yGateway+boxH/2)+' L'+marginX+','+(ySharedRow+boxH/2)+' L'+sharedRow[0].x+','+(ySharedRow+boxH/2)+'" fill="none" stroke="'+SHARED+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-shared)"/>';
       svg += label(marginX+52, (yGateway+boxH/2+ySharedRow+boxH/2)/2, 'core node', SHARED);
-      if(analysisBox) svg += line(analysisBox.cx, ySupport+boxH, sharedRow[0].cx-80, ySharedRow, SHARED, 'ah-shared', true);
+      if(analysisBox) svg += line(analysisBox.cx+20, ySupport+boxH, sharedRow[0].cx-80, ySharedRow, SHARED, 'ah-shared', true);
       if(neo4jBox && a.neo4jDedicated) svg += line(neo4jBox.cx, yData+boxH, sharedRow[0].cx+80, ySharedRow, SHARED, 'ah-shared', true);
       sharedNote = ' Every CAST Imaging machine mounts this share read/write (including the core node) — only representative lines are drawn.';
     }
