@@ -225,7 +225,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>5 · Reverse proxy &amp; HTTPS</legend>
+      <legend>5 · Reverse proxy</legend>
       <div class="q">
         <label class="qlabel">Reverse proxy (mandatory prerequisite)</label>
         <select id="reverseProxy">
@@ -236,17 +236,22 @@
         </select>
         <p class="hint" style="margin-top:6px;">A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is a <b>mandatory prerequisite</b> for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing. "Not decided yet" is a valid answer while planning, but must be resolved before install day.</p>
       </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>6 · HTTPS</legend>
       <div class="q">
         <label class="qlabel">TLS certificate source</label>
         <select id="certSource">
           <option value="ca-issued" selected>CA-issued (internal/corporate CA, public CA, or ACME/Let's Encrypt)</option>
           <option value="self-signed">Self-signed (POC only)</option>
         </select>
+        <p class="hint" style="margin-top:6px;">HTTPS/SSL is not mandatory, but highly recommended — see Section 5 for the mandatory reverse proxy it terminates on.</p>
       </div>
     </fieldset>
 
     <fieldset>
-      <legend>6 · Authentication</legend>
+      <legend>7 · Authentication</legend>
       <div class="q">
         <div class="opt-row">
           <label class="opt"><input type="radio" name="auth" value="local" checked>
@@ -260,7 +265,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>7 · Optional integrations</legend>
+      <legend>8 · Optional integrations</legend>
       <div class="q">
         <label class="opt"><input type="checkbox" id="mcp">
           <span class="opt-text"><b>AI / MCP Server features</b><span>Expose CAST Imaging knowledge to AI assistants (MCP + Gatekeeper + OAuth)</span></span></label>
@@ -285,7 +290,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>8 · Source code access</legend>
+      <legend>9 · Source code access</legend>
       <p class="hint" id="source-access-hint" style="margin-top:0;"></p>
       <div class="q">
         <div class="opt-row">
@@ -473,7 +478,7 @@
 
     if(hasUi){
       rows.push({src:'Tester / administrator workstation', dst:'Gateway', port:'8090', proto:'HTTP/HTTPS', purpose:'Direct access to Gateway, bypassing the reverse proxy — lets you validate Gateway itself during the setup/testing phase, before your reverse proxy and TLS termination (Section 5) are fully configured', tag:'optional', note:'Setup/testing phase only — close this direct path once your reverse proxy is validated; end users and production traffic should go through the reverse proxy in Section 5, not straight to Gateway'});
-      rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Direct access to SSO Service, bypassing Gateway\'s normal /auth path-routing — lets you validate sign-in (Local, SAML, or LDAP per Section 6) directly during setup/testing, independent of whether Gateway routing is fully working yet', tag:'optional', note:'Setup/testing phase only — SSO Service is otherwise internal-only, reached exclusively through Gateway; close this direct path before production go-live'});
+      rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Direct access to SSO Service, bypassing Gateway\'s normal /auth path-routing — lets you validate sign-in (Local, SAML, or LDAP per Section 7) directly during setup/testing, independent of whether Gateway routing is fully working yet', tag:'optional', note:'Setup/testing phase only — SSO Service is otherwise internal-only, reached exclusively through Gateway; close this direct path before production go-live'});
     }
     rows.push({src:'Tester / administrator workstation', dst:'Control Panel (admin-center)', port:'8098', proto:'HTTP/HTTPS', purpose:'Direct access to the Control Panel, bypassing Gateway\'s normal /admin path-routing — lets you validate administration/configuration directly during setup/testing, independent of whether Gateway routing is fully working yet', tag:'optional', note:'Setup/testing phase only — Control Panel is otherwise internal-only, reached exclusively through Gateway; close this direct path before production go-live'});
 
@@ -481,7 +486,7 @@
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
     }
     if(a.topology === 'multi' && (a.platform === 'docker' || a.platform === 'podman')){
-      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The /opt/cast/shared parent folder must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 8'});
+      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The /opt/cast/shared parent folder must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 9'});
     } else if(a.topology === 'multi' && a.platform === 'windows'){
       rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (deploy/delivery/common-data)', port:'445', proto:'SMB', purpose:'Windows file shares for the deploy/delivery/common-data folders, accessed under a service account whose credentials are consistent across every machine (see Section 1)', tag:'mandatory', note:'Exact folder layout not verified against CAST\'s Windows documentation — confirmed concept, not confirmed paths'});
     }
@@ -670,7 +675,7 @@
     if(hasViewer(a)) componentRows.push(['Viewer', '8083', 'Architecture/dependency graph UI (path /imaging)']);
     if(hasViewer(a)) componentRows.push(['Viewer-APIs (imaging-apis)', '8070', 'REST API layer backing the Viewer']);
     if(hasNeo4j(a)) componentRows.push(['ETL service', '9001', 'Loads analysis results from PostgreSQL into Neo4j for the Viewer']);
-    componentRows.push(['AI-service (ai-manager)', '8082', 'Present in CAST\'s reference architecture regardless of scenario — its exact relationship to the optional MCP/AI integration in Section 7 is not confirmed by the source diagram; treat as related, not confirmed identical']);
+    componentRows.push(['AI-service (ai-manager)', '8082', 'Present in CAST\'s reference architecture regardless of scenario — its exact relationship to the optional MCP/AI integration in Section 8 is not confirmed by the source diagram; treat as related, not confirmed identical']);
     if(hasDashboards(a)) componentRows.push(['Dashboards', '8097', 'KPI dashboards UI (path /dashboards)']);
     if(hasNeo4j(a)) componentRows.push(['Neo4j', '7687 / 7474 / 6362', 'Graph database for the Viewer (Bolt / HTTP browser interface / backup)']);
     componentRows.push(['PostgreSQL', '2285 (default, configurable)', 'Shared relational database used by every component above that persists data']);
@@ -731,7 +736,7 @@
 
     sizingHtml += osHtml + storageHtml + '<h4>Client-side requirements</h4><div class="tbl-wrap"><table><thead><tr><th>Profile</th><th>Requirement</th></tr></thead><tbody>' +
       '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs</td></tr>' +
-      '<tr><td>Delivery / analyst workstation</td><td>Same as above, plus local disk for source checkouts, a compatible JDK (≥ 17 LTS and ≤ 21, 64-bit, with <code>JAVA_HOME</code> set), and SCM client tools for the repositories selected in Section 8</td></tr>' +
+      '<tr><td>Delivery / analyst workstation</td><td>Same as above, plus local disk for source checkouts, a compatible JDK (≥ 17 LTS and ≤ 21, 64-bit, with <code>JAVA_HOME</code> set), and SCM client tools for the repositories selected in Section 9</td></tr>' +
       '</tbody></table></div>';
 
     var dbHtml = '<h3>2. Database requirements</h3>' +
@@ -883,7 +888,7 @@
     ]});
 
     groups.push({title:'Delivery / analyst workstation', key:'delivery-workstation', items:[
-      'JDK (≥ 17 LTS and ≤ 21) and SCM client tools for the repositories selected in Section 8 communicated to delivery/analyst staff'
+      'JDK (≥ 17 LTS and ≤ 21) and SCM client tools for the repositories selected in Section 9 communicated to delivery/analyst staff'
     ]});
 
     var checklistGroupsHtml = groups.map(function(g){
