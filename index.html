@@ -556,6 +556,8 @@
     if(etlBox){
       svg += line(pgBox.x+pgBox.w, yData+boxH/2, etlBox.x, yData+boxH/2, FLOW, 'ah-flow');
       svg += line(etlBox.x+etlBox.w, yData+boxH/2, neo4jBox.x, yData+boxH/2, FLOW, 'ah-flow');
+      svg += label((pgBox.x+pgBox.w+etlBox.x)/2, yData+boxH+16, 'reads :2285', FLOW);
+      svg += label((etlBox.x+etlBox.w+neo4jBox.x)/2, yData+boxH+16, 'loads :7687', FLOW);
     }
     if(viewerBox && neo4jBox){
       var bulgeX = Math.max(viewerApiBox ? viewerApiBox.x+viewerApiBox.w : 0, neo4jBox.x+neo4jBox.w) + 30;
