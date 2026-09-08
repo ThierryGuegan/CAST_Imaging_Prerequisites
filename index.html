@@ -655,6 +655,7 @@
 
     if(a.topology === 'multi' && hasAnalysis(a)){
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
+      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Each analysis-node writes analysis results directly to the '+dbLabel+' database — per CAST\'s architecture reference, this port is used by every component that reads/writes the database, not just imaging-services', tag:'mandatory', note:'Multi-'+unitWord+' topology — a real firewall path between every analysis-node '+unitWord+' and the database host/service must be opened, in addition to imaging-services\' own path above'});
     }
     if(a.topology === 'multi' && (a.platform === 'docker' || a.platform === 'podman')){
       rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The shared parent folder (<code>/opt/cast/shared</code> by default — the path is configurable at install time) must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of source-code access in Section 9'});
@@ -1046,7 +1047,8 @@
 
     if(a.topology === 'multi' && hasAnalysis(a)){
       groups.push({title:'Analysis-node machine(s)', key:'analysis-node', items:[
-        'Network connectivity correctly configured to the core node ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)'
+        'Network connectivity correctly configured to the core node ('+esc(ANALYSIS_NODE_COUNT[a.analysisNodes] || 1)+' analysis-node instance(s) registered against imaging-services)',
+        'Firewall path open from every analysis-node to the PostgreSQL database (2285 default, configurable) — analysis-nodes write results directly, not just through imaging-services'
       ]});
     }
 
