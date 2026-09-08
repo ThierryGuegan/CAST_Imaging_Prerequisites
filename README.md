@@ -19,7 +19,7 @@ the right regenerates live:
   hosting model, plus Neo4j requirements when your scenario includes the Viewer.
 - HTTPS/TLS guidance matched to your certificate source and termination point.
 - Authentication prerequisites for the exact method you picked (Local / SAML / LDAP),
-  all brokered through CAST's embedded Keycloak.
+  all brokered through CAST's embedded SSO Service and Auth service.
 - CAST Extend access and licensing steps, adapted for direct/proxy/air-gapped egress.
 - MCP Server (AI) prerequisites, only shown if you enable that integration.
 - A pre-installation checklist built from your actual answers.

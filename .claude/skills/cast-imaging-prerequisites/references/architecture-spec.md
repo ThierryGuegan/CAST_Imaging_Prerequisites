@@ -73,17 +73,37 @@ be a search-and-fix pass, not a rename in isolation.
 4. **Network egress** — direct outbound / via proxy / air-gapped. This alone reshapes several rows
    in the ports matrix (CAST Extend path, Docker Hub pull path, LLM/Highlight rows needing an
    explicit air-gap exception).
-5. **HTTPS** — certificate source and TLS termination point. Kept separate from egress because
-   they're orthogonal decisions a reader might answer differently.
-6. **Authentication** — Local / SAML / LDAP, radio. All three are brokered through CAST's embedded
-   Keycloak, not the application service directly — don't build rows that bypass Keycloak here.
-7. **Optional integrations** — MCP/AI (with LLM provider sub-select), CAST Highlight, email
+5. **Reverse proxy** — which reverse proxy/Ingress is in front of Gateway (or "not decided yet").
+   This is a **mandatory prerequisite independent of HTTPS** — CAST Imaging is not intended to run
+   with Gateway directly internet-facing, so don't fold this into the HTTPS section or make it
+   conditional on HTTPS being enabled. Kept as its own section (split out from HTTPS after an
+   earlier draft combined them and blurred that independence).
+6. **HTTPS** — certificate source and TLS termination point. Kept separate from egress (Section 4)
+   and from Reverse proxy (Section 5) because all three are orthogonal decisions a reader might
+   answer differently. The certificate-source choice includes a real "no HTTPS — serve over plain
+   HTTP" option, not just CA-issued/self-signed — HTTPS itself is highly recommended but not
+   mandatory (unlike the reverse proxy). The one hard exception: **SAML SSO requires HTTPS** (the
+   browser/IdP redirect flow needs an HTTPS callback URL), so if `a.auth==='saml'` and the cert
+   source is "none", surface that as an explicit conflict in the HTTPS section's own output — don't
+   let the two answers silently contradict each other.
+7. **Authentication** — Local / SAML / LDAP, radio. All three are brokered through CAST's embedded
+   **SSO Service** (8096, `/auth`) and **Auth service** (8092, `/oauth2`) — not "Keycloak"; that was
+   this tool's own earlier incorrect guess at the underlying broker's identity before a user-supplied
+   architecture diagram confirmed the real component names. Don't build rows that bypass Gateway's
+   `/auth`/`/oauth2` routing to reach these directly (a past bug: a headless API-client row sent
+   traffic straight to "Auth service" on its own port instead of through Gateway).
+8. **Optional integrations** — MCP/AI (with LLM provider sub-select), CAST Highlight, email
    notifications. Each is a checkbox that adds rows/sections conditionally rather than replacing
    anything.
-8. **Source code access** — which delivery protocols are in play (HTTPS / SMB). These only
+9. **Source code access** — which delivery protocols are in play (HTTPS / SMB). These only
    produce port rows when the scenario actually includes analysis — gate on `hasAnalysis(a)`, and
    show an explanatory hint (not just silently hide the checkboxes) when they're inert for the
    current scenario, so the user isn't left wondering why nothing changed.
+
+Section numbers appear throughout the generated output as literal text ("see Section 3", "see
+Section 5"). If you ever renumber a fieldset, grep the whole file for `Section \d` and fix every
+reference in the same pass — a renumber that only touches the `<legend>` tags leaves the prose
+pointing at the wrong section.
 
 ## State model
 
@@ -128,6 +148,80 @@ topology). If you add sizing rows, make sure they still respect — or explicitl
 respecting — whatever floors are already asserted; a hardcoded number below an asserted floor is
 a self-contradiction an audit will (and has) caught.
 
+## Architecture diagram conventions
+
+`buildArchitectureDiagram(a)` renders an inline SVG that answers one question: *what actually
+needs a network path to what, for this exact combination of answers.* It went through roughly
+fifteen audit rounds (one per component box) before converging on the rules below — the single
+most common finding across those rounds was a **diagram/text mismatch** (see the matching bug
+shape in `SKILL.md` step 3): a connection or port the ports table/component list already asserted
+as fact, silently missing from the picture. When you touch this function, re-derive every line it
+should contain from `componentRows`/`buildPortRows()` for the box you're changing, not just from
+what already happens to be drawn.
+
+- **Layout is computed, not hardcoded.** A small `layoutRow(items, width)` helper takes an array of
+  `{key, label, sub}` box specs and returns them centered as a group at a given box width — every
+  row (routed services, supporting services, data tier) is built by pushing conditional items onto
+  an array *before* calling `layoutRow`, the same way `buildPortRows()` pushes conditional rows.
+  This is what makes boxes that don't apply to the current answers disappear and the *remaining*
+  ones re-center, instead of leaving a gap or requiring hardcoded per-scenario coordinates.
+- **Four line colors, one meaning each** (declared once as `FLOW`/`ROUTE`/`SHARED`/`TESTONLY`
+  locals): `FLOW` (`var(--text-dim)`, solid) = a confirmed direct internal call; `ROUTE`
+  (`var(--accent)`, dashed) = Gateway's confirmed URL-path routing; `SHARED` (`var(--accent-2)`,
+  dashed) = shared-storage read/write; `TESTONLY` (`var(--warn)`, dashed) = a setup/testing-only
+  bypass that must be closed before production. Don't reuse `ROUTE`'s dashed-blue styling for a
+  relationship that isn't actually URL-path routing through Gateway — that's what caused the
+  AI-service line to overstate its own confirmed-ness (see the next point).
+- **Confidence in the line must match confidence in the text.** If `componentRows` or a nearby
+  callout says a relationship "is not confirmed by the source diagram," the line for it must look
+  less certain than a confirmed one — not just carry a caveat label next to an otherwise-identical
+  line. The convention: a fine dotted stroke (`stroke-dasharray="2 3"`) at reduced opacity (`.55`)
+  plus a small "link not confirmed" label, as used for Gateway → AI-service. Don't route a
+  *separately confirmed* fact (like the core node's confirmed `:8085` path to the Extend Local
+  Server) through a box whose *own* link is unconfirmed just because it's nearby — that borrows
+  uncertainty the fact doesn't have. Route confirmed facts from Gateway directly instead, even if
+  that means a longer line.
+- **Every line states its port.** Every connector in the diagram has a label naming the port it
+  uses (`label(x, y, text, color)`), even ones that look self-explanatory from the box text alone —
+  this was violated and then fixed for the PostgreSQL↔ETL↔Neo4j chain and for Viewer→Viewer-APIs.
+  When you add a new connector, add its label in the same edit; don't leave it for a later pass.
+- **Long or crowded connections route through the margin, not through the middle.** A straight line
+  between two boxes that aren't vertically adjacent will cut through whatever box sits between them
+  (this happened to Viewer→Neo4j through Viewer-APIs, and to the Gateway→shared-storage/Extend/
+  PostgreSQL "core node" lines, which all travel between rows far apart). The fix used throughout:
+  route via an empty margin — `M{start} L{marginX},{startY} L{marginX},{endY} L{end}` for an
+  orthogonal path down the left margin (`marginX` around 20–40, each core-node line at its own
+  `marginX` so parallel ones stay visually distinct), or a bezier that bulges past the obstructing
+  box's far edge for a shorter diagonal hop. Never let two independent lines share the exact same
+  start point *and* nearly the same path — the one drawn later will visually swallow the earlier
+  one (this happened to Analysis-node's lines to the Extend Local Server and to shared storage
+  until their start x-offsets were separated).
+- **Boxes present regardless of scenario need a connection drawn for every confirmed relationship,
+  not just the most obvious one.** Gateway/imaging-services connects to PostgreSQL unconditionally
+  (`buildPortRows()` has always had this row with no gate) — the diagram went a long time only
+  showing the conditional Analysis-node→PostgreSQL line, so any scenario without analysis
+  (`dashboards-only`, `viewer-readonly`) showed PostgreSQL with zero connections at all. When a
+  component is always present, check `buildPortRows()` for *every* row naming it, not just the one
+  that happens to already have a line.
+- **A box only gets a line for a relationship the current answers actually create.** The inverse of
+  the point above: Neo4j only needs its own shared-storage line when `a.neo4jDedicated` is true (a
+  co-located Neo4j is already covered by the core node's line) — drawing it unconditionally implied
+  a separate machine that, per the user's own answers, doesn't exist. Match every connection's
+  condition to the same predicate that gates the fact it represents, not just to "does this box
+  exist."
+- **The Tester/admin workstation box and its three bypass lines** (Gateway `:8090` always,
+  Control Panel `:8098–2381` always, SSO Service `:8096` only when `hasDashboards(a)||hasViewer(a)`)
+  must mirror `buildPortRows()`'s own tester rows exactly, including the `hasUi`-style gate on the
+  SSO Service line. Position this box independently from Browser (don't put them in the same
+  `layoutRow` call) — centering them as a pair shifts Browser off the vertical axis it needs to
+  share with Reverse proxy and Gateway below it.
+- **The Extend Local Server is optional, `extend.castsoftware.com` is not.** Every egress mode
+  needs a path to `extend.castsoftware.com` — `direct`/`proxy` egress connects the core node to it
+  directly (solid line, via the same margin-routing pattern), `airgapped` egress instead shows the
+  optional Local Server (dashed border, "air-gapped only" in its label) as an intermediate hop.
+  Gating the whole `extend.castsoftware.com` box on `a.egress==='airgapped'` — so it disappeared
+  entirely for the two more common egress modes — was a real bug found auditing this box.
+
 ## Ports/FQDN matrix
 
 `buildPortRows(a)` returns an array of row objects: `{src, dst, port, proto, purpose, tag, note}`.
@@ -156,8 +250,8 @@ Every non-obvious factual claim needs an implicit or explicit confidence level, 
 `SKILL.md`'s Confirmed / Reasonable inference / Unverifiable bar:
 
 - **Confirmed** facts read as plain assertions: `"CAST Imaging supports PostgreSQL only"`.
-- **Reasonable inferences** say why: `"CAST's REST APIs may still require a Keycloak-issued OAuth2
-  token even without a human browser session"` — plausible, stated as such, not asserted as fact.
+- **Reasonable inferences** say why: `"CAST's REST APIs may still require a token even without a
+  human browser session"` — plausible, stated as such, not asserted as fact.
 - **Unverifiable** claims say so explicitly in the generated text, e.g. `"not independently
   verified here (network egress to doc.castsoftware.com is blocked)"` or `"exact port not
   confirmed — verify against your CAST Imaging release"`. Never silently omit an unverifiable
@@ -174,16 +268,13 @@ not *what the six fixed sections actually are*. Egress, HTTPS, and auth are ques
 own.
 
 1. **Hardware sizing for your profile** (`sizingHtml`) — the composed sizing table, an inline SVG
-   **architecture diagram** (`buildArchitectureDiagram(a)` — boxes/arrows for Browser → mandatory
-   reverse proxy → Gateway, Gateway's internal path-routing fan-out, the supporting services,
-   PostgreSQL → ETL → Neo4j, and the shared-storage mount when `a.topology==='multi'`; every row is
-   laid out dynamically from the same `has*(a)` gates as the table below it, so boxes that don't
-   apply to the current answers are omitted and the remaining ones re-center, not just dimmed) and
-   the **named components table** it illustrates (every container/service by name and port —
-   Gateway, Console, Auth service, SSO Service, Control Panel, analysis-node, Viewer, Viewer-APIs,
-   ETL service, AI-service, Dashboards, Neo4j, PostgreSQL, extend-proxy — gated by the same
-   `has*(a)` predicates as everything else), OS/runtime version requirements, storage locations,
-   and client-side (end-user + delivery workstation) requirements.
+   **architecture diagram** (`buildArchitectureDiagram(a)` — see "Architecture diagram
+   conventions" below for the full set of rules this has converged on) and the **named components
+   table** it illustrates (every container/service by name and port — Gateway, Console, Auth
+   service, SSO Service, Control Panel, analysis-node, Viewer, Viewer-APIs, ETL service,
+   AI-service, Dashboards, Neo4j, PostgreSQL, extend-proxy — gated by the same `has*(a)`
+   predicates as everything else), OS/runtime version requirements, storage locations, and
+   client-side (end-user + delivery workstation) requirements.
 2. **Database requirements** (`dbHtml`) — PostgreSQL configuration/version/hosting, and Neo4j
    requirements when the scenario includes the Viewer.
 3. **Network ports & FQDN allowlist** (`netHtml`) — the full `buildPortRows(a)` table. This is
@@ -236,6 +327,23 @@ has to shift depending on how many optional sections actually rendered. If you a
 optional section, add its (empty-string-by-default) variable to the `optionalSections` array in
 the order you want it numbered — order in that array is numbering order, not declaration order
 elsewhere in the function.
+
+### The checklist
+
+The pre-installation checklist is grouped by **machine/role**, not by topic — `groups` is an array
+of `{title, key, items}` (e.g. "Core node (imaging-services...)", "Analysis-node machine(s)",
+"Reverse proxy", "End-user workstation"), each pushed conditionally on the same `has*(a)` /
+`a.topology` gates as everything else, so a group for a machine that doesn't exist in this
+configuration simply isn't pushed. Each item renders as a real
+`<input type="checkbox" data-check-key="{group.key}:{index}">`, not a decorative `:before` glyph —
+checked state is persisted to `localStorage` under `checklistStorageKey(key)` via a single
+delegated `change` listener registered once on `#results-content` (outside `render()`, so it
+survives every re-render), and restored by `restoreChecklistState()` called at the end of
+`render()`. If you add a new checklist group or reorder items within one, remember the storage key
+is `group.key + ':' + index` — inserting an item in the middle of an existing group's `items` array
+shifts every later item's persisted key, silently "forgetting" what the user had already checked.
+Append new items to the end of a group's array, or give the item its own stable key, rather than
+inserting in the middle.
 
 ## Content freshness marker
 
