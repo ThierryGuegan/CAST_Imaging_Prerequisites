@@ -568,7 +568,10 @@
       svg += '<line x1="'+gatewayRow[0].cx+'" y1="'+(yGateway+boxH)+'" x2="'+aiBox.cx+'" y2="'+ySupport+'" stroke="'+ROUTE+'" stroke-width="1.5" stroke-dasharray="2 3" opacity=".55" marker-end="url(#ah-route)"/>';
       svg += label(aiBox.cx+70, ySupport-8, 'link not confirmed', ROUTE);
     }
-    if(viewerBox && viewerApiBox) svg += line(viewerBox.cx, yRouted+boxH, viewerApiBox.cx, ySupport, FLOW, 'ah-flow');
+    if(viewerBox && viewerApiBox){
+      svg += line(viewerBox.cx, yRouted+boxH, viewerApiBox.cx, ySupport, FLOW, 'ah-flow');
+      svg += label(viewerBox.cx+55, (yRouted+boxH+ySupport)/2, 'REST :8070', FLOW);
+    }
 
     var pgBox = byKey(dataRow, 'pg'), etlBox = byKey(dataRow, 'etl'), neo4jBox = byKey(dataRow, 'neo4j');
     if(analysisBox){
