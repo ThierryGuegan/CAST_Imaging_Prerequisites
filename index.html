@@ -527,7 +527,7 @@
       return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="1.5"'+(dashed?' stroke-dasharray="5 4"':'')+' marker-end="url(#'+marker+')"/>';
     }
     function label(x,y,text,color){
-      return '<text x="'+x+'" y="'+y+'" text-anchor="middle" font-size="10" fill="'+color+'">'+esc(text)+'</text>';
+      return '<text x="'+x+'" y="'+y+'" text-anchor="middle" font-size="10.5" fill="'+color+'" paint-order="stroke" stroke="var(--panel-alt)" stroke-width="4" stroke-linejoin="round">'+esc(text)+'</text>';
     }
 
     var FLOW = 'var(--text-dim)', ROUTE = 'var(--accent)', SHARED = 'var(--accent-2)';
