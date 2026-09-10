@@ -154,7 +154,7 @@
         <p class="hint">A <b>scenario</b> defines which components are installed; <b>topology</b> (below) defines how they're spread across machines. imaging-services is always required. Source: CAST's "choose your deployment" step at <code>doc.castsoftware.com/imaging/install/global/docker</code>.</p>
       </div>
       <div class="q">
-        <label class="qlabel">Topology</label>
+        <label class="qlabel">Server topology</label>
         <div class="opt-row">
           <label class="opt"><input type="radio" name="topology" value="single" checked>
             <span class="opt-text"><b>Single machine</b><span>All selected components on one host — suitable for POC, testing, demo, or small production</span></span></label>
@@ -305,7 +305,7 @@
       <p class="hint" id="source-access-hint" style="margin-top:0;"></p>
       <div class="q">
         <div class="opt-row">
-          <label class="opt"><input type="checkbox" id="repoHttps" checked>
+          <label class="opt"><input type="checkbox" id="repoHttps">
             <span class="opt-text"><b>Git/SVN/DevOps over HTTPS</b><span>Port 443 to internal or cloud-hosted repositories</span></span></label>
           <label class="opt"><input type="checkbox" id="repoSmb">
             <span class="opt-text"><b>SMB file shares</b><span>Port 445 to internal file servers</span></span></label>
