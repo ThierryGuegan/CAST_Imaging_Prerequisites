@@ -197,6 +197,22 @@ what already happens to be drawn.
   bypass that must be closed before production. Don't reuse `ROUTE`'s dashed-blue styling for a
   relationship that isn't actually URL-path routing through Gateway — that's what caused the
   AI-service line to overstate its own confirmed-ness (see the next point).
+- **Box fill must contrast with the diagram background, not match it.** `box(b, yy, opts)`'s
+  default fill is `var(--panel-2)`, a shade lighter than `.arch-diagram-frame`'s own
+  `var(--panel-alt)` background — they used to be the same color, which meant every default box
+  was distinguishable only by its faint `var(--border)` outline and effectively invisible as a
+  distinct "card." If you add a new default-styled box, don't fill it with `--panel-alt` again.
+- **Four categorical colors mark which boxes run on their own machine**, applied via the
+  `machineBoxOpts(strokeColor, fillColor, dashed)` helper (a tinted fill plus a matching border/
+  sub-text color, `dashed` for "not actually your infrastructure" like a managed DBaaS): violet
+  `--m-analysis`/`--m-analysis-fill` for Analysis-node(s) when `a.topology==='multi'`, pink
+  `--m-neo4j`/`--m-neo4j-fill` for a dedicated Neo4j, orange `--m-db`/`--m-db-fill` for a dedicated
+  or managed PostgreSQL (dashed only for `managed`, since that's a cloud service not a machine),
+  and the existing teal `--accent-2`/`--m-extend-fill` for the Extend Local Server. These colors
+  are in addition to, not instead of, the existing "· own machine" text on the box's `sub` — color
+  alone isn't accessible to colorblind readers or screen readers. Each color has a matching
+  conditional entry in the `.arch-legend` block (a small `i.box` swatch) — add one whenever you add
+  a new machine color, gated on the same condition that triggers the box styling.
 - **Confidence in the line must match confidence in the text.** If `componentRows` or a nearby
   callout says a relationship "is not confirmed by the source diagram," the line for it must look
   less certain than a confirmed one — not just carry a caveat label next to an otherwise-identical

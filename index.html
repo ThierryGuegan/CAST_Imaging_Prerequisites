@@ -6,10 +6,14 @@
 <title>CAST Imaging — Requirements Builder</title>
 <style>
   :root{
-    --bg:#0f1720; --panel:#141d29; --panel-alt:#1a2432; --border:#26313f;
+    --bg:#0f1720; --panel:#141d29; --panel-alt:#1a2432; --panel-2:#223044; --border:#3a4a5e;
     --text:#e6edf3; --text-dim:#9fb0c0; --accent:#3ea6ff; --accent-2:#59d0a0;
     --warn:#f2b84b; --danger:#f2685b; --code-bg:#0b1219;
     --table-head:#1c2836; --table-row-alt:#111a24;
+    --m-analysis:#b79bfb; --m-analysis-fill:rgba(183,155,251,.16);
+    --m-neo4j:#f479bd; --m-neo4j-fill:rgba(244,121,189,.16);
+    --m-db:#ffa85c; --m-db-fill:rgba(255,168,92,.16);
+    --m-extend-fill:rgba(89,208,160,.16);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
@@ -87,6 +91,7 @@
   .arch-legend span{display:inline-flex;align-items:center;gap:7px;}
   .arch-legend i{display:inline-block;width:22px;height:0;border-top-width:2px;border-top-style:solid;}
   .arch-legend i.dash{border-top-style:dashed;}
+  .arch-legend i.box{width:13px;height:13px;border-radius:3px;border:1.5px solid;}
 
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 22px;}
   .btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#04101c;font-weight:700;
@@ -551,9 +556,9 @@
 
     function box(b, yy, opts){
       opts = opts || {};
-      var fill = opts.fill || 'var(--panel-alt)';
+      var fill = opts.fill || 'var(--panel-2)';
       var stroke = opts.stroke || 'var(--border)';
-      var sw = opts.strokeWidth || 1.3;
+      var sw = opts.strokeWidth || 1.4;
       var dash = opts.dash ? ' stroke-dasharray="4 3"' : '';
       return '<rect x="'+b.x+'" y="'+yy+'" width="'+b.w+'" height="'+boxH+'" rx="8" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"'+dash+'/>' +
         '<text x="'+b.cx+'" y="'+(yy+boxH/2-5)+'" text-anchor="middle" font-weight="600" font-size="12" fill="'+(opts.labelColor||'#fff')+'">'+esc(b.label)+'</text>' +
@@ -567,6 +572,8 @@
     }
 
     var FLOW = 'var(--text-dim)', ROUTE = 'var(--accent)', SHARED = 'var(--accent-2)', TESTONLY = 'var(--warn)';
+    var M_ANALYSIS = 'var(--m-analysis)', M_NEO4J = 'var(--m-neo4j)', M_DB = 'var(--m-db)', M_EXTEND = 'var(--accent-2)';
+    function machineBoxOpts(color, fill, dashed){ return {fill:fill, stroke:color, subColor:color, dash:!!dashed, strokeWidth:1.6}; }
     var svg = '';
 
     if(typeof counts.serverMachineCount === 'number'){
@@ -635,7 +642,7 @@
     var extendNote = '';
     if(a.egress === 'airgapped'){
       var extendBox = extendRow[0], extendTargetBox = extendRow[1];
-      svg += box(extendBox, yExtendRow, {stroke:'var(--accent-2)'});
+      svg += box(extendBox, yExtendRow, machineBoxOpts(M_EXTEND, 'var(--m-extend-fill)'));
       svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
       svg += line(extendBox.x+extendBox.w, yExtendRow+boxH/2, extendTargetBox.x, yExtendRow+boxH/2, FLOW, 'ah-flow');
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-flow)"/>';
@@ -668,8 +675,16 @@
     svg += box(proxyRow[0], yProxy, {stroke:'var(--warn)', strokeWidth:1.6});
     svg += box(gatewayRow[0], yGateway, {fill:'var(--accent)', stroke:'var(--accent)', labelColor:'#04101c', subColor:'#04101c'});
     routedRow.forEach(function(b){ svg += box(b, yRouted); });
-    supportRow.forEach(function(b){ svg += box(b, ySupport); });
-    dataRow.forEach(function(b){ svg += box(b, yData); });
+    supportRow.forEach(function(b){
+      var opts = (b.key === 'analysis' && a.topology === 'multi') ? machineBoxOpts(M_ANALYSIS, 'var(--m-analysis-fill)') : {};
+      svg += box(b, ySupport, opts);
+    });
+    dataRow.forEach(function(b){
+      var opts = {};
+      if(b.key === 'pg' && a.dbHosting !== 'colocated') opts = machineBoxOpts(M_DB, 'var(--m-db-fill)', a.dbHosting === 'managed');
+      if(b.key === 'neo4j' && a.topology === 'multi' && a.neo4jDedicated) opts = machineBoxOpts(M_NEO4J, 'var(--m-neo4j-fill)');
+      svg += box(b, yData, opts);
+    });
 
     var defs = '<defs>' +
       ['flow','route','shared','test'].map(function(k){
@@ -689,6 +704,10 @@
       '<span><i class="dash" style="border-color:'+ROUTE+'"></i>Gateway path-routing</span>' +
       '<span><i class="dash" style="border-color:'+TESTONLY+'"></i>Setup/testing-only bypass</span>' +
       (sharedRow ? '<span><i class="dash" style="border-color:'+SHARED+'"></i>Shared-storage read/write</span>' : '') +
+      (analysisBox && a.topology === 'multi' ? '<span><i class="box" style="background:var(--m-analysis-fill);border-color:'+M_ANALYSIS+'"></i>Analysis-node machine(s)</span>' : '') +
+      (neo4jBox && a.topology === 'multi' && a.neo4jDedicated ? '<span><i class="box" style="background:var(--m-neo4j-fill);border-color:'+M_NEO4J+'"></i>Dedicated Neo4j machine</span>' : '') +
+      (a.dbHosting !== 'colocated' ? '<span><i class="box" style="background:var(--m-db-fill);border-color:'+M_DB+'"></i>'+(a.dbHosting==='managed'?'Managed DBaaS (not a machine you provision)':'Dedicated database machine')+'</span>' : '') +
+      (a.egress === 'airgapped' ? '<span><i class="box" style="background:var(--m-extend-fill);border-color:'+M_EXTEND+'"></i>Extend Local Server machine</span>' : '') +
       '</div>';
   }
 
