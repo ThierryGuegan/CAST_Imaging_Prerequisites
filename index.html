@@ -895,7 +895,7 @@
       machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> on your existing Kubernetes node pool (no new dedicated servers to provision for these) + <b>'+workstationDesc+'</b> to access it'+(a.egress==='airgapped' ? ' + <b>1 Extend Local Server machine</b> (not pod-based — air-gapped egress) ' : '')+'.</div>';
     } else {
       var totalMachines = serverMachineCount + workstationRoleCount;
-      machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see table below'+(a.egress==='airgapped' ? ', includes the Extend Local Server' : '')+') + '+workstationDesc+'.</div>';
+      machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see Section 1'+(a.egress==='airgapped' ? ', includes the Extend Local Server' : '')+') + '+workstationDesc+'.</div>';
     }
 
     var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
@@ -1186,6 +1186,7 @@
     var nextNum = 7;
     var optionalHtml = optionalSections.map(function(h){ return h.replace('{N}', String(nextNum++)); }).join('');
     var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist for your profile</h3>' +
+      machineSummaryHtml +
       '<p>Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers. Checked boxes are remembered in your browser as you tweak answers or reload the page.</p>' +
       checklistGroupsHtml;
 
