@@ -491,6 +491,9 @@
     var testerBox = {x: browserRow[0].x+browserRow[0].w+60, w: 220};
     testerBox.cx = testerBox.x + testerBox.w/2;
     testerBox.label = 'Tester / admin workstation'; testerBox.sub = 'setup/testing phase only';
+    var reportGenBox = {x: browserRow[0].x-60-220, w: 220};
+    reportGenBox.cx = reportGenBox.x + reportGenBox.w/2;
+    reportGenBox.label = 'CAST Report Generator'; reportGenBox.sub = 'reporting workstation';
     var proxyRow = layoutRow([{key:'proxy', label:'Reverse proxy', sub:esc(LABELS.reverseProxy[a.reverseProxy])}]); var yProxy = y; y += boxH+gapY;
     var gatewayRow = layoutRow([{key:'gw', label:'Gateway', sub:':8090 — sole entry point'}]); var yGateway = y; y += boxH+gapY;
 
@@ -573,6 +576,11 @@
     svg += line(testerBox.cx, yBrowser+boxH, adminBox.cx, yRouted, TESTONLY, 'ah-test', true);
     svg += label(testerBox.cx+70, (yBrowser+boxH+yRouted)/2+34, ':8098–2381', TESTONLY);
 
+    if(hasDashboards(a)){
+      svg += line(reportGenBox.cx, yBrowser+boxH, gatewayRow[0].cx-40, yGateway, FLOW, 'ah-flow');
+      svg += label(reportGenBox.cx-6, (yBrowser+boxH+yGateway)/2, ':8090 / proxy :443', FLOW);
+    }
+
     routedRow.forEach(function(b){
       svg += line(gatewayRow[0].cx, yGateway+boxH, b.cx, yRouted, ROUTE, 'ah-route', true);
     });
@@ -638,6 +646,7 @@
 
     // boxes (drawn after connectors so they sit on top)
     svg += box(browserRow[0], yBrowser);
+    if(hasDashboards(a)) svg += box(reportGenBox, yBrowser);
     svg += box(testerBox, yBrowser, {stroke:'var(--warn)', dash:true, labelColor:'var(--warn)'});
     svg += box(proxyRow[0], yProxy, {stroke:'var(--warn)', strokeWidth:1.6});
     svg += box(gatewayRow[0], yGateway, {fill:'var(--accent)', stroke:'var(--accent)', labelColor:'#04101c', subColor:'#04101c'});
@@ -652,11 +661,11 @@
       }).join('') +
       '</defs>';
 
-    var ariaLabel = 'Diagram of the CAST Imaging components active for your current answers: the browser reaches Gateway on port 8090 only, through the mandatory reverse proxy; Gateway internally path-routes to ' + routedItems.map(function(r){return r.label;}).join(', ') + '; ' + (analysisBox||aiBox||viewerApiBox ? 'supporting services (' + supportItems.map(function(r){return r.label;}).join(', ') + ') sit behind it; ' : '') + 'PostgreSQL' + (etlBox ? ' feeds Neo4j through an ETL service' : ' is the sole data store') + '.';
+    var ariaLabel = 'Diagram of the CAST Imaging components active for your current answers: the browser reaches Gateway on port 8090 only, through the mandatory reverse proxy' + (hasDashboards(a) ? '; the CAST Report Generator workstation reaches Gateway the same way, directly on :8090 or via the reverse proxy on :443' : '') + '; Gateway internally path-routes to ' + routedItems.map(function(r){return r.label;}).join(', ') + '; ' + (analysisBox||aiBox||viewerApiBox ? 'supporting services (' + supportItems.map(function(r){return r.label;}).join(', ') + ') sit behind it; ' : '') + 'PostgreSQL' + (etlBox ? ' feeds Neo4j through an ETL service' : ' is the sole data store') + '.';
 
     return '<figure class="arch-diagram-frame">' +
       '<svg viewBox="0 0 '+W+' '+totalH+'" role="img" aria-label="'+esc(ariaLabel)+'">' + defs + '<g font-family="Segoe UI, Roboto, sans-serif">' + svg + '</g></svg>' +
-      '<figcaption>Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it. The three amber paths from the tester/admin workstation exist only to validate Gateway'+(testerHasUi?', SSO Service':'')+' and Control Panel directly during setup/testing — close them before production go-live.'+extendNote+sharedNote+'</figcaption>' +
+      '<figcaption>Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it. The three amber paths from the tester/admin workstation exist only to validate Gateway'+(testerHasUi?', SSO Service':'')+' and Control Panel directly during setup/testing — close them before production go-live.'+(hasDashboards(a) ? ' CAST Report Generator (an optional standalone reporting tool) reaches Gateway the same way as the browser — directly on :8090, or via the reverse proxy on :443 once configured.' : '')+extendNote+sharedNote+'</figcaption>' +
       '</figure>' +
       '<div class="arch-legend">' +
       '<span><i style="border-color:'+FLOW+'"></i>Direct internal call</span>' +
@@ -703,7 +712,7 @@
       rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Direct access to SSO Service, bypassing Gateway\'s normal /auth path-routing — lets you validate sign-in (Local, SAML, or LDAP per Section 7) directly during setup/testing, independent of whether Gateway routing is fully working yet', tag:'optional', note:'Setup/testing phase only — SSO Service is otherwise internal-only, reached exclusively through Gateway; close this direct path before production go-live'});
     }
     if(hasDashboards(a)){
-      rows.push({src:'CAST Report Generator (client workstation)', dst:'Gateway', port:'443 or 8090', proto:'HTTP/HTTPS', purpose:'Standalone desktop reporting tool pulling data via the CAST RestAPI embedded in CAST Dashboards, at the "/dashboards/rest" path — authenticated with an API key generated from the CAST Imaging user profile, not a browser session', tag:'recommended', note:'Same entry point as the End-user browser rows above (direct :8090, or via your reverse proxy on :443) — not drawn as a separate line in the architecture diagram since it reuses that exact path; per CAST\'s Install Report Generator documentation'});
+      rows.push({src:'CAST Report Generator (client workstation)', dst:'Gateway', port:'443 or 8090', proto:'HTTP/HTTPS', purpose:'Standalone desktop reporting tool pulling data via the CAST RestAPI embedded in CAST Dashboards, at the "/dashboards/rest" path — authenticated with an API key generated from the CAST Imaging user profile, not a browser session', tag:'recommended', note:'Same entry point as the End-user browser rows above (direct :8090, or via your reverse proxy on :443) — see the architecture diagram above for the CAST Report Generator workstation; per CAST\'s Install Report Generator documentation'});
     }
     rows.push({src:'Tester / administrator workstation', dst:'Control Panel (admin-center)', port:'8098–2381', proto:'HTTP/HTTPS', purpose:'Direct access to the Control Panel, bypassing Gateway\'s normal /admin path-routing — lets you validate administration/configuration directly during setup/testing, independent of whether Gateway routing is fully working yet', tag:'optional', note:'Setup/testing phase only — Control Panel is otherwise internal-only, reached exclusively through Gateway; close this direct path before production go-live'});
 

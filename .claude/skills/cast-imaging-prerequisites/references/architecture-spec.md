@@ -82,9 +82,11 @@ be a search-and-fix pass, not a rename in isolation.
    Dashboards" variant also runs on Linux. It requires Microsoft .NET 8 SDK (its installer offers
    to install this automatically — no Java JRE/JDK needed) and an API key generated from the CAST
    Imaging user profile, and connects to Gateway's `/dashboards/rest` path — gated on
-   `hasDashboards(a)` in `buildPortRows()`, reusing the exact same network entry point as the
-   End-user browser rows (hence not drawn as a separate architecture-diagram line — the note on
-   that row explains the reuse instead). Microsoft Office is *not* required to generate reports,
+   `hasDashboards(a)` in both `buildPortRows()` and `buildArchitectureDiagram(a)`, which draws it
+   as its own box (`reportGenBox`, positioned mirror-image to the Tester/admin workstation box on
+   the other side of Browser) with a solid `FLOW` line straight into Gateway, since it reuses the
+   exact same network entry point as the End-user browser rows rather than being a distinct path.
+   Microsoft Office is *not* required to generate reports,
    only to open/edit the output or customize templates — don't conflate this with the
    audit-tooling list's separate Word/Excel/PowerPoint requirement, even though in practice one
    satisfies the other when both apply.
