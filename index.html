@@ -198,14 +198,6 @@
           <option value="large">200+</option>
         </select>
       </div>
-      <div class="q">
-        <label class="qlabel">Audit context</label>
-        <select id="auditContext">
-          <option value="standard" selected>Standard deployment</option>
-          <option value="audit">Audit / structural-analysis engagement</option>
-        </select>
-        <p class="hint" style="margin-top:6px;">An audit/structural-analysis engagement means end users are analysts actively reviewing source code and producing deliverables alongside CAST Imaging, not just browsing results — this adds desktop tooling requirements to the end-user workstation profile below.</p>
-      </div>
     </fieldset>
 
     <fieldset>
@@ -318,6 +310,18 @@
           <label class="opt"><input type="checkbox" id="repoSmb">
             <span class="opt-text"><b>SMB file shares</b><span>Port 445 to internal file servers</span></span></label>
         </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>10 · Audit context</legend>
+      <div class="q">
+        <label class="qlabel">Audit context</label>
+        <select id="auditContext">
+          <option value="standard" selected>Standard deployment</option>
+          <option value="audit">Audit / structural-analysis engagement</option>
+        </select>
+        <p class="hint" style="margin-top:6px;">An audit/structural-analysis engagement means end users are analysts actively reviewing source code and producing deliverables alongside CAST Imaging, not just browsing results — this adds desktop tooling requirements to the end-user workstation profile.</p>
       </div>
     </fieldset>
 
@@ -973,7 +977,7 @@
     sizingHtml += osHtml + storageHtml + '<h4>Client-side requirements</h4><div class="tbl-wrap"><table><thead><tr><th>Profile</th><th>Requirement</th></tr></thead><tbody>' +
       '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs.' +
         ' <b>CAST Report Generator</b> installed for exporting Word/Excel/PowerPoint deliverables — a standalone tool, not bundled with CAST Imaging: the interactive UI variant is <b>Windows-only</b> (a separate command-line-only variant, "Report Generator for Dashboards", also runs on Linux, no UI); requires <b>Microsoft .NET 8 SDK</b> (its installer offers to install this automatically) — no Java JRE/JDK needed; requires an <b>API key</b> generated from the CAST Imaging user profile (see Section 3\'s network row for the Gateway path it uses). <b>Microsoft Office itself is not required to generate reports</b> — only to open/edit the generated files or customize templates. Minimum versions: CAST Imaging 3.4.0-funcrel / CAST Report Generator 1.29.0-funcrel. Source: <a href="https://doc.castsoftware.com/imaging/install/report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/report-generator</a>, <a href="https://doc.castsoftware.com/export-v2/doccom/cast-report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/export-v2/doccom/cast-report-generator</a>.' +
-        (hasAuditContext(a) ? ' <b>Audit / structural-analysis engagement selected (Section 2)</b> — also install: ' + AUDIT_WORKSTATION_TOOLS.map(function(t){ return '<b>'+esc(t)+'</b>'; }).join(', ') + ' (exact versions/edition per your engagement standards; not CAST-published requirements, listed as given for this deployment). Word/Excel/PowerPoint in this list also cover CAST Report Generator\'s optional Office dependency above.' : '') +
+        (hasAuditContext(a) ? ' <b>Audit / structural-analysis engagement selected (Section 10)</b> — also install: ' + AUDIT_WORKSTATION_TOOLS.map(function(t){ return '<b>'+esc(t)+'</b>'; }).join(', ') + ' (exact versions/edition per your engagement standards; not CAST-published requirements, listed as given for this deployment). Word/Excel/PowerPoint in this list also cover CAST Report Generator\'s optional Office dependency above.' : '') +
       '</td></tr>' +
       '<tr><td>Delivery / analyst workstation</td><td>Same as above, plus local disk for source checkouts, a compatible JDK (≥ 17 LTS and ≤ 21, 64-bit, with <code>JAVA_HOME</code> set), and SCM client tools for the repositories selected in Section 9</td></tr>' +
       '</tbody></table></div>';

@@ -66,30 +66,8 @@ be a search-and-fix pass, not a rename in isolation.
    an independent definition). If you ever add a fifth scenario, add its row to this table first,
    then work out which predicates it should satisfy — don't reverse-engineer a scenario from
    predicate behavior you want.
-2. **Project scale** — application count band (drives sizing baseline), concurrent-user band
-   (drives a RAM/CPU bonus on the UI-serving node, only when the scenario actually has a UI), and
-   **Audit context** (`hasAuditContext(a)`, standard vs. audit/structural-analysis engagement) —
-   a client-side-only flag, not a CAST-published requirement. Standard deployments only need
-   CAST Report Generator on the end-user workstation; an audit engagement additionally needs the
-   `AUDIT_WORKSTATION_TOOLS` list (VS Code, Notepad++, Word/Excel/PowerPoint, DBeaver, Python) —
-   user-supplied desktop tooling for analysts, labeled as given rather than CAST-confirmed since
-   `doc.castsoftware.com` has no opinion on it.
-
-   CAST Report Generator itself, unlike the audit-tooling list, *is* CAST-published (confirmed via
-   user-supplied PDF exports of `install/report-generator/` and
-   `export-v2/doccom/cast-report-generator/`): a standalone tool, not bundled with CAST Imaging.
-   The interactive UI variant is Windows-only; a separate CLI-only "Report Generator for
-   Dashboards" variant also runs on Linux. It requires Microsoft .NET 8 SDK (its installer offers
-   to install this automatically — no Java JRE/JDK needed) and an API key generated from the CAST
-   Imaging user profile, and connects to Gateway's `/dashboards/rest` path — gated on
-   `hasDashboards(a)` in both `buildPortRows()` and `buildArchitectureDiagram(a)`, which draws it
-   as its own box (`reportGenBox`, positioned mirror-image to the Tester/admin workstation box on
-   the other side of Browser) with a solid `FLOW` line straight into Gateway, since it reuses the
-   exact same network entry point as the End-user browser rows rather than being a distinct path.
-   Microsoft Office is *not* required to generate reports,
-   only to open/edit the output or customize templates — don't conflate this with the
-   audit-tooling list's separate Word/Excel/PowerPoint requirement, even though in practice one
-   satisfies the other when both apply.
+2. **Project scale** — application count band (drives sizing baseline) and concurrent-user band
+   (drives a RAM/CPU bonus on the UI-serving node, only when the scenario actually has a UI).
 3. **Database** — RDBMS is a fixed fact (PostgreSQL only — CAST doesn't support alternatives, so
    don't build this as a choice), plus a hosting model choice (co-located / dedicated / managed).
 4. **Network egress** — direct outbound / via proxy / air-gapped. This alone reshapes several rows
@@ -121,6 +99,29 @@ be a search-and-fix pass, not a rename in isolation.
    produce port rows when the scenario actually includes analysis — gate on `hasAnalysis(a)`, and
    show an explanatory hint (not just silently hide the checkboxes) when they're inert for the
    current scenario, so the user isn't left wondering why nothing changed.
+10. **Audit context** (`hasAuditContext(a)`, standard vs. audit/structural-analysis engagement) —
+    deliberately placed last, after every other questionnaire section, since it's a client-side-only
+    add-on rather than a deployment-architecture decision like Sections 1-9. Standard deployments
+    only need CAST Report Generator on the end-user workstation; an audit engagement additionally
+    needs the `AUDIT_WORKSTATION_TOOLS` list (VS Code, Notepad++, Word/Excel/PowerPoint, DBeaver,
+    Python) — user-supplied desktop tooling for analysts, labeled as given rather than
+    CAST-confirmed since `doc.castsoftware.com` has no opinion on it.
+
+    CAST Report Generator itself, unlike the audit-tooling list, *is* CAST-published (confirmed via
+    user-supplied PDF exports of `install/report-generator/` and
+    `export-v2/doccom/cast-report-generator/`): a standalone tool, not bundled with CAST Imaging.
+    The interactive UI variant is Windows-only; a separate CLI-only "Report Generator for
+    Dashboards" variant also runs on Linux. It requires Microsoft .NET 8 SDK (its installer offers
+    to install this automatically — no Java JRE/JDK needed) and an API key generated from the CAST
+    Imaging user profile, and connects to Gateway's `/dashboards/rest` path — gated on
+    `hasDashboards(a)` in both `buildPortRows()` and `buildArchitectureDiagram(a)`, which draws it
+    as its own box (`reportGenBox`, positioned mirror-image to the Tester/admin workstation box on
+    the other side of Browser) with a solid `FLOW` line straight into Gateway, since it reuses the
+    exact same network entry point as the End-user browser rows rather than being a distinct path.
+    Microsoft Office is *not* required to generate reports, only to open/edit the output or
+    customize templates — don't conflate this with the audit-tooling list's separate
+    Word/Excel/PowerPoint requirement, even though in practice one satisfies the other when both
+    apply.
 
 Section numbers appear throughout the generated output as literal text ("see Section 3", "see
 Section 5"). If you ever renumber a fieldset, grep the whole file for `Section \d` and fix every
