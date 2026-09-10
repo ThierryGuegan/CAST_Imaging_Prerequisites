@@ -66,8 +66,14 @@ be a search-and-fix pass, not a rename in isolation.
    an independent definition). If you ever add a fifth scenario, add its row to this table first,
    then work out which predicates it should satisfy — don't reverse-engineer a scenario from
    predicate behavior you want.
-2. **Project scale** — application count band (drives sizing baseline) and concurrent-user band
-   (drives a RAM/CPU bonus on the UI-serving node, only when the scenario actually has a UI).
+2. **Project scale** — application count band (drives sizing baseline), concurrent-user band
+   (drives a RAM/CPU bonus on the UI-serving node, only when the scenario actually has a UI), and
+   **Audit context** (`hasAuditContext(a)`, standard vs. audit/structural-analysis engagement) —
+   a client-side-only flag, not a CAST-published requirement. Standard deployments only need
+   CAST Report Generator on the end-user workstation; an audit engagement additionally needs the
+   `AUDIT_WORKSTATION_TOOLS` list (VS Code, Notepad++, Word/Excel/PowerPoint, DBeaver, Python) —
+   user-supplied desktop tooling for analysts, labeled as given rather than CAST-confirmed since
+   `doc.castsoftware.com` has no opinion on it.
 3. **Database** — RDBMS is a fixed fact (PostgreSQL only — CAST doesn't support alternatives, so
    don't build this as a choice), plus a hosting model choice (co-located / dedicated / managed).
 4. **Network egress** — direct outbound / via proxy / air-gapped. This alone reshapes several rows

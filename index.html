@@ -198,6 +198,14 @@
           <option value="large">200+</option>
         </select>
       </div>
+      <div class="q">
+        <label class="qlabel">Audit context</label>
+        <select id="auditContext">
+          <option value="standard" selected>Standard deployment</option>
+          <option value="audit">Audit / structural-analysis engagement</option>
+        </select>
+        <p class="hint" style="margin-top:6px;">An audit/structural-analysis engagement means end users are analysts actively reviewing source code and producing deliverables alongside CAST Imaging, not just browsing results — this adds desktop tooling requirements to the end-user workstation profile below.</p>
+      </div>
     </fieldset>
 
     <fieldset>
@@ -353,7 +361,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-08';
+  var TOOL_VERSION = '2026-09-10';
 
   var LABELS = {
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
@@ -366,8 +374,14 @@
     certSource:{'ca-issued':'CA-issued', 'self-signed':'Self-signed', 'none':'No HTTPS (plain HTTP)'},
     reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', iis:'IIS + ARR', undecided:'Not decided yet'},
     auth:{local:'Local accounts', saml:'SAML 2.0 SSO', ldap:'LDAP / Active Directory'},
-    llmProvider:{anthropic:'Anthropic API', openai:'OpenAI API', 'azure-openai':'Azure OpenAI', other:'Custom / internal LLM gateway'}
+    llmProvider:{anthropic:'Anthropic API', openai:'OpenAI API', 'azure-openai':'Azure OpenAI', other:'Custom / internal LLM gateway'},
+    auditContext:{standard:'Standard deployment', audit:'Audit / structural-analysis engagement'}
   };
+
+  // Desktop tooling an audit/structural-analysis engagement needs on top of the standard browser —
+  // user-supplied list, not independently verified against CAST's own docs (which don't prescribe
+  // client-side audit tooling; this reflects what analysts actually run alongside CAST Imaging).
+  var AUDIT_WORKSTATION_TOOLS = ['Microsoft VS Code', 'Notepad++', 'Microsoft Word', 'Microsoft Excel', 'Microsoft PowerPoint', 'DBeaver', 'Python 3.17'];
 
   var LLM_FQDN = {
     anthropic:'api.anthropic.com',
@@ -429,11 +443,13 @@
   function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
   function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
   function hasNeo4j(a){ return hasViewer(a); }
+  function hasAuditContext(a){ return a.auditContext === 'audit'; }
 
   function state(){
     return {
       scale: document.getElementById('scale').value,
       users: document.getElementById('users').value,
+      auditContext: document.getElementById('auditContext').value,
       platform: document.querySelector('input[name=platform]:checked').value,
       scenario: document.getElementById('scenario').value,
       topology: document.querySelector('input[name=topology]:checked').value,
@@ -943,7 +959,9 @@
       '</tbody></table></div>') : '';
 
     sizingHtml += osHtml + storageHtml + '<h4>Client-side requirements</h4><div class="tbl-wrap"><table><thead><tr><th>Profile</th><th>Requirement</th></tr></thead><tbody>' +
-      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs</td></tr>' +
+      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs; <b>CAST Report Generator</b> installed locally for exporting/formatting deliverables' +
+        (hasAuditContext(a) ? '. <b>Audit / structural-analysis engagement selected (Section 2)</b> — also install: ' + AUDIT_WORKSTATION_TOOLS.map(function(t){ return '<b>'+esc(t)+'</b>'; }).join(', ') + ' (exact versions/edition per your engagement standards; not CAST-published requirements, listed as given for this deployment).' : '') +
+      '</td></tr>' +
       '<tr><td>Delivery / analyst workstation</td><td>Same as above, plus local disk for source checkouts, a compatible JDK (≥ 17 LTS and ≤ 21, 64-bit, with <code>JAVA_HOME</code> set), and SCM client tools for the repositories selected in Section 9</td></tr>' +
       '</tbody></table></div>';
 
@@ -1099,9 +1117,14 @@
     }
     groups.push({title:'Reverse proxy', key:'reverse-proxy', items:reverseProxyItems});
 
-    groups.push({title:'End-user workstation', key:'end-user-workstation', items:[
-      'Browser (Chrome / Edge / Firefox), 8 GB RAM, and 1920×1080 resolution requirements communicated to end users'
-    ]});
+    var endUserItems = [
+      'Browser (Chrome / Edge / Firefox), 8 GB RAM, and 1920×1080 resolution requirements communicated to end users',
+      'CAST Report Generator installed on end-user workstations'
+    ];
+    if(hasAuditContext(a)){
+      endUserItems.push('Audit/structural-analysis engagement tooling installed on end-user workstations: ' + AUDIT_WORKSTATION_TOOLS.join(', '));
+    }
+    groups.push({title:'End-user workstation', key:'end-user-workstation', items:endUserItems});
 
     groups.push({title:'Delivery / analyst workstation', key:'delivery-workstation', items:[
       'JDK (≥ 17 LTS and ≤ 21) and SCM client tools for the repositories selected in Section 9 communicated to delivery/analyst staff'
