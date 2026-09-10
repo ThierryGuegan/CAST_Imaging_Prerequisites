@@ -111,8 +111,28 @@
   }
 
   @media print{
+    /* Light-theme palette: most of the page is built on these custom properties, so redefining
+       them here converts fieldsets, tables, chips, code pills, and the SVG diagram (which now
+       falls back to var(--text) for box titles) to print-safe colors in one place. What's left
+       below are the handful of rules that use a literal hex color instead of a variable. */
+    :root{
+      --bg:#ffffff; --panel:#f8fafc; --panel-alt:#eef2f6; --panel-2:#e2e8f0; --border:#c3ccd6;
+      --text:#111827; --text-dim:#4b5563; --accent:#1d4ed8; --accent-2:#0f8a63;
+      --warn:#92400e; --danger:#b91c1c; --code-bg:#eef2f6;
+      --table-head:#e2e8f0; --table-row-alt:#f8fafc;
+      --m-analysis:#6d28d9; --m-analysis-fill:rgba(109,40,217,.08);
+      --m-neo4j:#a21caf; --m-neo4j-fill:rgba(162,28,175,.08);
+      --m-db:#b45309; --m-db-fill:rgba(180,83,9,.08);
+      --m-extend-fill:rgba(15,138,99,.08);
+    }
     header.app-header .no-print, .form-pane{display:none !important;}
-    body{background:#fff;color:#111;}
+    body{background:#fff;color:#111827;}
+    header.app-header h1, h2.page-title, h3, .chip b, .callout b, thead th{color:#111827;}
+    p, ul, ol, .chip, tbody td{color:#374151;}
+    .tag.mandatory{background:rgba(185,28,28,.12);color:#991b1b;}
+    .tag.conditional{background:rgba(146,64,14,.12);color:#92400e;}
+    .tag.optional{background:rgba(15,138,99,.12);color:#0f8a63;}
+    .tag.recommended{background:rgba(29,78,216,.12);color:#1d4ed8;}
     .results-pane{height:auto;overflow:visible;padding:0;}
     .toolbar{display:none !important;}
     table, .callout, fieldset, .arch-diagram-frame{break-inside:avoid;}
@@ -561,7 +581,7 @@
       var sw = opts.strokeWidth || 1.4;
       var dash = opts.dash ? ' stroke-dasharray="4 3"' : '';
       return '<rect x="'+b.x+'" y="'+yy+'" width="'+b.w+'" height="'+boxH+'" rx="8" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"'+dash+'/>' +
-        '<text x="'+b.cx+'" y="'+(yy+boxH/2-5)+'" text-anchor="middle" font-weight="600" font-size="12" fill="'+(opts.labelColor||'#fff')+'">'+esc(b.label)+'</text>' +
+        '<text x="'+b.cx+'" y="'+(yy+boxH/2-5)+'" text-anchor="middle" font-weight="600" font-size="12" fill="'+(opts.labelColor||'var(--text)')+'">'+esc(b.label)+'</text>' +
         '<text x="'+b.cx+'" y="'+(yy+boxH/2+12)+'" text-anchor="middle" font-size="10" fill="'+(opts.subColor||'var(--text-dim)')+'">'+b.sub+'</text>';
     }
     function line(x1,y1,x2,y2,color,marker,dashed){

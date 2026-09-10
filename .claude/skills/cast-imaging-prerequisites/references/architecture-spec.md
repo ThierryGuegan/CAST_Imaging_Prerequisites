@@ -35,9 +35,26 @@ document states has to earn that sentence — see the Goal section of `SKILL.md`
     the *currently-displayed* content was produced, which is only true if it updates every time the
     content actually changes.
 - A `@media print` block hides the form pane and toolbar so "Print / Save as PDF" produces a clean
-  document of just the generated content.
-- Dark theme by CSS custom properties on `:root`; no light/dark toggle needed since this is a
-  planning tool, not a public artifact — keep it simple unless asked otherwise.
+  document of just the generated content. It also redefines the same `:root` custom properties to
+  a light palette (see below) — print is this tool's only non-dark rendering context, and it went
+  a long time silently broken: the print block only ever set `body{background:#fff}`, leaving
+  every fieldset/callout/table/chip/diagram box on its own dark `var(--panel*)` background with
+  hardcoded `color:#fff` text sitting on top — readable on screen, largely invisible once the page
+  background actually turned white. Since almost everything in this file is built on the `:root`
+  custom properties, redefining them inside `@media print` fixes most of the page in one place;
+  the remaining literal hex colors (`h1`, `h2.page-title`, `h3`, `.chip b`, `.callout b`,
+  `thead th`, `p`, `ul`/`ol`, `.chip`, `tbody td`, and the four `.tag.*` variants) need their own
+  print overrides listed right there in the same block — if you add a new element with a literal
+  (non-`var()`) text color, add its print override alongside these, in the same edit.
+- Dark theme by CSS custom properties on `:root`, with the `@media print` overrides above as the
+  only other palette. No interactive light/dark toggle — this is a planning tool, not a public
+  artifact — keep it simple unless asked otherwise.
+- The architecture diagram's `box()` helper defaults its title-text fill to `var(--text)` (not a
+  hardcoded `#fff`) for exactly this reason: it's visually identical to `#fff` against the normal
+  dark `--text` value (`#e6edf3`, off-white), but automatically goes dark in print once `--text` is
+  redefined there — no per-box-type print override needed. Any new box-title color should default
+  through a variable the same way; a literal hex here is the same trap the rest of the page fell
+  into.
 
 ## Questionnaire sections (numbered fieldsets)
 
