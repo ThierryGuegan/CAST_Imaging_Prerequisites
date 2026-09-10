@@ -959,7 +959,7 @@
       '</tbody></table></div>') : '';
 
     sizingHtml += osHtml + storageHtml + '<h4>Client-side requirements</h4><div class="tbl-wrap"><table><thead><tr><th>Profile</th><th>Requirement</th></tr></thead><tbody>' +
-      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs; <b>CAST Report Generator</b> installed locally for exporting/formatting deliverables' +
+      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs; <b>CAST Report Generator</b> installed locally for exporting/formatting deliverables (see <a href="https://doc.castsoftware.com/imaging/install/report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/report-generator</a> and <a href="https://doc.castsoftware.com/export-v2/doccom/cast-report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/export-v2/doccom/cast-report-generator</a> for install/version prerequisites — not independently verified here, network egress to doc.castsoftware.com is blocked)' +
         (hasAuditContext(a) ? '. <b>Audit / structural-analysis engagement selected (Section 2)</b> — also install: ' + AUDIT_WORKSTATION_TOOLS.map(function(t){ return '<b>'+esc(t)+'</b>'; }).join(', ') + ' (exact versions/edition per your engagement standards; not CAST-published requirements, listed as given for this deployment).' : '') +
       '</td></tr>' +
       '<tr><td>Delivery / analyst workstation</td><td>Same as above, plus local disk for source checkouts, a compatible JDK (≥ 17 LTS and ≤ 21, 64-bit, with <code>JAVA_HOME</code> set), and SCM client tools for the repositories selected in Section 9</td></tr>' +
@@ -1119,7 +1119,7 @@
 
     var endUserItems = [
       'Browser (Chrome / Edge / Firefox), 8 GB RAM, and 1920×1080 resolution requirements communicated to end users',
-      'CAST Report Generator installed on end-user workstations'
+      'CAST Report Generator installed on end-user workstations (see <a href="https://doc.castsoftware.com/imaging/install/report-generator/" target="_blank" rel="noopener">install/report-generator</a> / <a href="https://doc.castsoftware.com/export-v2/doccom/cast-report-generator/" target="_blank" rel="noopener">export-v2/doccom/cast-report-generator</a>)'
     ];
     if(hasAuditContext(a)){
       endUserItems.push('Audit/structural-analysis engagement tooling installed on end-user workstations: ' + AUDIT_WORKSTATION_TOOLS.join(', '));

@@ -14,7 +14,8 @@ asking the user to paste the page content directly.
 | §1 Platform & topology — deployment scenario / component split | Which components a scenario installs (imaging-services, analysis-node, imaging-viewer, dashboards) | `install/before-you-start/deployment-options/`, `install/global/docker/` ("choose your deployment" step) |
 | §1 Platform & topology — multi-machine, analysis-node scaling | Horizontal scaling model, shared storage requirement | `install/global/docker/reference/config-examples/`, `install/requirements/disk/storage-locations/` |
 | §2 Project scale — user/scale bands | Sizing bands aren't CAST-published tiers — treat as internal planning heuristics, not doc-sourced facts | — (no direct doc source; label accordingly) |
-| §2 Project scale — Audit context, CAST Report Generator, and the audit-tooling list (VS Code, Notepad++, Office, DBeaver, Python) | Not a `doc.castsoftware.com` concept at all — this is user-supplied engagement/desktop-tooling context, not a CAST-published client-side requirement. Don't search for a doc page to back it; label it in the tool's own text as given, not confirmed | — (no CAST doc source; user-supplied fact) |
+| §2 Project scale — CAST Report Generator | Install/version prerequisites for the report-export tool referenced on the end-user workstation | `install/report-generator/`, and CAST Export's own doc site: `doc.castsoftware.com/export-v2/doccom/cast-report-generator/` (a different CAST product's doc tree, not under `imaging/`) — user-supplied URLs, not yet fetched (`WebFetch` blocked and `WebSearch` returned no results the one time tried); cited as the source to check, not yet used to verify specific claims |
+| §2 Project scale — Audit context and the audit-tooling list (VS Code, Notepad++, Office, DBeaver, Python) | Not a `doc.castsoftware.com` concept at all — this is user-supplied engagement/desktop-tooling context, not a CAST-published client-side requirement. Don't search for a doc page to back it; label it in the tool's own text as given, not confirmed | — (no CAST doc source; user-supplied fact) |
 | §3 Database — PostgreSQL | Supported/minimum versions, hosting options | `install/requirements/db/` |
 | §3 Database — disk floors, storage locations | 256GB floor, RAM floors, per-platform storage paths | `install/requirements/disk/`, `install/requirements/disk/storage-locations/`, `install/requirements/disk/storage-locations/docker/`, `install/requirements/disk/storage-locations/windows/`, `install/requirements/disk/storage-locations/cloud/` |
 | §3 Database — hardware sizing | CPU/RAM baselines | `install/requirements/hardware/` |
@@ -38,6 +39,7 @@ cites one, that's the exact page whose content the surrounding text claims to re
 - `install/requirements/software/`
 - `install/requirements/disk/storage-locations/` (+ `/docker/`, `/windows/`, `/cloud/` variants)
 - `install/requirements/hardware/#tcp-ports` (the "Named components (architecture overview)" table in §1 and most of the port numbers in §3)
+- `install/report-generator/` and `export-v2/doccom/cast-report-generator/` (CAST Report Generator, §2 client-side requirements)
 
 ## Using this map
 
