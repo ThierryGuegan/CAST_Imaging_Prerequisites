@@ -99,7 +99,9 @@ be a search-and-fix pass, not a rename in isolation.
    produce port rows when the scenario actually includes analysis — gate on `hasAnalysis(a)`, and
    show an explanatory hint (not just silently hide the checkboxes) when they're inert for the
    current scenario, so the user isn't left wondering why nothing changed.
-10. **Audit context** (`hasAuditContext(a)`, standard vs. audit/structural-analysis engagement) —
+10. **Deployment context (audit, …)** — currently just the Audit context field (`hasAuditContext(a)`,
+    standard vs. audit/structural-analysis engagement), named generically since more
+    non-architectural, client-side deployment-context flags may join it here later —
     deliberately placed last, after every other questionnaire section, since it's a client-side-only
     add-on rather than a deployment-architecture decision like Sections 1-9. Standard deployments
     only need CAST Report Generator on the end-user workstation; an audit engagement additionally
