@@ -246,6 +246,23 @@ what already happens to be drawn.
   optional Local Server (dashed border, "air-gapped only" in its label) as an intermediate hop.
   Gating the whole `extend.castsoftware.com` box on `a.egress==='airgapped'` — so it disappeared
   entirely for the two more common egress modes — was a real bug found auditing this box.
+- **Machine-count summary — derive it from `sizingRows`, never recompute it separately.**
+  `render()` computes `serverMachineCount` (`sizingRows.length`, minus 1 if `dbHosting==='managed'`
+  since that row is a cloud service you don't provision, plus 1 if `egress==='airgapped'` since
+  `sizingRows` never includes the Extend Local Server) and `workstationRoleCount` (1 for the
+  end-user workstation, +1 when `hasAnalysis(a)` for the delivery/analyst workstation) right after
+  `sizingRows` is finalized (after the MCP row is concatenated), then passes both into
+  `buildArchitectureDiagram(a, counts)` and into the `<h3>1. Hardware sizing...</h3>` callout. Don't
+  add a second, independent count inside the diagram function itself — that's exactly the kind of
+  drift that produces a diagram/text mismatch when `sizingRows`'s composition changes later. The
+  diagram renders the totals as its own header line (`counts.serverMachineCount` /
+  `counts.workstationRoleCount`) and appends `· own {machine|pod}` to the `sub` text of every box
+  that isn't part of the implicit core/all-in-one node (Analysis-node(s), a dedicated Neo4j, a
+  dedicated/managed PostgreSQL, the Extend Local Server) — this per-box annotation, not a bounding
+  rectangle around groups of boxes, is the safe way to show grouping: a single rectangle spanning
+  multiple rows can't correctly exclude one box sitting inside a row it otherwise needs to enclose
+  (e.g. Analysis-node sits in the same row as AI-service/Viewer-APIs, which *are* part of the core
+  node), so don't attempt that without solving the exclusion problem first.
 
 ## Ports/FQDN matrix
 

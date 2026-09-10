@@ -475,8 +475,11 @@
 
   function esc(s){ return String(s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 
-  function buildArchitectureDiagram(a){
-    var W = 1260, boxH = 60, gapY = 34;
+  function buildArchitectureDiagram(a, counts){
+    counts = counts || {};
+    var isK8sDiagram = a.platform === 'kubernetes';
+    var machineWord = isK8sDiagram ? 'pod' : 'machine';
+    var W = 1260, boxH = 60, gapY = 34, headerH = 30;
 
     function layoutRow(items, w){
       w = w || 180;
@@ -490,7 +493,7 @@
     }
     function byKey(row, key){ for(var i=0;i<row.length;i++){ if(row[i].key===key) return row[i]; } return null; }
 
-    var y = 16;
+    var y = 16 + headerH;
     var browserRow = layoutRow([{key:'browser', label:'Browser', sub:'end user'}]); var yBrowser = y; y += boxH+gapY;
     var testerBox = {x: browserRow[0].x+browserRow[0].w+60, w: 220};
     testerBox.cx = testerBox.x + testerBox.w/2;
@@ -512,22 +515,25 @@
     var routedRow = layoutRow(routedItems); var yRouted = y; y += boxH+gapY;
 
     var supportItems = [];
-    if(hasAnalysis(a)) supportItems.push({key:'analysis', label:'Analysis-node(s)', sub:':8089'});
+    if(hasAnalysis(a)){
+      var analysisNodeCount = ANALYSIS_NODE_COUNT[a.analysisNodes] || 1;
+      supportItems.push({key:'analysis', label:'Analysis-node(s)', sub:':8089' + (a.topology === 'multi' ? ' · own '+machineWord+(analysisNodeCount>1 ? 's (×'+analysisNodeCount+')' : '') : '')});
+    }
     supportItems.push({key:'ai', label:'AI-service', sub:'ai-manager · :8082'});
     if(hasViewer(a)) supportItems.push({key:'viewerapi', label:'Viewer-APIs', sub:'imaging-apis · :8070'});
     var supportRow = layoutRow(supportItems); var ySupport = y; y += boxH+gapY;
 
-    var dataItems = [{key:'pg', label:'PostgreSQL', sub:'default :2285'}];
+    var dataItems = [{key:'pg', label:'PostgreSQL', sub:'default :2285' + (a.dbHosting !== 'colocated' ? ' · '+(a.dbHosting==='managed' ? 'managed DBaaS' : 'own '+machineWord) : '')}];
     if(hasNeo4j(a)){
       dataItems.push({key:'etl', label:'ETL service', sub:':9001'});
-      dataItems.push({key:'neo4j', label:'Neo4j', sub:'Bolt :7687 · :7474 · :6362'});
+      dataItems.push({key:'neo4j', label:'Neo4j', sub:'Bolt :7687 · :7474 · :6362' + (a.topology === 'multi' && a.neo4jDedicated ? ' · own '+machineWord : '')});
     }
     var dataRow = layoutRow(dataItems); var yData = y; y += boxH+gapY;
 
     var extendRow = null, yExtendRow = null;
     if(a.egress === 'airgapped'){
       extendRow = layoutRow([
-        {key:'extend', label:'Extend Local Server', sub:'extend-proxy · :8085'},
+        {key:'extend', label:'Extend Local Server', sub:'extend-proxy · :8085 · own '+machineWord},
         {key:'extendtarget', label:'extend.castsoftware.com', sub:'outbound only · :443'}
       ], 220); yExtendRow = y; y += boxH+gapY;
     } else {
@@ -562,6 +568,13 @@
 
     var FLOW = 'var(--text-dim)', ROUTE = 'var(--accent)', SHARED = 'var(--accent-2)', TESTONLY = 'var(--warn)';
     var svg = '';
+
+    if(typeof counts.serverMachineCount === 'number'){
+      var headerText = isK8sDiagram
+        ? counts.serverMachineCount+' pod resource request(s) on your node pool + '+counts.workstationRoleCount+' workstation role(s) — boxes below marked "own '+machineWord+'" get their own pod'
+        : counts.serverMachineCount+' server '+machineWord+'(s) required + '+counts.workstationRoleCount+' workstation role(s) — boxes below marked "own '+machineWord+'" run apart from the rest';
+      svg += '<text x="'+(W/2)+'" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text)">'+esc(headerText)+'</text>';
+    }
 
     // connectors
     svg += line(browserRow[0].cx, yBrowser+boxH, proxyRow[0].cx, yProxy, FLOW, 'ah-flow');
@@ -665,11 +678,11 @@
       }).join('') +
       '</defs>';
 
-    var ariaLabel = 'Diagram of the CAST Imaging components active for your current answers: the browser reaches Gateway on port 8090 only, through the mandatory reverse proxy' + (hasDashboards(a) ? '; the CAST Report Generator workstation reaches Gateway the same way, directly on :8090 or via the reverse proxy on :443' : '') + '; Gateway internally path-routes to ' + routedItems.map(function(r){return r.label;}).join(', ') + '; ' + (analysisBox||aiBox||viewerApiBox ? 'supporting services (' + supportItems.map(function(r){return r.label;}).join(', ') + ') sit behind it; ' : '') + 'PostgreSQL' + (etlBox ? ' feeds Neo4j through an ETL service' : ' is the sole data store') + '.';
+    var ariaLabel = (typeof counts.serverMachineCount === 'number' ? counts.serverMachineCount+' server '+machineWord+'(s) plus '+counts.workstationRoleCount+' workstation role(s) are required for this configuration; ' : '') + 'Diagram of the CAST Imaging components active for your current answers: the browser reaches Gateway on port 8090 only, through the mandatory reverse proxy' + (hasDashboards(a) ? '; the CAST Report Generator workstation reaches Gateway the same way, directly on :8090 or via the reverse proxy on :443' : '') + '; Gateway internally path-routes to ' + routedItems.map(function(r){return r.label;}).join(', ') + '; ' + (analysisBox||aiBox||viewerApiBox ? 'supporting services (' + supportItems.map(function(r){return r.label;}).join(', ') + ') sit behind it; ' : '') + 'PostgreSQL' + (etlBox ? ' feeds Neo4j through an ETL service' : ' is the sole data store') + '.';
 
     return '<figure class="arch-diagram-frame">' +
       '<svg viewBox="0 0 '+W+' '+totalH+'" role="img" aria-label="'+esc(ariaLabel)+'">' + defs + '<g font-family="Segoe UI, Roboto, sans-serif">' + svg + '</g></svg>' +
-      '<figcaption>Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it. The three amber paths from the tester/admin workstation exist only to validate Gateway'+(testerHasUi?', SSO Service':'')+' and Control Panel directly during setup/testing — close them before production go-live.'+(hasDashboards(a) ? ' CAST Report Generator (an optional standalone reporting tool) reaches Gateway the same way as the browser — directly on :8090, or via the reverse proxy on :443 once configured.' : '')+extendNote+sharedNote+'</figcaption>' +
+      '<figcaption>'+(typeof counts.serverMachineCount === 'number' ? '<b>'+counts.serverMachineCount+' server '+machineWord+'(s)</b> required, plus <b>'+counts.workstationRoleCount+' workstation role(s)</b> (see the hardware sizing table above) — any box below labeled "own '+machineWord+'" runs apart from the others; everything unlabeled shares the core/all-in-one '+machineWord+'. ' : '')+'Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it. The three amber paths from the tester/admin workstation exist only to validate Gateway'+(testerHasUi?', SSO Service':'')+' and Control Panel directly during setup/testing — close them before production go-live.'+(hasDashboards(a) ? ' CAST Report Generator (an optional standalone reporting tool) reaches Gateway the same way as the browser — directly on :8090, or via the reverse proxy on :443 once configured.' : '')+extendNote+sharedNote+'</figcaption>' +
       '</figure>' +
       '<div class="arch-legend">' +
       '<span><i style="border-color:'+FLOW+'"></i>Direct internal call</span>' +
@@ -872,7 +885,21 @@
     }
     if(a.mcp) sizingRows = sizingRows.concat([{c:'MCP Server (Imaging + Gatekeeper)' + (isK8s ? ' pods' : ''), cpu:2, ram:4, disk:20}]);
 
+    // ---- Machine-count summary: how many server machines/pods + workstation roles this profile needs ----
+    var serverMachineCount = sizingRows.length - (a.dbHosting === 'managed' ? 1 : 0) + (a.egress === 'airgapped' ? 1 : 0);
+    var workstationRoleCount = 1 + (hasAnalysis(a) ? 1 : 0);
+    var workstationDesc = hasAnalysis(a) ? '1 end-user workstation + 1 delivery/analyst workstation' : '1 end-user workstation';
+    var machineWordSizing = isK8s ? 'pod resource request' : 'server machine';
+    var machineSummaryHtml;
+    if(isK8s){
+      machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> on your existing Kubernetes node pool (no new dedicated servers to provision for these) + <b>'+workstationDesc+'</b> to access it'+(a.egress==='airgapped' ? ' + <b>1 Extend Local Server machine</b> (not pod-based — air-gapped egress) ' : '')+'.</div>';
+    } else {
+      var totalMachines = serverMachineCount + workstationRoleCount;
+      machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see table below'+(a.egress==='airgapped' ? ', includes the Extend Local Server' : '')+') + '+workstationDesc+'.</div>';
+    }
+
     var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
+      machineSummaryHtml +
       (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk. "Single node pool" vs. one pod per row below mirrors the topology choice in Section 1, not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' : '') +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr></thead><tbody>' +
       sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+esc(r.disk)+' GB</td></tr>'; }).join('') +
@@ -922,7 +949,7 @@
 
     sizingHtml += '<h4>Named components (architecture overview)</h4>' +
       '<p>All components below other than Gateway communicate over CAST\'s internal container network and are not individually customer-firewall-configurable in a single- or co-located multi-machine topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j machines) where a real firewall path is required. Source: CAST\'s architecture reference diagram and <a href="https://doc.castsoftware.com/imaging/install/requirements/hardware/#tcp-ports" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports)</a>.</p>' +
-      buildArchitectureDiagram(a) +
+      buildArchitectureDiagram(a, {serverMachineCount: isK8s ? sizingRows.length : serverMachineCount, workstationRoleCount: workstationRoleCount}) +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Port(s)</th><th>Role</th></tr></thead><tbody>' +
       componentRows.map(function(r){ return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+r[2]+'</td></tr>'; }).join('') +
       '</tbody></table></div>';
