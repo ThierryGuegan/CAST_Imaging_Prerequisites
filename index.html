@@ -931,7 +931,7 @@
     var machineWordSizing = isK8s ? 'pod resource request' : 'server machine';
     var machineSummaryHtml;
     if(isK8s){
-      machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> on your existing Kubernetes node pool (no new dedicated servers to provision for these) + <b>'+workstationDesc+'</b> to access it'+(a.egress==='airgapped' ? ' + <b>1 Extend Local Server machine</b> (not pod-based — air-gapped egress) ' : '')+'.</div>';
+      machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> on your existing Kubernetes node pool (no new dedicated servers to provision for these), plus <b>'+workstationDesc+'</b> to access it'+(a.egress==='airgapped' ? ', plus <b>1 Extend Local Server machine</b> (not pod-based — air-gapped egress)' : '')+'.</div>';
     } else {
       var totalMachines = serverMachineCount + workstationRoleCount;
       machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see Section 1'+(a.egress==='airgapped' ? ', includes the Extend Local Server' : '')+') + '+workstationDesc+'.</div>';
