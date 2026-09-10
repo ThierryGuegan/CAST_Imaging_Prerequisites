@@ -194,11 +194,11 @@
             <option value="2-3">2–3 (analyze a few applications in parallel)</option>
             <option value="4+">4+ (large/numerous codebases, high analysis throughput)</option>
           </select>
-          <p class="hint">Each analysis-node registers itself against the same imaging-services instance and can run on its own machine — this is CAST Imaging's horizontal scaling mechanism for analysis workload.</p>
+          <p class="hint" id="analysis-nodes-hint">Each analysis-node registers itself against the same imaging-services instance and can run on its own machine — this is CAST Imaging's horizontal scaling mechanism for analysis workload.</p>
         </div>
         <div class="sub-block" id="neo4j-dedicated-sub">
           <label class="opt"><input type="checkbox" id="neo4jDedicated">
-            <span class="opt-text"><b>Run Neo4j on its own dedicated machine</b><span>Separate from imaging-viewer — isolates graph-database load and lets you update CAST Imaging independently of Neo4j</span></span></label>
+            <span class="opt-text"><b id="neo4j-dedicated-label">Run Neo4j on its own dedicated machine</b><span>Separate from imaging-viewer — isolates graph-database load and lets you update CAST Imaging independently of Neo4j</span></span></label>
         </div>
       </div>
     </fieldset>
@@ -870,14 +870,19 @@
   function render(){
     stampGeneratedDate();
     var a = state();
+    var isK8s = a.platform === 'kubernetes';
+    var unitWord = isK8s ? 'pod' : 'machine';
 
     document.getElementById('mcp-sub').className = 'sub-block' + (a.mcp ? ' show' : '');
     document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' && hasAnalysis(a) ? ' show' : '');
     document.getElementById('neo4j-dedicated-sub').className = 'sub-block' + (a.topology === 'multi' && hasNeo4j(a) ? ' show' : '');
     document.getElementById('topology-hint').textContent =
-      (a.scale === 'enterprise' && a.topology === 'single') ? 'Single machine is not recommended at Enterprise scale — consider Multi-machine or Kubernetes.' :
-      (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-machine is usually unnecessary for a POC — Single machine is simpler.' :
-      (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more machines to provision and maintain, network connectivity between machines must be correctly configured, and every machine must mount the same /opt/cast/shared network folder over SMB.' : '';
+      (a.scale === 'enterprise' && a.topology === 'single') ? 'Single '+unitWord+' is not recommended at Enterprise scale — consider Multi-'+unitWord+(isK8s ? '' : ' or Kubernetes')+'.' :
+      (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-'+unitWord+' is usually unnecessary for a POC — Single '+unitWord+' is simpler.' :
+      (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more '+unitWord+'s to provision and maintain, network connectivity between '+unitWord+'s must be correctly configured, and every '+unitWord+' must mount the same /opt/cast/shared network folder over SMB.' : '';
+    document.getElementById('analysis-nodes-hint').textContent =
+      'Each analysis-node registers itself against the same imaging-services instance and can run on its own '+unitWord+' — this is CAST Imaging\'s horizontal scaling mechanism for analysis workload.';
+    document.getElementById('neo4j-dedicated-label').textContent = 'Run Neo4j on its own dedicated ' + (isK8s ? 'pod (StatefulSet)' : 'machine');
 
     document.getElementById('source-access-hint').textContent = hasAnalysis(a) ? '' :
       'Your scenario ('+LABELS.scenario[a.scenario]+') excludes analysis — these options won\'t add any firewall rows, since there\'s no analysis-node to check out source code.';
@@ -893,7 +898,6 @@
     var sizeSpec = SIZING[a.scale];
     var userBonus = USER_BONUS[a.users] || {cpu:0, ram:0};
     var userBonusApplies = hasViewer(a) || hasDashboards(a);
-    var isK8s = a.platform === 'kubernetes';
     var allInOneLabel = isK8s ? 'All pods' : 'All-in-one host';
     var coreLabel = isK8s ? 'Core pods' : 'Core node';
     var neo4jDedicatedLabel = isK8s ? 'Neo4j pod (dedicated StatefulSet, serves imaging-viewer)' : 'Neo4j machine (dedicated, serves imaging-viewer)';
@@ -1066,7 +1070,7 @@
       (hasNeo4j(a) ?
         '<tr><td>Requirement</td><td>Bundled with imaging-viewer — not a user-selectable engine; an ETL loads analysis results from PostgreSQL into Neo4j for the Viewer</td></tr>' +
         '<tr><td>Ports</td><td>7687 (Bolt, used by imaging-viewer) / 6362 (backup) / 7474 (Neo4j\'s own HTTP browser/admin interface, optional)</td></tr>' +
-        '<tr><td>Hosting</td><td>' + (a.topology==='multi' && a.neo4jDedicated ? '<b>Deployed on its own dedicated machine</b> per your topology answer.' : 'Co-located with imaging-viewer.') + '</td></tr>' +
+        '<tr><td>Hosting</td><td>' + (a.topology==='multi' && a.neo4jDedicated ? '<b>Deployed on its own dedicated '+(isK8s?'pod (StatefulSet)':'machine')+'</b> per your topology answer.' : 'Co-located with imaging-viewer.') + '</td></tr>' +
         '<tr><td>Memory</td><td><b>16 GB RAM minimum, 32 GB recommended</b> — defaults to a 12 GB initial/maximum JVM heap, tunable via <code>imaging-viewer/.env</code></td></tr>'
         : '<tr><td>Requirement</td><td>Not required — your scenario ('+esc(LABELS.scenario[a.scenario])+') excludes the Viewer.</td></tr>') +
       '</tbody></table></div>';
