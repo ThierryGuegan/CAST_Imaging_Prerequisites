@@ -237,17 +237,19 @@ what already happens to be drawn.
   `var(--panel-alt)` background — they used to be the same color, which meant every default box
   was distinguishable only by its faint `var(--border)` outline and effectively invisible as a
   distinct "card." If you add a new default-styled box, don't fill it with `--panel-alt` again.
-- **Four categorical colors mark which boxes run on their own machine**, applied via the
+- **Three categorical colors mark which boxes run on their own machine**, applied via the
   `machineBoxOpts(strokeColor, fillColor, dashed)` helper (a tinted fill plus a matching border/
   sub-text color, `dashed` for "not actually your infrastructure" like a managed DBaaS): violet
   `--m-analysis`/`--m-analysis-fill` for Analysis-node(s) when `a.topology==='multi'`, pink
   `--m-neo4j`/`--m-neo4j-fill` for a dedicated Neo4j, orange `--m-db`/`--m-db-fill` for a dedicated
-  or managed PostgreSQL (dashed only for `managed`, since that's a cloud service not a machine),
-  and the existing teal `--accent-2`/`--m-extend-fill` for the Extend Local Server. These colors
-  are in addition to, not instead of, the existing "· own machine" text on the box's `sub` — color
-  alone isn't accessible to colorblind readers or screen readers. Each color has a matching
-  conditional entry in the `.arch-legend` block (a small `i.box` swatch) — add one whenever you add
-  a new machine color, gated on the same condition that triggers the box styling.
+  or managed PostgreSQL (dashed only for `managed`, since that's a cloud service not a machine).
+  The Extend Local Server does *not* get one of these — see the machine-count note below for why —
+  it keeps its own plain `stroke:'var(--accent-2)'` highlight instead, same as before machine
+  colors existed. These colors are in addition to, not instead of, the existing "· own machine"
+  text on the box's `sub` — color alone isn't accessible to colorblind readers or screen readers.
+  Each color has a matching conditional entry in the `.arch-legend` block (a small `i.box` swatch)
+  — add one whenever you add a new machine color, gated on the same condition that triggers the
+  box styling.
 - **Confidence in the line must match confidence in the text.** If `componentRows` or a nearby
   callout says a relationship "is not confirmed by the source diagram," the line for it must look
   less certain than a confirmed one — not just carry a caveat label next to an otherwise-identical
@@ -299,17 +301,19 @@ what already happens to be drawn.
   entirely for the two more common egress modes — was a real bug found auditing this box.
 - **Machine-count summary — derive it from `sizingRows`, never recompute it separately.**
   `render()` computes `serverMachineCount` (`sizingRows.length`, minus 1 if `dbHosting==='managed'`
-  since that row is a cloud service you don't provision, plus 1 if `egress==='airgapped'` since
-  `sizingRows` never includes the Extend Local Server) and `workstationRoleCount` (1 for the
-  end-user workstation, +1 when `hasAnalysis(a)` for the delivery/analyst workstation) right after
-  `sizingRows` is finalized (after the MCP row is concatenated), then passes both into
-  `buildArchitectureDiagram(a, counts)` and into the `<h3>1. Hardware sizing...</h3>` callout. Don't
-  add a second, independent count inside the diagram function itself — that's exactly the kind of
-  drift that produces a diagram/text mismatch when `sizingRows`'s composition changes later. The
-  diagram renders the totals as its own header line (`counts.serverMachineCount` /
-  `counts.workstationRoleCount`) and appends `· own {machine|pod}` to the `sub` text of every box
-  that isn't part of the implicit core/all-in-one node (Analysis-node(s), a dedicated Neo4j, a
-  dedicated/managed PostgreSQL, the Extend Local Server) — this per-box annotation, not a bounding
+  since that row is a cloud service you don't provision — the Extend Local Server is never counted
+  here, since it's co-located with whichever host runs Gateway/imaging-services, not a separately
+  provisioned machine) and `workstationRoleCount` (1 for the end-user workstation, +1 when
+  `hasAnalysis(a)` for the delivery/analyst workstation; note `workstationMachineCount` is always
+  `1` since one physical workstation can cover multiple roles — `workstationDesc` is the
+  human-readable string built from these two) right after `sizingRows` is finalized (after the MCP
+  row is concatenated), then passes both into `buildArchitectureDiagram(a, counts)` and into the
+  `<h3>1. Hardware sizing...</h3>` callout. Don't add a second, independent count inside the diagram
+  function itself — that's exactly the kind of drift that produces a diagram/text mismatch when
+  `sizingRows`'s composition changes later. The diagram renders the totals as its own header line
+  (`counts.serverMachineCount` / `counts.workstationRoleCount`) and appends `· own {machine|pod}` to
+  the `sub` text of every box that isn't part of the implicit core/all-in-one node (Analysis-node(s),
+  a dedicated Neo4j, a dedicated/managed PostgreSQL) — this per-box annotation, not a bounding
   rectangle around groups of boxes, is the safe way to show grouping: a single rectangle spanning
   multiple rows can't correctly exclude one box sitting inside a row it otherwise needs to enclose
   (e.g. Analysis-node sits in the same row as AI-service/Viewer-APIs, which *are* part of the core
@@ -377,8 +381,8 @@ own.
    server components do.
 
    **Machine-count model**: `serverMachineCount` counts server-side machines/pods 1:1 (each row in
-   `sizingRows`, adjusted for the managed-DBaaS row and the Extend Local Server — see the
-   "Architecture diagram conventions" section below). Workstations are different: `hasAnalysis(a)`
+   `sizingRows`, adjusted for the managed-DBaaS row — see the "Architecture diagram conventions"
+   section below). Workstations are different: `hasAnalysis(a)`
    adds a second *role* (delivery/analyst) alongside the always-present end-user role, but the two
    roles don't need two separate physical machines — the same person can cover both. So
    `workstationMachineCount` is always `1` regardless of role count; `workstationRoleCount` (still

@@ -13,7 +13,6 @@
     --m-analysis:#b79bfb; --m-analysis-fill:rgba(183,155,251,.16);
     --m-neo4j:#f479bd; --m-neo4j-fill:rgba(244,121,189,.16);
     --m-db:#ffa85c; --m-db-fill:rgba(255,168,92,.16);
-    --m-extend-fill:rgba(89,208,160,.16);
     --heading:#fff; --body-text:#cfd8e2;
   }
   :root[data-theme="light"]{
@@ -24,7 +23,6 @@
     --m-analysis:#6d28d9; --m-analysis-fill:rgba(109,40,217,.08);
     --m-neo4j:#a21caf; --m-neo4j-fill:rgba(162,28,175,.08);
     --m-db:#b45309; --m-db-fill:rgba(180,83,9,.08);
-    --m-extend-fill:rgba(15,138,99,.08);
     --heading:#111827; --body-text:#374151;
   }
   *{box-sizing:border-box;}
@@ -139,7 +137,6 @@
       --m-analysis:#6d28d9; --m-analysis-fill:rgba(109,40,217,.08);
       --m-neo4j:#a21caf; --m-neo4j-fill:rgba(162,28,175,.08);
       --m-db:#b45309; --m-db-fill:rgba(180,83,9,.08);
-      --m-extend-fill:rgba(15,138,99,.08);
       --heading:#111827; --body-text:#374151;
     }
     header.app-header .no-print, .form-pane{display:none !important;}
@@ -582,7 +579,7 @@
     var extendRow = null, yExtendRow = null;
     if(a.egress === 'airgapped'){
       extendRow = layoutRow([
-        {key:'extend', label:'Extend Local Server', sub:'extend-proxy · :8085 · own '+machineWord},
+        {key:'extend', label:'Extend Local Server', sub:'extend-proxy · :8085'},
         {key:'extendtarget', label:'extend.castsoftware.com', sub:'outbound only · :443'}
       ], 220); yExtendRow = y; y += boxH+gapY;
     } else {
@@ -616,7 +613,7 @@
     }
 
     var FLOW = 'var(--text-dim)', ROUTE = 'var(--accent)', SHARED = 'var(--accent-2)', TESTONLY = 'var(--warn)';
-    var M_ANALYSIS = 'var(--m-analysis)', M_NEO4J = 'var(--m-neo4j)', M_DB = 'var(--m-db)', M_EXTEND = 'var(--accent-2)';
+    var M_ANALYSIS = 'var(--m-analysis)', M_NEO4J = 'var(--m-neo4j)', M_DB = 'var(--m-db)';
     function machineBoxOpts(color, fill, dashed){ return {fill:fill, stroke:color, subColor:color, dash:!!dashed, strokeWidth:1.6}; }
     var svg = '';
 
@@ -686,7 +683,7 @@
     var extendNote = '';
     if(a.egress === 'airgapped'){
       var extendBox = extendRow[0], extendTargetBox = extendRow[1];
-      svg += box(extendBox, yExtendRow, machineBoxOpts(M_EXTEND, 'var(--m-extend-fill)'));
+      svg += box(extendBox, yExtendRow, {stroke:'var(--accent-2)'});
       svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
       svg += line(extendBox.x+extendBox.w, yExtendRow+boxH/2, extendTargetBox.x, yExtendRow+boxH/2, FLOW, 'ah-flow');
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-flow)"/>';
@@ -751,7 +748,6 @@
       (analysisBox && a.topology === 'multi' ? '<span><i class="box" style="background:var(--m-analysis-fill);border-color:'+M_ANALYSIS+'"></i>Analysis-node machine(s)</span>' : '') +
       (neo4jBox && a.topology === 'multi' && a.neo4jDedicated ? '<span><i class="box" style="background:var(--m-neo4j-fill);border-color:'+M_NEO4J+'"></i>Dedicated Neo4j machine</span>' : '') +
       (a.dbHosting !== 'colocated' ? '<span><i class="box" style="background:var(--m-db-fill);border-color:'+M_DB+'"></i>'+(a.dbHosting==='managed'?'Managed DBaaS (not a machine you provision)':'Dedicated database machine')+'</span>' : '') +
-      (a.egress === 'airgapped' ? '<span><i class="box" style="background:var(--m-extend-fill);border-color:'+M_EXTEND+'"></i>Extend Local Server machine</span>' : '') +
       '</div>';
   }
 
@@ -956,7 +952,10 @@
     // Workstation ROLES (end-user, delivery/analyst) are distinct responsibilities, not necessarily distinct
     // physical machines — the same person/laptop can cover both, so the minimum footprint counts workstations
     // as 1 machine regardless of role count, while still naming every role that machine needs to cover.
-    var serverMachineCount = sizingRows.length - (a.dbHosting === 'managed' ? 1 : 0) + (a.egress === 'airgapped' ? 1 : 0);
+    // The Extend Local Server (extend-proxy) is not counted as its own machine: it's a container
+    // co-located with imaging-services/Gateway on whichever host runs that — the all-in-one host
+    // in single topology, the core node/pods in multi — not a separately provisioned machine.
+    var serverMachineCount = sizingRows.length - (a.dbHosting === 'managed' ? 1 : 0);
     var workstationRoleCount = 1 + (hasAnalysis(a) ? 1 : 0);
     var workstationMachineCount = 1;
     var workstationDesc = hasAnalysis(a)
@@ -965,10 +964,10 @@
     var machineWordSizing = isK8s ? 'pod resource request' : 'server machine';
     var machineSummaryHtml;
     if(isK8s){
-      machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> on your existing Kubernetes node pool (no new dedicated servers to provision for these), plus <b>'+workstationDesc+'</b> to access it'+(a.egress==='airgapped' ? ', plus <b>1 Extend Local Server machine</b> (not pod-based — air-gapped egress)' : '')+'.</div>';
+      machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> on your existing Kubernetes node pool (no new dedicated servers to provision for these), plus <b>'+workstationDesc+'</b> to access it.</div>';
     } else {
       var totalMachines = serverMachineCount + workstationMachineCount;
-      machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see Section 1\'s Server components table'+(a.egress==='airgapped' ? ', includes the Extend Local Server' : '')+') + '+workstationDesc+' (see Workstation components table)'+'.</div>';
+      machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see Section 1\'s Server components table'+(a.egress==='airgapped' ? '; the Extend Local Server is co-located there, not a separate machine' : '')+') + '+workstationDesc+' (see Workstation components table)'+'.</div>';
     }
 
     var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
