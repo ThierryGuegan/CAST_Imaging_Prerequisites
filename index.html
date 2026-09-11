@@ -928,22 +928,29 @@
     }
     if(a.mcp) sizingRows = sizingRows.concat([{c:'MCP Server (Imaging + Gatekeeper)' + (isK8s ? ' pods' : ''), cpu:2, ram:4, disk:20}]);
 
-    // ---- Machine-count summary: how many server machines/pods + workstation roles this profile needs ----
+    // ---- Machine-count summary: how many server machines/pods + workstation machine(s) this profile needs ----
+    // Workstation ROLES (end-user, delivery/analyst) are distinct responsibilities, not necessarily distinct
+    // physical machines — the same person/laptop can cover both, so the minimum footprint counts workstations
+    // as 1 machine regardless of role count, while still naming every role that machine needs to cover.
     var serverMachineCount = sizingRows.length - (a.dbHosting === 'managed' ? 1 : 0) + (a.egress === 'airgapped' ? 1 : 0);
     var workstationRoleCount = 1 + (hasAnalysis(a) ? 1 : 0);
-    var workstationDesc = hasAnalysis(a) ? '1 end-user workstation + 1 delivery/analyst workstation' : '1 end-user workstation';
+    var workstationMachineCount = 1;
+    var workstationDesc = hasAnalysis(a)
+      ? '1 workstation covering 2 roles (end-user + delivery/analyst — can be the same machine, or split across more if your team prefers)'
+      : '1 end-user workstation';
     var machineWordSizing = isK8s ? 'pod resource request' : 'server machine';
     var machineSummaryHtml;
     if(isK8s){
       machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> on your existing Kubernetes node pool (no new dedicated servers to provision for these), plus <b>'+workstationDesc+'</b> to access it'+(a.egress==='airgapped' ? ', plus <b>1 Extend Local Server machine</b> (not pod-based — air-gapped egress)' : '')+'.</div>';
     } else {
-      var totalMachines = serverMachineCount + workstationRoleCount;
-      machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see Section 1'+(a.egress==='airgapped' ? ', includes the Extend Local Server' : '')+') + '+workstationDesc+'.</div>';
+      var totalMachines = serverMachineCount + workstationMachineCount;
+      machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see Section 1\'s Server components table'+(a.egress==='airgapped' ? ', includes the Extend Local Server' : '')+') + '+workstationDesc+' (see Workstation components table)'+'.</div>';
     }
 
     var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
       machineSummaryHtml +
       (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk. "Single node pool" vs. one pod per row below mirrors the topology choice in Section 1, not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' : '') +
+      '<h4>Server components</h4>' +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr></thead><tbody>' +
       sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+esc(r.disk)+' GB</td></tr>'; }).join('') +
       '</tbody></table></div>';
@@ -972,6 +979,28 @@
 
     sizingHtml += '<div class="callout info">CAST\'s absolute floor is <b>256 GB free disk per node</b>, on SSD or equivalent high-IOPS storage (SAN configured with SSD) — the figures above already sit at or above that floor for your profile, but treat 256 GB as a hard minimum on any node regardless.</div>';
     sizingHtml += '<div class="callout info">CAST\'s RAM floor differs by topology: <b>32 GB minimum for a standalone/all-in-one machine</b> (everything on one host), versus <b>16 GB minimum per node in a distributed/multi-machine deployment</b> — 32 GB recommended per node there too. The figures above already respect these floors.</div>';
+
+    var winNoteParts = [];
+    if(hasDashboards(a)) winNoteParts.push('CAST Report Generator\'s interactive UI (a Linux-capable CLI-only variant, "Report Generator for Dashboards", exists as an alternative)');
+    if(hasAuditContext(a)) winNoteParts.push('Notepad++ (no official cross-platform build)');
+    var endUserOs = 'Windows, macOS, or Linux — any current browser works' +
+      (winNoteParts.length ? '. <b>Windows specifically required</b> for: ' + winNoteParts.join(', ') + '.' : '.');
+    var endUserSoftware = 'Chrome / Edge / Firefox' +
+      (hasDashboards(a) ? '; <b>CAST Report Generator</b> (optional — see note below)' : '') +
+      (hasAuditContext(a) ? '; audit/structural-analysis engagement tooling (see note below)' : '');
+
+    sizingHtml += '<h4>Workstation components</h4>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Operating system</th><th>Hardware</th><th>Software</th></tr></thead><tbody>' +
+      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>'+endUserOs+'</td><td>8 GB RAM, 1920×1080 recommended for architecture/dependency graphs</td><td>'+endUserSoftware+'</td></tr>' +
+      '<tr><td>Delivery / analyst workstation</td><td>Same as End-user workstation</td><td>8 GB RAM minimum, plus local disk for source checkouts</td><td>Browser + JDK (≥ 17 LTS and ≤ 21, 64-bit, <code>JAVA_HOME</code> set) + SCM client tools for the repositories selected in Section 9</td></tr>' +
+      '</tbody></table></div>';
+
+    if(hasDashboards(a)){
+      sizingHtml += '<div class="callout info"><b>CAST Report Generator</b> — a standalone tool, not bundled with CAST Imaging, for exporting Word/Excel/PowerPoint deliverables: requires <b>Microsoft .NET 8 SDK</b> (its installer offers to install this automatically) — no Java JRE/JDK needed; requires an <b>API key</b> generated from the CAST Imaging user profile (see Section 3\'s network row for the Gateway path it uses). <b>Microsoft Office itself is not required to generate reports</b> — only to open/edit the generated files or customize templates. Minimum versions: CAST Imaging 3.4.0-funcrel / CAST Report Generator 1.29.0-funcrel. Source: <a href="https://doc.castsoftware.com/imaging/install/report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/report-generator</a>, <a href="https://doc.castsoftware.com/export-v2/doccom/cast-report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/export-v2/doccom/cast-report-generator</a>.</div>';
+    }
+    if(hasAuditContext(a)){
+      sizingHtml += '<div class="callout info"><b>Audit / structural-analysis engagement selected (Section 10)</b> — also install on the end-user workstation: ' + AUDIT_WORKSTATION_TOOLS.map(function(t){ return '<b>'+esc(t)+'</b>'; }).join(', ') + ' (exact versions/edition per your engagement standards; not CAST-published requirements, listed as given for this deployment). Word/Excel/PowerPoint in this list also cover CAST Report Generator\'s optional Office dependency above.</div>';
+    }
 
     var componentRows = [
       ['Gateway', '8090', 'Single customer-facing entry point — routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards) to every other service below. This is the only port that needs to be exposed/opened inbound to users.']
@@ -1044,13 +1073,7 @@
       osRows.map(function(r){ return '<tr><td>'+esc(r[0])+'</td><td>'+r[1]+'</td></tr>'; }).join('') +
       '</tbody></table></div>') : '';
 
-    sizingHtml += osHtml + storageHtml + '<h4>Client-side requirements</h4><div class="tbl-wrap"><table><thead><tr><th>Profile</th><th>Requirement</th></tr></thead><tbody>' +
-      '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>Chrome / Edge / Firefox on Windows, macOS, or Linux — CAST regularly tests against current browser versions rather than pinning a strict minimum, so keep browsers up to date; 8 GB RAM, 1920×1080 recommended for architecture/dependency graphs.' +
-        ' <b>CAST Report Generator</b> installed for exporting Word/Excel/PowerPoint deliverables — a standalone tool, not bundled with CAST Imaging: the interactive UI variant is <b>Windows-only</b> (a separate command-line-only variant, "Report Generator for Dashboards", also runs on Linux, no UI); requires <b>Microsoft .NET 8 SDK</b> (its installer offers to install this automatically) — no Java JRE/JDK needed; requires an <b>API key</b> generated from the CAST Imaging user profile (see Section 3\'s network row for the Gateway path it uses). <b>Microsoft Office itself is not required to generate reports</b> — only to open/edit the generated files or customize templates. Minimum versions: CAST Imaging 3.4.0-funcrel / CAST Report Generator 1.29.0-funcrel. Source: <a href="https://doc.castsoftware.com/imaging/install/report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/report-generator</a>, <a href="https://doc.castsoftware.com/export-v2/doccom/cast-report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/export-v2/doccom/cast-report-generator</a>.' +
-        (hasAuditContext(a) ? ' <b>Audit / structural-analysis engagement selected (Section 10)</b> — also install: ' + AUDIT_WORKSTATION_TOOLS.map(function(t){ return '<b>'+esc(t)+'</b>'; }).join(', ') + ' (exact versions/edition per your engagement standards; not CAST-published requirements, listed as given for this deployment). Word/Excel/PowerPoint in this list also cover CAST Report Generator\'s optional Office dependency above.' : '') +
-      '</td></tr>' +
-      '<tr><td>Delivery / analyst workstation</td><td>Same as above, plus local disk for source checkouts, a compatible JDK (≥ 17 LTS and ≤ 21, 64-bit, with <code>JAVA_HOME</code> set), and SCM client tools for the repositories selected in Section 9</td></tr>' +
-      '</tbody></table></div>';
+    sizingHtml += osHtml + storageHtml;
 
     var dbHtml = '<h3>2. Database requirements</h3>' +
       '<h4>PostgreSQL (RDBMS)</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +

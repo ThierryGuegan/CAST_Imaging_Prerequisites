@@ -342,14 +342,31 @@ not *what the six fixed sections actually are*. Egress, HTTPS, and auth are ques
 *inputs* that reshape content inside several of these sections — they are not sections of their
 own.
 
-1. **Hardware sizing for your profile** (`sizingHtml`) — the composed sizing table, an inline SVG
-   **architecture diagram** (`buildArchitectureDiagram(a)` — see "Architecture diagram
-   conventions" below for the full set of rules this has converged on) and the **named components
-   table** it illustrates (every container/service by name and port — Gateway, Console, Auth
-   service, SSO Service, Control Panel, analysis-node, Viewer, Viewer-APIs, ETL service,
-   AI-service, Dashboards, Neo4j, PostgreSQL, extend-proxy — gated by the same `has*(a)`
-   predicates as everything else), OS/runtime version requirements, storage locations, and
-   client-side (end-user + delivery workstation) requirements.
+1. **Hardware sizing for your profile** (`sizingHtml`) — the machine-count summary callout
+   (`machineSummaryHtml`, see below), a **Server components** table (the `sizingRows` vCPU/RAM/Disk
+   table), an inline SVG **architecture diagram** (`buildArchitectureDiagram(a)` — see
+   "Architecture diagram conventions" below for the full set of rules this has converged on) and
+   the **named components table** it illustrates (every container/service by name and port —
+   Gateway, Console, Auth service, SSO Service, Control Panel, analysis-node, Viewer, Viewer-APIs,
+   ETL service, AI-service, Dashboards, Neo4j, PostgreSQL, extend-proxy — gated by the same
+   `has*(a)` predicates as everything else), OS/runtime version requirements, storage locations,
+   and a **Workstation components** table (End-user + Delivery/analyst workstation, with their own
+   Operating system / Hardware / Software columns — the OS column is where any platform constraint
+   from an optional add-on surfaces, e.g. CAST Report Generator's Windows-only UI or Notepad++
+   having no cross-platform build when Audit context is selected). Server and Workstation
+   components are two separate tables, not one — don't fold workstation rows back into the sizing
+   table's vCPU/RAM/Disk columns; workstations don't have a meaningful vCPU/RAM/Disk figure the way
+   server components do.
+
+   **Machine-count model**: `serverMachineCount` counts server-side machines/pods 1:1 (each row in
+   `sizingRows`, adjusted for the managed-DBaaS row and the Extend Local Server — see the
+   "Architecture diagram conventions" section below). Workstations are different: `hasAnalysis(a)`
+   adds a second *role* (delivery/analyst) alongside the always-present end-user role, but the two
+   roles don't need two separate physical machines — the same person can cover both. So
+   `workstationMachineCount` is always `1` regardless of role count; `workstationRoleCount` (still
+   tracked separately, e.g. for the diagram's role count) is not added again on top of it. The
+   "Minimum footprint" callout names the roles a single workstation needs to cover
+   (`workstationDesc`) rather than implying one machine per role.
 2. **Database requirements** (`dbHtml`) — PostgreSQL configuration/version/hosting, and Neo4j
    requirements when the scenario includes the Viewer.
 3. **Network ports & FQDN allowlist** (`netHtml`) — the full `buildPortRows(a)` table. This is
