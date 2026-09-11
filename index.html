@@ -390,7 +390,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-10';
+  var TOOL_VERSION = '2026-09-11';
 
   var LABELS = {
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
@@ -1008,8 +1008,8 @@
         '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/docker/" target="_blank" rel="noopener">.../docker</a>' +
         ' — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
     } else if(a.platform === 'windows'){
-      storageHtml = '<h4>Storage locations</h4><p>CAST Storage Service/PostgreSQL on Windows defaults to <code>%PROGRAMFILES%\\CAST\\CASTStorageService&lt;version&gt;</code>, with the data directory controlled by the <code>DBDATADIR</code> installer variable. Full per-folder paths are at CAST\'s reference: ' +
-        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/windows/" target="_blank" rel="noopener">storage-locations/windows</a> — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
+      storageHtml = '<h4>Storage locations</h4><p>CAST does not ship a PostgreSQL installer for Windows — you install an official EnterpriseDB PostgreSQL release yourself and accept its defaults: <code>%PROGRAMFILES%\\PostgreSQL\\&lt;version&gt;</code> for the install directory, <code>%PROGRAMFILES%\\PostgreSQL\\&lt;version&gt;\\data</code> for the data directory (a Windows Service named <code>postgresql-x64-&lt;version&gt;</code> is created and set to auto-start). The older <code>%PROGRAMFILES%\\CAST\\CASTStorageService&lt;version&gt;</code> path (with a <code>DBDATADIR</code> installer variable) belongs to the legacy, end-of-life <b>CAST Storage Service</b> installer — not the current PostgreSQL-based install. Full per-folder paths are at CAST\'s reference: ' +
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/windows/" target="_blank" rel="noopener">storage-locations/windows</a> and <a href="https://doc.castsoftware.com/imaging/install/db/windows/" target="_blank" rel="noopener">install/db/windows</a> — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
     } else if(a.platform === 'kubernetes'){
       storageHtml = '<h4>Storage locations</h4><p>On Kubernetes, storage is provisioned as persistent volumes/StorageClasses rather than host paths — for Azure/AKS, CAST defaults to Azure Disks (block storage) per node, with an optional move to Azure Files when running multiple analysis-node pods. See CAST\'s cloud reference: ' +
         '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/cloud/" target="_blank" rel="noopener">storage-locations/cloud</a> — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
