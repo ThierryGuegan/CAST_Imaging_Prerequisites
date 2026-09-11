@@ -46,15 +46,33 @@ document states has to earn that sentence — see the Goal section of `SKILL.md`
   `thead th`, `p`, `ul`/`ol`, `.chip`, `tbody td`, and the four `.tag.*` variants) need their own
   print overrides listed right there in the same block — if you add a new element with a literal
   (non-`var()`) text color, add its print override alongside these, in the same edit.
-- Dark theme by CSS custom properties on `:root`, with the `@media print` overrides above as the
-  only other palette. No interactive light/dark toggle — this is a planning tool, not a public
-  artifact — keep it simple unless asked otherwise.
+- Dark theme by default, plus an interactive light-mode toggle (`#theme-toggle` in the header,
+  `data-theme="light"` on `<html>`, persisted in `localStorage['theme']`). Two hardcoded-color
+  problems had to be solved once, not twice, to add this cleanly:
+  - **Text colors that weren't already a variable.** `h1`/`h2.page-title`/`h3`/`.chip b`/
+    `.callout b`/`thead th` were hardcoded `color:#fff`, and `p`/`ul`/`ol`/`.chip`/`tbody td` were
+    hardcoded `color:#cfd8e2` — both fine on the one dark background they were written for, both
+    invisible-or-wrong on a light one. Introduced two new semantic variables for exactly this,
+    `--heading` and `--body-text`, defined in the dark `:root` (`#fff` / `#cfd8e2`, i.e. unchanged
+    visually) and redefined under `:root[data-theme="light"]` (`#111827` / `#374151`). Every rule
+    above now reads through the variable instead of the literal hex. If you add a new rule with a
+    literal text color instead of `var(--heading)`/`var(--body-text)`/an existing variable, you've
+    reintroduced this exact bug for light mode.
+  - **The `@media print` block** used to hardcode its own light-mode overrides for this same set of
+    selectors (see the earlier note about print's default palette). Once `--heading`/`--body-text`
+    existed, print's `:root` override could just set them too and delete the parallel literal-color
+    ruleset — one light palette definition, reused by both the print block and the interactive
+    toggle, instead of two that could drift apart.
+  - A couple of non-text rules needed their own light variant since a literal white/black overlay
+    doesn't invert automatically: `.opt:hover`'s `rgba(255,255,255,.03)` highlight is invisible on
+    a white background, so `:root[data-theme="light"] .opt:hover` overrides it to
+    `rgba(0,0,0,.04)`.
 - The architecture diagram's `box()` helper defaults its title-text fill to `var(--text)` (not a
   hardcoded `#fff`) for exactly this reason: it's visually identical to `#fff` against the normal
-  dark `--text` value (`#e6edf3`, off-white), but automatically goes dark in print once `--text` is
-  redefined there — no per-box-type print override needed. Any new box-title color should default
-  through a variable the same way; a literal hex here is the same trap the rest of the page fell
-  into.
+  dark `--text` value (`#e6edf3`, off-white), but automatically goes dark in print *and* in the
+  interactive light toggle once `--text` is redefined there — no per-box-type override needed
+  either place. Any new box-title color should default through a variable the same way; a literal
+  hex here is the same trap the rest of the page fell into.
 
 ## Questionnaire sections (numbered fieldsets)
 

@@ -14,6 +14,18 @@
     --m-neo4j:#f479bd; --m-neo4j-fill:rgba(244,121,189,.16);
     --m-db:#ffa85c; --m-db-fill:rgba(255,168,92,.16);
     --m-extend-fill:rgba(89,208,160,.16);
+    --heading:#fff; --body-text:#cfd8e2;
+  }
+  :root[data-theme="light"]{
+    --bg:#ffffff; --panel:#f8fafc; --panel-alt:#eef2f6; --panel-2:#e2e8f0; --border:#c3ccd6;
+    --text:#111827; --text-dim:#4b5563; --accent:#1d4ed8; --accent-2:#0f8a63;
+    --warn:#92400e; --danger:#b91c1c; --code-bg:#eef2f6;
+    --table-head:#e2e8f0; --table-row-alt:#f8fafc;
+    --m-analysis:#6d28d9; --m-analysis-fill:rgba(109,40,217,.08);
+    --m-neo4j:#a21caf; --m-neo4j-fill:rgba(162,28,175,.08);
+    --m-db:#b45309; --m-db-fill:rgba(180,83,9,.08);
+    --m-extend-fill:rgba(15,138,99,.08);
+    --heading:#111827; --body-text:#374151;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
@@ -23,8 +35,11 @@
 
   header.app-header{padding:16px 24px;border-bottom:1px solid var(--border);background:var(--panel);
     display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
-  header.app-header h1{font-size:17px;margin:0;color:#fff;}
-  header.app-header p{margin:0;color:var(--text-dim);font-size:13px;}
+  header.app-header h1{font-size:17px;margin:0;color:var(--heading);}
+  header.app-header p{margin:0;color:var(--text-dim);font-size:13px;flex:1 1 auto;}
+  #theme-toggle{margin-left:auto;flex:0 0 auto;background:transparent;border:1px solid var(--border);color:var(--text-dim);
+    padding:7px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  #theme-toggle:hover{border-color:var(--accent);color:var(--text);}
 
   .layout{display:flex;align-items:flex-start;}
   .form-pane{width:420px;flex:0 0 420px;height:calc(100vh - 57px);overflow-y:auto;
@@ -34,12 +49,13 @@
   fieldset{border:1px solid var(--border);border-radius:10px;padding:14px 16px 16px;margin:0 0 16px;background:var(--panel-alt);}
   legend{font-size:12.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;padding:0 6px;}
   .q{margin:12px 0;}
-  .q > label.qlabel{display:block;font-size:13px;color:#fff;margin-bottom:6px;font-weight:600;}
+  .q > label.qlabel{display:block;font-size:13px;color:var(--heading);margin-bottom:6px;font-weight:600;}
   .opt-row{display:flex;flex-direction:column;gap:6px;}
   .opt{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:7px;border:1px solid transparent;cursor:pointer;}
   .opt:hover{background:rgba(255,255,255,.03);}
+  :root[data-theme="light"] .opt:hover{background:rgba(0,0,0,.04);}
   .opt input{margin-top:3px;flex:0 0 auto;}
-  .opt .opt-text b{display:block;font-size:13px;color:#fff;}
+  .opt .opt-text b{display:block;font-size:13px;color:var(--heading);}
   .opt .opt-text span{display:block;font-size:11.5px;color:var(--text-dim);}
   select, input[type=text], input[type=number]{
     width:100%;background:var(--code-bg);border:1px solid var(--border);color:var(--text);
@@ -49,27 +65,27 @@
     border-radius:0 6px 6px 0;display:none;}
   .sub-block.show{display:block;}
 
-  h2.page-title{font-size:22px;color:#fff;margin:0 0 4px;}
+  h2.page-title{font-size:22px;color:var(--heading);margin:0 0 4px;}
   .page-sub{color:var(--text-dim);margin:0 0 18px;font-size:13.5px;}
-  h3{font-size:16.5px;color:#fff;margin:26px 0 10px;border-bottom:1px solid var(--border);padding-bottom:7px;}
+  h3{font-size:16.5px;color:var(--heading);margin:26px 0 10px;border-bottom:1px solid var(--border);padding-bottom:7px;}
   h4{font-size:14px;color:var(--accent);margin:18px 0 8px;}
-  p{color:#cfd8e2;}
-  ul,ol{color:#cfd8e2;padding-left:20px;}
+  p{color:var(--body-text);}
+  ul,ol{color:var(--body-text);padding-left:20px;}
   li{margin:4px 0;}
 
   .profile-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 20px;}
-  .chip{background:var(--panel-alt);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;color:#cfd8e2;}
-  .chip b{color:#fff;}
+  .chip{background:var(--panel-alt);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--body-text);}
+  .chip b{color:var(--heading);}
 
   .callout{border-radius:8px;padding:12px 14px;margin:14px 0;font-size:13.5px;border:1px solid;}
   .callout.info{background:rgba(62,166,255,.08);border-color:rgba(62,166,255,.35);}
   .callout.warn{background:rgba(242,184,75,.08);border-color:rgba(242,184,75,.4);}
   .callout.danger{background:rgba(242,104,91,.08);border-color:rgba(242,104,91,.4);}
-  .callout b{color:#fff;}
+  .callout b{color:var(--heading);}
 
   table{width:100%;border-collapse:collapse;margin:10px 0 22px;font-size:13px;}
-  thead th{background:var(--table-head);color:#fff;text-align:left;padding:8px 10px;border:1px solid var(--border);white-space:nowrap;}
-  tbody td{padding:7px 10px;border:1px solid var(--border);color:#cfd8e2;vertical-align:top;}
+  thead th{background:var(--table-head);color:var(--heading);text-align:left;padding:8px 10px;border:1px solid var(--border);white-space:nowrap;}
+  tbody td{padding:7px 10px;border:1px solid var(--border);color:var(--body-text);vertical-align:top;}
   tbody tr:nth-child(even){background:var(--table-row-alt);}
   .tbl-wrap{overflow-x:auto;border-radius:6px;}
   .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;}
@@ -96,7 +112,7 @@
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 22px;}
   .btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#04101c;font-weight:700;
     padding:9px 16px;border-radius:7px;font-size:13px;border:none;cursor:pointer;}
-  .btn.secondary{background:transparent;border:1px solid var(--border);color:#cfd8e2;}
+  .btn.secondary{background:transparent;border:1px solid var(--border);color:var(--body-text);}
   .btn:hover{filter:brightness(1.08);}
   .btn-print{padding:13px 26px;font-size:15px;border-radius:9px;
     box-shadow:0 3px 14px rgba(62,166,255,.45);letter-spacing:.01em;}
@@ -124,11 +140,10 @@
       --m-neo4j:#a21caf; --m-neo4j-fill:rgba(162,28,175,.08);
       --m-db:#b45309; --m-db-fill:rgba(180,83,9,.08);
       --m-extend-fill:rgba(15,138,99,.08);
+      --heading:#111827; --body-text:#374151;
     }
     header.app-header .no-print, .form-pane{display:none !important;}
     body{background:#fff;color:#111827;}
-    header.app-header h1, h2.page-title, h3, .chip b, .callout b, thead th{color:#111827;}
-    p, ul, ol, .chip, tbody td{color:#374151;}
     .tag.mandatory{background:rgba(185,28,28,.12);color:#991b1b;}
     .tag.conditional{background:rgba(146,64,14,.12);color:#92400e;}
     .tag.optional{background:rgba(15,138,99,.12);color:#0f8a63;}
@@ -140,12 +155,21 @@
     .arch-diagram-frame svg{min-width:0;}
   }
 </style>
+<script>
+  (function(){
+    try{
+      var saved = localStorage.getItem('theme');
+      if(saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    }catch(e){}
+  })();
+</script>
 </head>
 <body>
 
 <header class="app-header">
   <h1>CAST Imaging — Requirements Builder</h1>
   <p>Answer the questions on the left to generate the exact architecture &amp; installation prerequisites for <b>your</b> deployment — not a generic checklist.</p>
+  <button id="theme-toggle" class="no-print" type="button"></button>
 </header>
 
 <div class="layout">
@@ -1272,6 +1296,22 @@
       box.checked = (val === '1');
     });
   }
+
+  function updateThemeToggleLabel(){
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    document.getElementById('theme-toggle').textContent = isLight ? '🌙 Dark mode' : '☀️ Light mode';
+  }
+  document.getElementById('theme-toggle').addEventListener('click', function(){
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if(isLight){
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+    try { localStorage.setItem('theme', isLight ? 'dark' : 'light'); } catch(e){}
+    updateThemeToggleLabel();
+  });
+  updateThemeToggleLabel();
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
