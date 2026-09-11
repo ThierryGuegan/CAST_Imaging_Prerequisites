@@ -203,9 +203,9 @@
         <label class="qlabel">Server topology</label>
         <div class="opt-row">
           <label class="opt"><input type="radio" name="topology" value="single" checked>
-            <span class="opt-text"><b>Single machine</b><span>All selected components on one host — suitable for POC, testing, demo, or small production</span></span></label>
+            <span class="opt-text"><b id="topology-single-label">Single machine</b><span id="topology-single-desc">All selected components on one host — suitable for POC, testing, demo, or small production</span></span></label>
           <label class="opt"><input type="radio" name="topology" value="multi">
-            <span class="opt-text"><b>Multi-machine</b><span>Components distributed across dedicated hosts — recommended for production</span></span></label>
+            <span class="opt-text"><b id="topology-multi-label">Multi-machine</b><span id="topology-multi-desc">Components distributed across dedicated hosts — recommended for production</span></span></label>
         </div>
         <p class="hint" id="topology-hint"></p>
         <div class="sub-block" id="analysis-nodes-sub">
@@ -494,6 +494,11 @@
   function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
   function hasNeo4j(a){ return hasViewer(a); }
   function hasAuditContext(a){ return a.auditContext === 'audit'; }
+  function topologyLabel(a){
+    return a.platform === 'kubernetes'
+      ? (a.topology === 'multi' ? 'Multi-pod' : 'Single pod')
+      : LABELS.topology[a.topology];
+  }
 
   function state(){
     return {
@@ -745,8 +750,8 @@
       '<span><i class="dash" style="border-color:'+ROUTE+'"></i>Gateway path-routing</span>' +
       '<span><i class="dash" style="border-color:'+TESTONLY+'"></i>Setup/testing-only bypass</span>' +
       (sharedRow ? '<span><i class="dash" style="border-color:'+SHARED+'"></i>Shared-storage read/write</span>' : '') +
-      (analysisBox && a.topology === 'multi' ? '<span><i class="box" style="background:var(--m-analysis-fill);border-color:'+M_ANALYSIS+'"></i>Analysis-node machine(s)</span>' : '') +
-      (neo4jBox && a.topology === 'multi' && a.neo4jDedicated ? '<span><i class="box" style="background:var(--m-neo4j-fill);border-color:'+M_NEO4J+'"></i>Dedicated Neo4j machine</span>' : '') +
+      (analysisBox && a.topology === 'multi' ? '<span><i class="box" style="background:var(--m-analysis-fill);border-color:'+M_ANALYSIS+'"></i>Analysis-node '+machineWord+'(s)</span>' : '') +
+      (neo4jBox && a.topology === 'multi' && a.neo4jDedicated ? '<span><i class="box" style="background:var(--m-neo4j-fill);border-color:'+M_NEO4J+'"></i>Dedicated Neo4j '+machineWord+'</span>' : '') +
       (a.dbHosting !== 'colocated' ? '<span><i class="box" style="background:var(--m-db-fill);border-color:'+M_DB+'"></i>'+(a.dbHosting==='managed'?'Managed DBaaS (not a machine you provision)':'Dedicated database machine')+'</span>' : '') +
       '</div>';
   }
@@ -903,13 +908,17 @@
     document.getElementById('analysis-nodes-hint').textContent =
       'Each analysis-node registers itself against the same imaging-services instance and can run on its own '+unitWord+' — this is CAST Imaging\'s horizontal scaling mechanism for analysis workload.';
     document.getElementById('neo4j-dedicated-label').textContent = 'Run Neo4j on its own dedicated ' + (isK8s ? 'pod (StatefulSet)' : 'machine');
+    document.getElementById('topology-single-label').textContent = isK8s ? 'Single pod' : 'Single machine';
+    document.getElementById('topology-single-desc').textContent = isK8s ? 'All selected components on one node — suitable for POC, testing, demo, or small production' : 'All selected components on one host — suitable for POC, testing, demo, or small production';
+    document.getElementById('topology-multi-label').textContent = isK8s ? 'Multi-pod' : 'Multi-machine';
+    document.getElementById('topology-multi-desc').textContent = isK8s ? 'Components distributed across dedicated pods — recommended for production' : 'Components distributed across dedicated hosts — recommended for production';
 
     document.getElementById('source-access-hint').textContent = hasAnalysis(a) ? '' :
       'Your scenario ('+LABELS.scenario[a.scenario]+') excludes analysis — these options won\'t add any firewall rows, since there\'s no analysis-node to check out source code.';
 
     // profile chips
     var chips = ['scale','users','platform','scenario','topology','egress','auth'].map(function(k){
-      return '<span class="chip">'+k+': <b>'+esc(LABELS[k][a[k]])+'</b></span>';
+      return '<span class="chip">'+k+': <b>'+esc(k === 'topology' ? topologyLabel(a) : LABELS[k][a[k]])+'</b></span>';
     }).join('');
     if(a.mcp) chips += '<span class="chip">MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
     if(a.highlight) chips += '<span class="chip">Highlight: <b>enabled</b></span>';
@@ -1218,7 +1227,7 @@
     groups.push({title:'Every server ' + checklistUnitWord + ' (' + everyMachineScope + ')', key:'every-machine', items:everyMachine});
 
     var coreNode = [];
-    coreNode.push((isK8s ? 'Node pool capacity' : 'Server(s)') + ' provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(LABELS.topology[a.topology])+')');
+    coreNode.push((isK8s ? 'Node pool capacity' : 'Server(s)') + ' provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(topologyLabel(a))+')');
     coreNode.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
     coreNode.push('All firewall rules from Section 3 opened before install day');
     coreNode.push(a.egress === 'airgapped' ? 'CAST Extend Local Update Server deployed and reachable' : 'Outbound access to extend.castsoftware.com confirmed' + (a.egress==='proxy' ? ' through the corporate proxy' : ''));
