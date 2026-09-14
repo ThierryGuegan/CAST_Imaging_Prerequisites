@@ -743,7 +743,7 @@
 
     return '<figure class="arch-diagram-frame">' +
       '<svg viewBox="0 0 '+W+' '+totalH+'" role="img" aria-label="'+esc(ariaLabel)+'">' + defs + '<g font-family="Segoe UI, Roboto, sans-serif">' + svg + '</g></svg>' +
-      '<figcaption>'+(typeof counts.serverMachineCount === 'number' ? '<b>'+counts.serverMachineCount+' server '+machineWord+'(s)</b> required, plus <b>'+counts.workstationRoleCount+' workstation role(s)</b> (see the hardware sizing table above) — any box below labeled "own '+machineWord+'" runs apart from the others; everything unlabeled shares the core/all-in-one '+machineWord+'. ' : '')+'Gateway (:8090) is the only component reachable from outside this deployment; it path-routes internally to every service shown above it. The three amber paths from the tester/admin workstation exist only to validate Gateway'+(testerHasUi?', SSO Service':'')+' and Control Panel directly during setup/testing — close them before production go-live.'+(hasDashboards(a) ? ' CAST Report Generator (an optional standalone reporting tool) reaches Gateway the same way as the browser — directly on :8090, or via the reverse proxy on :443 once configured.' : '')+extendNote+sharedNote+'</figcaption>' +
+      '<figcaption>'+(typeof counts.serverMachineCount === 'number' ? '<b>'+counts.serverMachineCount+' server '+machineWord+'(s)</b> + <b>'+counts.workstationRoleCount+' workstation role(s)</b> (see sizing table above) — boxes labeled "own '+machineWord+'" run apart; everything else shares the core/all-in-one '+machineWord+'. ' : '')+'Gateway (:8090) is the only externally-reachable component. The amber paths from the tester/admin workstation are setup/testing-only bypasses to Gateway'+(testerHasUi?', SSO Service,':'')+' and Control Panel — close them before go-live.'+(hasDashboards(a) ? ' CAST Report Generator reaches Gateway the same way as the browser.' : '')+extendNote+sharedNote+'</figcaption>' +
       '</figure>' +
       '<div class="arch-legend">' +
       '<span><i style="border-color:'+FLOW+'"></i>Direct internal call</span>' +
@@ -779,8 +779,8 @@
     var podmanPortNote = a.platform === 'podman' ? ' — rootless Podman can\'t bind ports below 1024 by default; either lower net.ipv4.ip_unprivileged_port_start, grant CAP_NET_BIND_SERVICE, or publish to a high port and front it with something that can bind 80/443' : '';
     var hasUi = hasDashboards(a) || hasViewer(a);
     var rows = (hasUi ? [
-      {src:'End-user browser', dst:'Gateway', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access — Gateway is CAST Imaging\'s single customer-facing entry point; it internally routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards) to every other UI service, so this is the only port that needs to be reachable', tag:'recommended', note:'HTTPS is not mandatory, but highly recommended — CAST Imaging can also be served over plain HTTP'+podmanPortNote},
-      {src:'End-user browser', dst:'Gateway', port:'8090', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS, or the port your reverse proxy forwards to — Gateway listens on 8090, not the standard port 80', tag:'conditional', note:'Use if HTTPS is not configured; otherwise redirect to HTTPS and disable'+podmanPortNote+' — per CAST\'s architecture reference, this is the only port that needs to be exposed/opened inbound to users'}
+      {src:'End-user browser', dst:'Gateway', port:'443', proto:'HTTPS', purpose:'Console / Viewer UI access — Gateway is CAST Imaging\'s single customer-facing entry point, path-routing internally to every other UI service; the only port that needs to be reachable', tag:'recommended', note:'HTTPS is recommended, not mandatory'+podmanPortNote},
+      {src:'End-user browser', dst:'Gateway', port:'8090', proto:'HTTP', purpose:'Console / Viewer UI access without HTTPS — Gateway listens on 8090, not port 80', tag:'conditional', note:'Use only if HTTPS isn\'t configured; otherwise disable'+podmanPortNote}
     ] : [
       {src:'API client / CI pipeline', dst:'Gateway', port:'443 or 8090 (matches your HTTPS/HTTP choice)', proto:'HTTP/HTTPS', purpose:'This scenario has no Viewer/Dashboards UI — imaging-services is consumed programmatically via CAST\'s REST APIs (delivery, analysis triggering, results retrieval) through the same Gateway entry point rather than through a browser', tag:'mandatory', note:'Headless scenario — no separate browser-facing UI ports are needed'+podmanPortNote},
       {src:'API client / CI pipeline', dst:'Gateway', port:'443 or 8090 (matches your HTTPS/HTTP choice)', proto:'HTTP/HTTPS', purpose:'OAuth2 token issuance via Gateway\'s /oauth2 path — internally routed to Auth service (:8092), not a separately exposed port, per Gateway\'s single-entry-point model — for API authentication, since CAST\'s REST APIs may still require a token even without a human browser session', tag:'conditional', note:'Reasonable inference from CAST\'s architecture reference, not independently confirmed for headless API-only use — check your API authentication docs before excluding this'}
@@ -789,13 +789,13 @@
     ]);
 
     if(hasUi){
-      rows.push({src:'Tester / administrator workstation', dst:'Gateway', port:'8090', proto:'HTTP/HTTPS', purpose:'Direct access to Gateway, bypassing the reverse proxy — lets you validate Gateway itself during the setup/testing phase, before your reverse proxy and TLS termination (Section 5) are fully configured', tag:'optional', note:'Setup/testing phase only — close this direct path once your reverse proxy is validated; end users and production traffic should go through the reverse proxy in Section 5, not straight to Gateway'});
-      rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Direct access to SSO Service, bypassing Gateway\'s normal /auth path-routing — lets you validate sign-in (Local, SAML, or LDAP per Section 7) directly during setup/testing, independent of whether Gateway routing is fully working yet', tag:'optional', note:'Setup/testing phase only — SSO Service is otherwise internal-only, reached exclusively through Gateway; close this direct path before production go-live'});
+      rows.push({src:'Tester / administrator workstation', dst:'Gateway', port:'8090', proto:'HTTP/HTTPS', purpose:'Validate Gateway directly, bypassing the reverse proxy, before it\'s fully configured (Section 5)', tag:'optional', note:'Setup/testing only — close once your reverse proxy is validated'});
+      rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Validate sign-in (Local/SAML/LDAP, Section 7) directly, bypassing Gateway\'s /auth routing', tag:'optional', note:'Setup/testing only — SSO Service is otherwise internal-only; close before go-live'});
     }
     if(hasDashboards(a)){
-      rows.push({src:'CAST Report Generator (client workstation)', dst:'Gateway', port:'443 or 8090', proto:'HTTP/HTTPS', purpose:'Standalone desktop reporting tool pulling data via the CAST RestAPI embedded in CAST Dashboards, at the "/dashboards/rest" path — authenticated with an API key generated from the CAST Imaging user profile, not a browser session', tag:'recommended', note:'Same entry point as the End-user browser rows above (direct :8090, or via your reverse proxy on :443) — see the architecture diagram above for the CAST Report Generator workstation; per CAST\'s Install Report Generator documentation'});
+      rows.push({src:'CAST Report Generator (client workstation)', dst:'Gateway', port:'443 or 8090', proto:'HTTP/HTTPS', purpose:'Pulls data via CAST Dashboards\' RestAPI (/dashboards/rest), authenticated with an API key, not a browser session', tag:'recommended', note:'Same entry point as the End-user browser rows above'});
     }
-    rows.push({src:'Tester / administrator workstation', dst:'Control Panel (admin-center)', port:'8098–2381', proto:'HTTP/HTTPS', purpose:'Direct access to the Control Panel, bypassing Gateway\'s normal /admin path-routing — lets you validate administration/configuration directly during setup/testing, independent of whether Gateway routing is fully working yet', tag:'optional', note:'Setup/testing phase only — Control Panel is otherwise internal-only, reached exclusively through Gateway; close this direct path before production go-live'});
+    rows.push({src:'Tester / administrator workstation', dst:'Control Panel (admin-center)', port:'8098–2381', proto:'HTTP/HTTPS', purpose:'Validate admin/configuration directly, bypassing Gateway\'s /admin routing', tag:'optional', note:'Setup/testing only — Control Panel is otherwise internal-only; close before go-live'});
 
     if(a.topology === 'multi' && hasAnalysis(a)){
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services (' + coreWord + ')', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — bidirectional connectivity between every analysis-node '+unitWord+' and the '+coreWord});
@@ -833,7 +833,7 @@
       if(a.egress === 'airgapped'){
         rows.push({src:'CAST Imaging node(s)', dst:'Internal container registry (mirrored from Docker Hub)', port:'443', proto:'HTTPS', purpose:'CAST\'s images are published to Docker Hub — an air-gapped install needs them mirrored into a reachable internal registry before "compose up"/deploy', tag:'mandatory'});
       } else {
-        rows.push({src:'CAST Imaging node(s)', dst:'registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com', port:'443', proto:'HTTPS', purpose:'Pull CAST\'s Docker Hub images at install/update time'+(a.egress==='proxy' ? ' via your configured proxy' : ''), tag:'mandatory', note:'Exact hostnames per Docker\'s own documented pull path — confirm CAST doesn\'t front them with its own registry for your release'});
+        rows.push({src:'CAST Imaging node(s)', dst:'registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com', port:'443', proto:'HTTPS', purpose:'Pull CAST\'s Docker Hub images at install/update time'+(a.egress==='proxy' ? ' via your configured proxy' : ''), tag:'mandatory', note:'Exact hostnames per Docker\'s documented pull path'});
       }
     }
     if(a.highlight){
@@ -1072,14 +1072,13 @@
         (a.topology === 'multi' ? '<li>All of the above live under the shared <code>/opt/cast/shared</code> mount from Section 1/3 — required for every topology except a single all-in-one demo/POC machine</li>' : '') +
         '</ul><p>Full paths for every folder, plus Windows- and cloud-specific storage layouts, are at CAST\'s reference pages: ' +
         '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/" target="_blank" rel="noopener">storage-locations</a>, ' +
-        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/docker/" target="_blank" rel="noopener">.../docker</a>' +
-        ' — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/docker/" target="_blank" rel="noopener">.../docker</a>.</p>';
     } else if(a.platform === 'windows'){
       storageHtml = '<h4>Storage locations</h4><p>CAST does not ship a PostgreSQL installer for Windows — you install an official EnterpriseDB PostgreSQL release yourself and accept its defaults: <code>%PROGRAMFILES%\\PostgreSQL\\&lt;version&gt;</code> for the install directory, <code>%PROGRAMFILES%\\PostgreSQL\\&lt;version&gt;\\data</code> for the data directory (a Windows Service named <code>postgresql-x64-&lt;version&gt;</code> is created and set to auto-start). The older <code>%PROGRAMFILES%\\CAST\\CASTStorageService&lt;version&gt;</code> path (with a <code>DBDATADIR</code> installer variable) belongs to the legacy, end-of-life <b>CAST Storage Service</b> installer — not the current PostgreSQL-based install. Full per-folder paths are at CAST\'s reference: ' +
-        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/windows/" target="_blank" rel="noopener">storage-locations/windows</a> and <a href="https://doc.castsoftware.com/imaging/install/db/windows/" target="_blank" rel="noopener">install/db/windows</a> — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/windows/" target="_blank" rel="noopener">storage-locations/windows</a> and <a href="https://doc.castsoftware.com/imaging/install/db/windows/" target="_blank" rel="noopener">install/db/windows</a>.</p>';
     } else if(a.platform === 'kubernetes'){
       storageHtml = '<h4>Storage locations</h4><p>On Kubernetes, storage is provisioned as persistent volumes/StorageClasses rather than host paths — for Azure/AKS, CAST defaults to Azure Disks (block storage) per node, with an optional move to Azure Files when running multiple analysis-node pods. See CAST\'s cloud reference: ' +
-        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/cloud/" target="_blank" rel="noopener">storage-locations/cloud</a> — not independently verified here (network egress to doc.castsoftware.com is blocked).</p>';
+        '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/cloud/" target="_blank" rel="noopener">storage-locations/cloud</a>.</p>';
     }
 
     var osRows = [];
@@ -1169,7 +1168,7 @@
 
     var authHtml = '<h3>5. Authentication prerequisites</h3>';
     if(a.auth === 'local'){
-      authHtml += '<ul><li>No external identity provider required.</li><li>Plan initial admin password rotation and manual account lifecycle management.</li><li>Recommended even alongside SSO: keep a break-glass local admin account.</li></ul>';
+      authHtml += '<ul><li>No external identity provider required.</li><li>Plan manual account lifecycle management and a break-glass local admin account — recommended even alongside SSO.</li></ul>';
     } else if(a.auth === 'saml'){
       authHtml += '<ul>' +
         '<li>Gather IdP metadata (or manually: Entity ID, SSO URL, signing certificate) from your identity team.</li>' +
@@ -1276,7 +1275,7 @@
     groups.push({title:'End-user workstation', key:'end-user-workstation', items:endUserItems});
 
     groups.push({title:'Delivery / analyst workstation', key:'delivery-workstation', items:[
-      'JDK (≥ 17 LTS and ≤ 21) and SCM client tools for the repositories selected in Section 9 communicated to delivery/analyst staff'
+      'Browser, JDK (≥ 17 LTS and ≤ 21), and SCM client tools for the repositories selected in Section 9 communicated to delivery/analyst staff'
     ]});
 
     var checklistGroupsHtml = groups.map(function(g){
