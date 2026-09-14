@@ -411,7 +411,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-14';
+  var TOOL_VERSION = '2026-09-11';
 
   var LABELS = {
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
@@ -499,21 +499,17 @@
       ? (a.topology === 'multi' ? 'Multi-pod' : 'Single pod')
       : LABELS.topology[a.topology];
   }
-  // "Advanced topology" — running Neo4j on its own dedicated machine, separate from imaging-viewer —
-  // is CAST-documented for Docker and Podman only; Windows and Kubernetes don't offer it.
-  function canDedicateNeo4j(a){ return a.platform === 'docker' || a.platform === 'podman'; }
 
   function state(){
-    var platform = document.querySelector('input[name=platform]:checked').value;
     return {
       scale: document.getElementById('scale').value,
       users: document.getElementById('users').value,
       auditContext: document.getElementById('auditContext').value,
-      platform: platform,
+      platform: document.querySelector('input[name=platform]:checked').value,
       scenario: document.getElementById('scenario').value,
       topology: document.querySelector('input[name=topology]:checked').value,
       analysisNodes: document.getElementById('analysisNodes').value,
-      neo4jDedicated: document.getElementById('neo4jDedicated').checked && (platform === 'docker' || platform === 'podman'),
+      neo4jDedicated: document.getElementById('neo4jDedicated').checked,
       dbHosting: document.getElementById('dbHosting').value,
       egress: document.querySelector('input[name=egress]:checked').value,
       certSource: document.getElementById('certSource').value,
@@ -811,9 +807,9 @@
       rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (deploy/delivery/common-data)', port:'445', proto:'SMB', purpose:'Windows file shares for the deploy/delivery/common-data folders, accessed under a service account whose credentials are consistent across every machine (see Section 1)', tag:'mandatory', note:'Exact folder layout not verified against CAST\'s Windows documentation — confirmed concept, not confirmed paths'});
     }
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated){
-      var neo4jDst = 'Neo4j (dedicated machine)';
+      var neo4jDst = 'Neo4j (dedicated ' + (isK8s ? 'StatefulSet' : 'machine') + ')';
       rows.push({src:'imaging-viewer', dst:neo4jDst, port:'7687', proto:'Bolt/TCP', purpose:'Graph database read/write for CAST Imaging Viewer — Neo4j\'s Bolt port per CAST\'s architecture reference', tag:'mandatory'});
-      rows.push({src:'Backup/admin host', dst:neo4jDst, port:'6362', proto:'TCP', purpose:'Neo4j backup operations', tag:'conditional', note:'Only if backups are triggered from outside the Neo4j machine'});
+      rows.push({src:'Backup/admin host', dst:neo4jDst, port:'6362', proto:'TCP', purpose:'Neo4j backup operations', tag:'conditional', note:'Only if backups are triggered from outside the Neo4j '+(isK8s?'pod':'machine')});
       rows.push({src:'Backup/admin host', dst:neo4jDst, port:'7474', proto:'HTTP', purpose:'Neo4j\'s own browser-based admin/query interface — for direct database administration, not used by imaging-viewer itself', tag:'optional', note:'Only if you need to browse/query Neo4j directly outside the Viewer application'});
     }
 
@@ -904,14 +900,14 @@
 
     document.getElementById('mcp-sub').className = 'sub-block' + (a.mcp ? ' show' : '');
     document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' && hasAnalysis(a) ? ' show' : '');
-    document.getElementById('neo4j-dedicated-sub').className = 'sub-block' + (a.topology === 'multi' && hasNeo4j(a) && canDedicateNeo4j(a) ? ' show' : '');
+    document.getElementById('neo4j-dedicated-sub').className = 'sub-block' + (a.topology === 'multi' && hasNeo4j(a) ? ' show' : '');
     document.getElementById('topology-hint').textContent =
       (a.scale === 'enterprise' && a.topology === 'single') ? 'Single '+unitWord+' is not recommended at Enterprise scale — consider Multi-'+unitWord+(isK8s ? '' : ' or Kubernetes')+'.' :
       (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-'+unitWord+' is usually unnecessary for a POC — Single '+unitWord+' is simpler.' :
       (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more '+unitWord+'s to provision and maintain, network connectivity between '+unitWord+'s must be correctly configured, and every '+unitWord+' must mount the same /opt/cast/shared network folder over SMB.' : '';
     document.getElementById('analysis-nodes-hint').textContent =
       'Each analysis-node registers itself against the same imaging-services instance and can run on its own '+unitWord+' — this is CAST Imaging\'s horizontal scaling mechanism for analysis workload.';
-    document.getElementById('neo4j-dedicated-label').textContent = 'Run Neo4j on its own dedicated machine';
+    document.getElementById('neo4j-dedicated-label').textContent = 'Run Neo4j on its own dedicated ' + (isK8s ? 'pod (StatefulSet)' : 'machine');
     document.getElementById('topology-single-label').textContent = isK8s ? 'Single pod' : 'Single machine';
     document.getElementById('topology-single-desc').textContent = isK8s ? 'All selected components on one node — suitable for POC, testing, demo, or small production' : 'All selected components on one host — suitable for POC, testing, demo, or small production';
     document.getElementById('topology-multi-label').textContent = isK8s ? 'Multi-pod' : 'Multi-machine';
@@ -933,7 +929,7 @@
     var userBonusApplies = hasViewer(a) || hasDashboards(a);
     var allInOneLabel = isK8s ? 'All pods' : 'All-in-one host';
     var coreLabel = isK8s ? 'Core pods' : 'Core node';
-    var neo4jDedicatedLabel = 'Neo4j machine (dedicated, serves imaging-viewer)';
+    var neo4jDedicatedLabel = isK8s ? 'Neo4j pod (dedicated StatefulSet, serves imaging-viewer)' : 'Neo4j machine (dedicated, serves imaging-viewer)';
     var analysisLabel = isK8s ? 'Analysis-node pod' : 'Analysis-node machine';
     var sizingRows;
     if(a.topology === 'single'){
@@ -1129,7 +1125,7 @@
       (hasNeo4j(a) ?
         '<tr><td>Requirement</td><td>Bundled with imaging-viewer — not a user-selectable engine; an ETL loads analysis results from PostgreSQL into Neo4j for the Viewer</td></tr>' +
         '<tr><td>Ports</td><td>7687 (Bolt, used by imaging-viewer) / 6362 (backup) / 7474 (Neo4j\'s own HTTP browser/admin interface, optional)</td></tr>' +
-        '<tr><td>Hosting</td><td>' + (a.topology==='multi' && a.neo4jDedicated ? '<b>Deployed on its own dedicated machine</b> per your topology answer.' : 'Co-located with imaging-viewer.') + '</td></tr>' +
+        '<tr><td>Hosting</td><td>' + (a.topology==='multi' && a.neo4jDedicated ? '<b>Deployed on its own dedicated '+(isK8s?'pod (StatefulSet)':'machine')+'</b> per your topology answer.' : 'Co-located with imaging-viewer.') + '</td></tr>' +
         '<tr><td>Memory</td><td><b>16 GB RAM minimum, 32 GB recommended</b> — defaults to a 12 GB initial/maximum JVM heap, tunable via <code>imaging-viewer/.env</code></td></tr>'
         : '<tr><td>Requirement</td><td>Not required — your scenario ('+esc(LABELS.scenario[a.scenario])+') excludes the Viewer.</td></tr>') +
       '</tbody></table></div>';
@@ -1223,7 +1219,7 @@
     if(a.topology === 'multi'){
       var machineList = [isK8s ? 'core pods' : 'core node'];
       if(hasAnalysis(a)) machineList.push('analysis-node(s)');
-      if(hasNeo4j(a) && a.neo4jDedicated) machineList.push('Neo4j machine');
+      if(hasNeo4j(a) && a.neo4jDedicated) machineList.push('Neo4j ' + (isK8s ? 'StatefulSet' : 'machine'));
       everyMachineScope = machineList.join(', ');
     } else {
       everyMachineScope = isK8s ? 'single node pool' : 'the single host';
@@ -1253,7 +1249,7 @@
     }
 
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated){
-      groups.push({title:'Neo4j machine (dedicated)', key:'neo4j-machine', items:[
+      groups.push({title:'Neo4j ' + (isK8s ? 'StatefulSet (dedicated)' : 'machine (dedicated)'), key:'neo4j-machine', items:[
         'Network connectivity correctly configured to imaging-viewer (Bolt port 7687)'
       ]});
     }
