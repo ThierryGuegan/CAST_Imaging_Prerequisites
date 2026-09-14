@@ -411,7 +411,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-11';
+  var TOOL_VERSION = '2026-09-14';
 
   var LABELS = {
     scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
@@ -971,9 +971,17 @@
       ? '1 workstation covering 2 roles (end-user + delivery/analyst — can be the same machine, or split across more if your team prefers)'
       : '1 end-user workstation';
     var machineWordSizing = isK8s ? 'pod resource request' : 'server machine';
+    // Cluster-node floor per CAST's Kubernetes hardware doc: 2 nodes minimum (AnalysisNodeReplicaCount:1,
+    // no isolation); enabling analysis-node/Neo4j isolation onto dedicated cluster nodes (this tool's multi
+    // topology + neo4j-dedicated checkbox) costs +1 node total; each additional analysis-node replica beyond
+    // the first costs +1 more. EnforcePostgresIsolation (a further, separately-enabled node for the embedded
+    // PostgreSQL pod) isn't modeled here since this tool has no corresponding input — see the callout below.
+    var k8sIsolationActive = a.topology === 'multi' && (hasAnalysis(a) || (hasNeo4j(a) && a.neo4jDedicated));
+    var k8sAnalysisReplicaCount = hasAnalysis(a) ? (ANALYSIS_NODE_COUNT[a.analysisNodes] || 1) : 1;
+    var k8sMinNodes = 2 + (k8sIsolationActive ? 1 : 0) + Math.max(0, k8sAnalysisReplicaCount - 1);
     var machineSummaryHtml;
     if(isK8s){
-      machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> on your existing Kubernetes node pool (no new dedicated servers to provision for these), plus <b>'+workstationDesc+'</b> to access it.</div>';
+      machineSummaryHtml = '<div class="callout info"><b>'+sizingRows.length+' '+machineWordSizing+'(s)</b> to fit on your cluster, requiring <b>'+k8sMinNodes+' cluster node'+(k8sMinNodes===1?'':'s')+' minimum</b> (4 vCPU / 32 GB RAM per node minimum, per CAST\'s Kubernetes hardware doc — see the callout below), plus <b>'+workstationDesc+'</b> to access it.</div>';
     } else {
       var totalMachines = serverMachineCount + workstationMachineCount;
       machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see Section 1\'s Server components table'+(a.egress==='airgapped' ? '; the Extend Local Server is co-located there, not a separate machine' : '')+') + '+workstationDesc+' (see Workstation components table)'+'.</div>';
@@ -981,7 +989,8 @@
 
     var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
       machineSummaryHtml +
-      (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk. "Single node pool" vs. one pod per row below mirrors the topology choice in Section 1, not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' : '') +
+      (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk (the default per-component PVC sizes CAST ships are used as-is; their storage classes support online volume expansion, so you can grow a volume later without a rebuild). "Single node pool" vs. one pod per row below mirrors the topology choice in Section 1, not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' +
+        '<div class="callout info"><b>Cluster requirements per CAST\'s Kubernetes hardware doc:</b> <b>2 nodes minimum</b>, <b>4 vCPU per node minimum</b>, <b>32 GB RAM per node minimum</b> (64 GB recommended; 128 GB for multiple complex/large applications). Your profile above needs <b>'+k8sMinNodes+' node'+(k8sMinNodes===1?'':'s')+' minimum</b>: the base 2, '+(k8sIsolationActive ? '+1 for running the analysis-node/Neo4j workload on its own dedicated node(s) (this tool\'s multi-machine topology'+(hasNeo4j(a)&&a.neo4jDedicated?' and dedicated-Neo4j checkbox':'')+' — CAST\'s <code>EnforceAnalysisNodeIsolation</code>/<code>EnforceNeo4jIsolation</code> Helm settings, which require <code>EnforceBalancedAffinity: true</code>), ' : '')+(k8sAnalysisReplicaCount > 1 ? '+'+(k8sAnalysisReplicaCount-1)+' for each analysis-node replica beyond the first (<code>AnalysisNodeReplicaCount</code> in <code>values.yaml</code>)' : 'no further additions for a single analysis-node replica')+'. Not modeled here: further isolating the embedded PostgreSQL pod onto its own node (<code>EnforcePostgresIsolation</code>) costs one more node again — CAST\'s own "extra large" example (3 analysis-node replicas + all three isolation flags) reaches 6 nodes minimum. All cluster nodes (and any managed PostgreSQL instance) should sit in the <b>same Availability Zone</b>.</div>' : '') +
       '<h4>Server components</h4>' +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr></thead><tbody>' +
       sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+esc(r.disk)+' GB</td></tr>'; }).join('') +

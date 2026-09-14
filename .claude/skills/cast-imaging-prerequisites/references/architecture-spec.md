@@ -208,6 +208,23 @@ topology). If you add sizing rows, make sure they still respect — or explicitl
 respecting — whatever floors are already asserted; a hardcoded number below an asserted floor is
 a self-contradiction an audit will (and has) caught.
 
+**Kubernetes cluster-node floor is a separate model from the pod-request rows above it** — a real
+gap found auditing against CAST's own "What hardware do I need?" doc (user-supplied PDF). The
+`SIZING`-derived rows in the sizing table are per-*pod* resource requests; Kubernetes is additionally
+sized at the *cluster* level (how many underlying nodes the pool needs), which per that doc is 2
+nodes minimum, 4 vCPU/node minimum, 32 GB RAM/node minimum (64 GB recommended, 128 GB for multiple
+complex/large applications), scaling via `AnalysisNodeReplicaCount` (+1 node per analysis-node
+replica beyond the first) and the `EnforceAnalysisNodeIsolation`/`EnforceNeo4jIsolation` Helm flags
+(+1 node total for isolating that workload onto its own dedicated node — the doc only ever shows
+these two enabled together, so don't assume they're independently additive without new evidence).
+`render()` computes this as `k8sMinNodes` (base 2 + isolation bonus + replica-count bonus) right next
+to `serverMachineCount`, and surfaces it in both the `isK8s` branch of `machineSummaryHtml` and a
+dedicated callout in `sizingHtml` — don't let the two drift, same discipline as the machine-count
+summary below. `EnforcePostgresIsolation` (isolating the *embedded* PostgreSQL pod onto its own
+node) is **not** modeled in `k8sMinNodes` — this tool has no input representing it — so the callout
+says so explicitly rather than silently under-counting; don't add it without first adding a real
+input for it.
+
 ## Architecture diagram conventions
 
 `buildArchitectureDiagram(a)` renders an inline SVG that answers one question: *what actually
