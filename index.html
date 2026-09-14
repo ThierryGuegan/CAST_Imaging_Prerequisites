@@ -446,22 +446,22 @@
     poc:{
       single:{cpu:4, ram:32, disk:256},
       core:{cpu:2, ram:16, disk:256}, analysis:{cpu:2, ram:16, disk:256}, neo4j:{cpu:2, ram:16, disk:256},
-      singleNote:''
+      singleWarnLevel:''
     },
     small:{
       single:{cpu:8, ram:32, disk:300},
       core:{cpu:4, ram:32, disk:256}, analysis:{cpu:4, ram:32, disk:256}, neo4j:{cpu:4, ram:32, disk:256},
-      singleNote:''
+      singleWarnLevel:''
     },
     standard:{
       single:{cpu:12, ram:48, disk:400},
       core:{cpu:8, ram:32, disk:256}, analysis:{cpu:8, ram:32, disk:'500+'}, neo4j:{cpu:8, ram:32, disk:256},
-      singleNote:' (not recommended for production — prefer multi-machine)'
+      singleWarnLevel:'discouraged'
     },
     enterprise:{
       single:{cpu:16, ram:64, disk:600},
       core:{cpu:16, ram:64, disk:400}, analysis:{cpu:16, ram:64, disk:'1000+'}, neo4j:{cpu:8, ram:64, disk:400},
-      singleNote:' (strongly discouraged at this scale — use multi-machine/Kubernetes)'
+      singleWarnLevel:'strongly-discouraged'
     }
   };
 
@@ -931,9 +931,12 @@
     var coreLabel = isK8s ? 'Core pods' : 'Core node';
     var neo4jDedicatedLabel = isK8s ? 'Neo4j pod (dedicated StatefulSet, serves imaging-viewer)' : 'Neo4j machine (dedicated, serves imaging-viewer)';
     var analysisLabel = isK8s ? 'Analysis-node pod' : 'Analysis-node machine';
+    var singleNote = sizeSpec.singleWarnLevel === 'strongly-discouraged' ? ' (strongly discouraged at this scale — use multi-'+(isK8s?'pod':'machine')+(isK8s?'':'/Kubernetes')+')'
+      : sizeSpec.singleWarnLevel === 'discouraged' ? ' (not recommended for production — prefer multi-'+(isK8s?'pod':'machine')+')'
+      : '';
     var sizingRows;
     if(a.topology === 'single'){
-      sizingRows = [{c:allInOneLabel + ' (' + allInOneComponentList(a) + ')' + sizeSpec.singleNote, cpu:sizeSpec.single.cpu, ram:sizeSpec.single.ram, disk:sizeSpec.single.disk}];
+      sizingRows = [{c:allInOneLabel + ' (' + allInOneComponentList(a) + ')' + singleNote, cpu:sizeSpec.single.cpu, ram:sizeSpec.single.ram, disk:sizeSpec.single.disk}];
     } else {
       sizingRows = [{c:coreLabel + ' (' + coreComponentList(a) + ')', cpu:sizeSpec.core.cpu, ram:sizeSpec.core.ram, disk:sizeSpec.core.disk}];
       if(hasNeo4j(a) && a.neo4jDedicated){
@@ -1007,7 +1010,7 @@
     }
 
     if(a.topology === 'multi' && hasAnalysis(a) && (a.analysisNodes === '2-3' || a.analysisNodes === '4+')){
-      sizingHtml += '<div class="callout info">Each analysis-node machine registers itself against the same imaging-services instance, letting analyses run in parallel across multiple applications. This is CAST Imaging\'s horizontal scaling mechanism for analysis workload — it does not scale imaging-services, imaging-viewer, dashboards, or PostgreSQL themselves.</div>';
+      sizingHtml += '<div class="callout info">Each analysis-node '+(isK8s?'pod':'machine')+' registers itself against the same imaging-services instance, letting analyses run in parallel across multiple applications. This is CAST Imaging\'s horizontal scaling mechanism for analysis workload — it does not scale imaging-services, imaging-viewer, dashboards, or PostgreSQL themselves.</div>';
     }
 
     if(a.scale === 'standard' || a.scale === 'enterprise'){
@@ -1058,7 +1061,7 @@
     if(a.egress === 'airgapped') componentRows.push(['Extend Local Server (extend-proxy)', '8085', 'On-premises mirror of extend.castsoftware.com for air-gapped installs']);
 
     sizingHtml += '<h4>Named components (architecture overview)</h4>' +
-      '<p>All components below other than Gateway communicate over CAST\'s internal container network and are not individually customer-firewall-configurable in a single- or co-located multi-machine topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j machines) where a real firewall path is required. Source: CAST\'s architecture reference diagram and <a href="https://doc.castsoftware.com/imaging/install/requirements/hardware/#tcp-ports" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports)</a>.</p>' +
+      '<p>All components below other than Gateway communicate over CAST\'s internal container network and are not individually customer-firewall-configurable in a single- or co-located multi-'+(isK8s?'pod':'machine')+' topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j '+(isK8s?'pods':'machines')+') where a real firewall path is required. Source: CAST\'s architecture reference diagram and <a href="https://doc.castsoftware.com/imaging/install/requirements/hardware/#tcp-ports" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports)</a>.</p>' +
       buildArchitectureDiagram(a, {serverMachineCount: isK8s ? sizingRows.length : serverMachineCount, workstationRoleCount: workstationRoleCount}) +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Port(s)</th><th>Role</th></tr></thead><tbody>' +
       componentRows.map(function(r){ return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+r[2]+'</td></tr>'; }).join('') +

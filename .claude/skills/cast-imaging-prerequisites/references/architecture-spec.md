@@ -196,7 +196,12 @@ predicate for it before you use it in more than one place.
 
 `SIZING` is a plain object keyed by scale band, each holding baseline `{cpu, ram, disk}` specs for
 the roles that can exist (`single` for all-in-one, `core`/`analysis`/`neo4j` for multi-machine
-roles), plus a `singleNote` annotation string for scale bands where all-in-one is discouraged.
+roles), plus a `singleWarnLevel` ('', 'discouraged', or 'strongly-discouraged') for scale bands where
+all-in-one is discouraged — `render()` turns that into the actual annotation text, since the wording
+needs `isK8s` (a hardcoded "prefer multi-machine" string was a real bug found auditing: it survived
+unchanged even when `platform === 'kubernetes'`, so it told a Kubernetes user to "use multi-machine/
+Kubernetes" while already on Kubernetes). Don't put full sentences needing `isK8s` back into `SIZING`
+itself — keep it a plain data table and do platform-aware phrasing in `render()`.
 `render()` composes the actual sizing table from these baselines plus the current `has*(a)`
 answers — it does not hardcode a table per scenario. Component labels for each row are built by
 small `*ComponentList(a)` helper functions that push component names conditionally, so the label
