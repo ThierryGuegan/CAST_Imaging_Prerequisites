@@ -196,7 +196,10 @@ predicate for it before you use it in more than one place.
 
 `SIZING` is a plain object keyed by scale band, each holding baseline `{cpu, ram, disk}` specs for
 the roles that can exist (`single` for all-in-one, `core`/`analysis`/`neo4j` for multi-machine
-roles), plus a `singleWarnLevel` ('', 'discouraged', or 'strongly-discouraged') for scale bands where
+roles, `postgresDedicated`/`postgresManaged` for a non-co-located PostgreSQL — these used to be
+hardcoded flat numbers outside `SIZING` entirely, at every scale, which is what let them fall below
+CAST's own documented floor; see the anchor note below), plus a `singleWarnLevel` ('', 'discouraged',
+or 'strongly-discouraged') for scale bands where
 all-in-one is discouraged — `render()` turns that into the actual annotation text, since the wording
 needs `isK8s` (a hardcoded "prefer multi-machine" string was a real bug found auditing: it survived
 unchanged even when `platform === 'kubernetes'`, so it told a Kubernetes user to "use multi-machine/
@@ -212,6 +215,18 @@ disk (an absolute per-node minimum) and RAM (different floors for standalone vs.
 topology). If you add sizing rows, make sure they still respect — or explicitly justify not
 respecting — whatever floors are already asserted; a hardcoded number below an asserted floor is
 a self-contradiction an audit will (and has) caught.
+
+**The `standard`/`small`/`enterprise` disk numbers are anchored to one real CAST data point, not
+invented.** A user-supplied PDF of CAST's "What hardware do I need?" doc gives a concrete example:
+managing up to 50 applications with up to 5 parallel analyses on one node needs 32 GB RAM / 2048 GB
+disk for that node, and 64 GB RAM / 3072 GB disk for its PostgreSQL instance. The `small` tier (whose
+app-count band spans 50) uses this anchor directly; `standard`/`enterprise` are simple, explicitly-
+labeled multiples of it (2x/4x) rather than a researched figure, because CAST states there is no
+linear formula relating app count to sizing — don't tighten those without new primary evidence, and
+keep the `sizingHtml` callout that cites the anchor and calls out the extrapolation as such whenever
+you touch this again. Before this fix, `postgresDedicated`/`postgresManaged` were flat numbers
+(512 GB / 1024 GB) applied at every scale — below the anchor's 3072 GB even at `enterprise`, a
+self-contradiction against the tool's own cited source that an audit caught.
 
 **Kubernetes cluster-node floor is a separate model from the pod-request rows above it** — a real
 gap found auditing against CAST's own "What hardware do I need?" doc (user-supplied PDF). The

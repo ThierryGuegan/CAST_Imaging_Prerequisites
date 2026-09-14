@@ -442,25 +442,36 @@
 
   // ---- Sizing baselines, keyed by scale. Component lists are composed dynamically from the selected scenario. ----
   // Every disk figure respects CAST's documented absolute floor of 256GB free disk per node (SSD/high-IOPS).
+  // Disk floors below are anchored to the one concrete data point CAST's own "What hardware do I
+  // need?" doc gives (user-supplied PDF): managing up to 50 applications with up to 5 parallel
+  // analyses on one node needs 32 GB RAM / 2048 GB disk for that node, and 64 GB RAM / 3072 GB disk
+  // for its PostgreSQL instance. That's the anchor for the "small" tier (50-150 apps spans it).
+  // CAST explicitly states there's no linear formula relating app count to sizing, so standard/
+  // enterprise figures are our own conservative multiples of that anchor, not CAST-confirmed —
+  // flagged as such in the sizingHtml callout that cites this same source.
   var SIZING = {
     poc:{
-      single:{cpu:4, ram:32, disk:256},
+      single:{cpu:4, ram:32, disk:512},
       core:{cpu:2, ram:16, disk:256}, analysis:{cpu:2, ram:16, disk:256}, neo4j:{cpu:2, ram:16, disk:256},
+      postgresDedicated:{cpu:4, ram:32, disk:512}, postgresManaged:{cpu:4, ram:32, disk:512},
       singleWarnLevel:''
     },
     small:{
-      single:{cpu:8, ram:32, disk:300},
-      core:{cpu:4, ram:32, disk:256}, analysis:{cpu:4, ram:32, disk:256}, neo4j:{cpu:4, ram:32, disk:256},
+      single:{cpu:8, ram:32, disk:2048},
+      core:{cpu:4, ram:32, disk:1024}, analysis:{cpu:4, ram:32, disk:2048}, neo4j:{cpu:4, ram:32, disk:256},
+      postgresDedicated:{cpu:8, ram:64, disk:3072}, postgresManaged:{cpu:8, ram:64, disk:3072},
       singleWarnLevel:''
     },
     standard:{
-      single:{cpu:12, ram:48, disk:400},
-      core:{cpu:8, ram:32, disk:256}, analysis:{cpu:8, ram:32, disk:'500+'}, neo4j:{cpu:8, ram:32, disk:256},
+      single:{cpu:12, ram:64, disk:4096},
+      core:{cpu:8, ram:32, disk:1536}, analysis:{cpu:8, ram:32, disk:4096}, neo4j:{cpu:8, ram:32, disk:256},
+      postgresDedicated:{cpu:12, ram:96, disk:5120}, postgresManaged:{cpu:12, ram:96, disk:5120},
       singleWarnLevel:'discouraged'
     },
     enterprise:{
-      single:{cpu:16, ram:64, disk:600},
-      core:{cpu:16, ram:64, disk:400}, analysis:{cpu:16, ram:64, disk:'1000+'}, neo4j:{cpu:8, ram:64, disk:400},
+      single:{cpu:16, ram:96, disk:8192},
+      core:{cpu:16, ram:64, disk:2048}, analysis:{cpu:16, ram:64, disk:8192}, neo4j:{cpu:8, ram:64, disk:400},
+      postgresDedicated:{cpu:16, ram:128, disk:8192}, postgresManaged:{cpu:16, ram:128, disk:8192},
       singleWarnLevel:'strongly-discouraged'
     }
   };
@@ -950,10 +961,10 @@
       }
     }
     if(a.dbHosting === 'dedicated'){
-      sizingRows.push({c:'PostgreSQL machine (dedicated database server'+(isK8s ? ', typically outside the cluster' : '')+')', cpu:4, ram:32, disk:512});
+      sizingRows.push({c:'PostgreSQL machine (dedicated database server'+(isK8s ? ', typically outside the cluster' : '')+')', cpu:sizeSpec.postgresDedicated.cpu, ram:sizeSpec.postgresDedicated.ram, disk:sizeSpec.postgresDedicated.disk});
     }
     if(a.dbHosting === 'managed'){
-      sizingRows.push({c:'PostgreSQL instance (managed/clustered DBaaS, primary + standby for HA)', cpu:8, ram:64, disk:1024});
+      sizingRows.push({c:'PostgreSQL instance (managed/clustered DBaaS, primary + standby for HA)', cpu:sizeSpec.postgresManaged.cpu, ram:sizeSpec.postgresManaged.ram, disk:sizeSpec.postgresManaged.disk});
     }
     if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
       sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + userBonus.cpu, ram:sizingRows[0].ram + userBonus.ram, disk:sizingRows[0].disk};
@@ -1011,6 +1022,10 @@
 
     if(a.topology === 'multi' && hasAnalysis(a) && (a.analysisNodes === '2-3' || a.analysisNodes === '4+')){
       sizingHtml += '<div class="callout info">Each analysis-node '+(isK8s?'pod':'machine')+' registers itself against the same imaging-services instance, letting analyses run in parallel across multiple applications. This is CAST Imaging\'s horizontal scaling mechanism for analysis workload — it does not scale imaging-services, imaging-viewer, dashboards, or PostgreSQL themselves.</div>';
+    }
+
+    if(a.scale !== 'poc'){
+      sizingHtml += '<div class="callout info">Anchored to CAST\'s own documented example: managing up to <b>50 applications with up to 5 parallel analyses</b> on one node needs <b>32 GB RAM / 2 TB disk</b> for that node and <b>64 GB RAM / 3 TB disk</b> for its PostgreSQL instance. The figures above meet or exceed this at your selected scale — figures beyond that anchor (standard/enterprise) are a conservative extrapolation, not a CAST-published formula; CAST states app-count-to-sizing isn\'t linear.</div>';
     }
 
     if(a.scale === 'standard' || a.scale === 'enterprise'){
