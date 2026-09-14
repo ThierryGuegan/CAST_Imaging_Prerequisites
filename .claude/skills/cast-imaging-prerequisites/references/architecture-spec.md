@@ -102,7 +102,13 @@ be a search-and-fix pass, not a rename in isolation.
    then work out which predicates it should satisfy — don't reverse-engineer a scenario from
    predicate behavior you want.
 2. **Project scale** — application count band (drives sizing baseline) and concurrent-user band
-   (drives a RAM/CPU bonus on the UI-serving node, only when the scenario actually has a UI).
+   (drives a RAM/CPU bonus on the UI-serving node, only when the scenario actually has a UI). Both
+   are `opt-row` radio groups (like Platform/Topology), not `<select>`s — read via
+   `document.querySelector('input[name=scale]:checked')` in `state()`. `render()` builds a
+   `scaleProfileHtml` callout at the top of the sizing section spelling out the actual app-count and
+   concurrent-user ranges together (not just the short band label already shown in the profile
+   chips), and is explicit that the bands are this tool's own heuristic while the numbers they drive
+   are anchored to CAST's documented example where one exists (see the Sizing model section below).
 3. **Database** — RDBMS is a fixed fact (PostgreSQL only — CAST doesn't support alternatives, so
    don't build this as a choice), plus a hosting model choice (co-located / dedicated / managed).
 4. **Network egress** — direct outbound / via proxy / air-gapped. This alone reshapes several rows
