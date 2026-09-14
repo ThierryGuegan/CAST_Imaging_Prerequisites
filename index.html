@@ -1002,10 +1002,6 @@
       sizingHtml += '<div class="callout info">Your scenario excludes the Viewer/Dashboards, so concurrent end-user count does not add to server-side sizing here — it only affects the client-side requirements below.</div>';
     }
 
-    if(hasNeo4j(a)){
-      sizingHtml += '<div class="callout info">Neo4j (bundled with imaging-viewer) needs <b>16 GB RAM minimum, 32 GB recommended</b> — it defaults to an initial/maximum JVM heap of 12 GB, tunable via <code>imaging-viewer/.env</code>. Sizing above already accounts for this.</div>';
-    }
-
     if(a.dbHosting === 'managed'){
       sizingHtml += '<div class="callout info">The managed/clustered DBaaS row is an equivalent-capacity planning figure, not a machine you provision yourself — your cloud provider (e.g. Amazon RDS, Azure Database for PostgreSQL, Google Cloud SQL) sizes and replicates the underlying nodes for you. Pick an instance tier that meets or exceeds it.</div>';
     }
@@ -1018,8 +1014,9 @@
       sizingHtml += '<div class="callout warn">Sizing scales with the number of applications delivered, retained snapshot history, and concurrent analyses/users. Re-validate after a pilot batch of real deliveries.</div>';
     }
 
-    sizingHtml += '<div class="callout info">CAST\'s absolute floor is <b>256 GB free disk per node</b>, on SSD or equivalent high-IOPS storage (SAN configured with SSD) — the figures above already sit at or above that floor for your profile, but treat 256 GB as a hard minimum on any node regardless.</div>';
-    sizingHtml += '<div class="callout info">CAST\'s RAM floor differs by topology: <b>32 GB minimum for a standalone/all-in-one machine</b> (everything on one host), versus <b>16 GB minimum per node in a distributed/multi-machine deployment</b> — 32 GB recommended per node there too. The figures above already respect these floors.</div>';
+    var floorParts = ['<b>Disk:</b> 256 GB min/node (SSD or equivalent high-IOPS)', '<b>RAM:</b> 32 GB min standalone, 16 GB min/node distributed (32 GB recommended)'];
+    if(hasNeo4j(a)) floorParts.push('<b>Neo4j:</b> 16 GB min, 32 GB recommended (12 GB JVM heap default, tunable via <code>imaging-viewer/.env</code>)');
+    sizingHtml += '<div class="callout info">CAST\'s hard floors — already respected above: '+floorParts.join(' · ')+'.</div>';
 
     var winNoteParts = [];
     if(hasDashboards(a)) winNoteParts.push('CAST Report Generator\'s interactive UI (a Linux-capable CLI-only variant, "Report Generator for Dashboards", exists as an alternative)');
@@ -1037,7 +1034,7 @@
       '</tbody></table></div>';
 
     if(hasDashboards(a)){
-      sizingHtml += '<div class="callout info"><b>CAST Report Generator</b> — a standalone tool, not bundled with CAST Imaging, for exporting Word/Excel/PowerPoint deliverables: requires <b>Microsoft .NET 8 SDK</b> (its installer offers to install this automatically) — no Java JRE/JDK needed; requires an <b>API key</b> generated from the CAST Imaging user profile (see Section 3\'s network row for the Gateway path it uses). <b>Microsoft Office itself is not required to generate reports</b> — only to open/edit the generated files or customize templates. Minimum versions: CAST Imaging 3.4.0-funcrel / CAST Report Generator 1.29.0-funcrel. Source: <a href="https://doc.castsoftware.com/imaging/install/report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/report-generator</a>, <a href="https://doc.castsoftware.com/export-v2/doccom/cast-report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/export-v2/doccom/cast-report-generator</a>.</div>';
+      sizingHtml += '<div class="callout info"><b>CAST Report Generator</b> — a standalone tool, not bundled with CAST Imaging, for exporting Word/Excel/PowerPoint deliverables: requires <b>Microsoft .NET 8 SDK</b> (its installer offers to install this automatically); requires an <b>API key</b> generated from the CAST Imaging user profile (see Section 3\'s network row for the Gateway path it uses). <b>Microsoft Office itself is not required to generate reports</b> — only to open/edit the generated files or customize templates. Source: <a href="https://doc.castsoftware.com/imaging/install/report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/report-generator</a>, <a href="https://doc.castsoftware.com/export-v2/doccom/cast-report-generator/" target="_blank" rel="noopener">doc.castsoftware.com/export-v2/doccom/cast-report-generator</a>.</div>';
     }
     if(hasAuditContext(a)){
       sizingHtml += '<div class="callout info"><b>Audit / structural-analysis engagement selected (Section 10)</b> — also install on the end-user workstation: ' + AUDIT_WORKSTATION_TOOLS.map(function(t){ return '<b>'+esc(t)+'</b>'; }).join(', ') + ' (exact versions/edition per your engagement standards; not CAST-published requirements, listed as given for this deployment). Word/Excel/PowerPoint in this list also cover CAST Report Generator\'s optional Office dependency above.</div>';
@@ -1118,12 +1115,12 @@
 
     var dbHtml = '<h3>2. Database requirements</h3>' +
       '<h4>PostgreSQL (RDBMS)</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
-      '<tr><td>Engine</td><td>PostgreSQL — port <b>2285 by default</b> (configurable), not the PostgreSQL community default of 5432 — the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data. Per CAST\'s architecture reference, this port is used by every CAST Imaging component that reads/writes the database, not just imaging-services.</td></tr>' +
+      '<tr><td>Engine</td><td>PostgreSQL — port <b>2285 by default</b> (configurable), not the PostgreSQL community default of 5432 — the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data.</td></tr>' +
       '<tr><td>Version</td><td>' +
         (a.dbHosting==='colocated'
           ? 'The bundled '+((a.platform==='docker'||a.platform==='podman')?'Docker':'')+' image ships <b>PostgreSQL 15</b> — pinned by CAST, nothing for you to choose.'
           : 'You provision PostgreSQL yourself: on Windows, install from EnterpriseDB; on Linux, from the distribution\'s official PostgreSQL repository (or run it in Docker). CAST currently recommends <b>PostgreSQL 18.x</b> for a self-provisioned instance.') +
-        ' The legacy <b>CAST Storage Service is end-of-life</b> — deployments still on it must migrate to standard PostgreSQL. Confirm the full supported/minimum version range against <a href="https://doc.castsoftware.com/imaging/install/requirements/db/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/db</a> before provisioning'+(a.dbHosting!=='colocated' ? ' your '+esc(LABELS.dbHosting[a.dbHosting]).toLowerCase()+' instance' : '')+'.</td></tr>' +
+        ' Confirm the full supported/minimum version range against <a href="https://doc.castsoftware.com/imaging/install/requirements/db/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/db</a> before provisioning'+(a.dbHosting!=='colocated' ? ' your '+esc(LABELS.dbHosting[a.dbHosting]).toLowerCase()+' instance' : '')+'.</td></tr>' +
       '<tr><td>Hosting</td><td>'+esc(LABELS.dbHosting[a.dbHosting])+
         (a.dbHosting==='colocated' && (a.scale==='standard'||a.scale==='enterprise') ? ' — <b>not recommended</b> at this scale; move to a dedicated or managed instance' : '') +
       '</td></tr>' +
@@ -1166,7 +1163,6 @@
         '<li>On '+(a.platform==='podman'?'Podman':'Docker')+', CAST\'s documented approach is a dedicated Nginx vHost <code>.conf</code> file with <code>ssl_certificate</code> / <code>ssl_certificate_key</code> directives, <code>ssl_protocols TLSv1.2</code> or higher, and server cipher preference enabled — not a CAST-specific certificate variable.</li>' +
         '<li><b>The private key must not be encrypted</b> ("BEGIN ENCRYPTED PRIVATE KEY") — CAST\'s bundled Nginx does not support encrypted keys; strip the passphrase before use.</li>' +
         '<li>Self-signed certificates must be installed/trusted on every workstation that accesses CAST Imaging, or users will see browser warnings.</li>' +
-        '<li>Behind any reverse proxy: forward <code>X-Forwarded-For</code>, <code>X-Forwarded-Proto</code>, <code>X-Forwarded-Host</code>, and set <code>KC_PROXY=edge</code>, <code>KC_PROXY_HEADERS=xforwarded</code>, <code>PROXY_ADDRESS_FORWARDING=true</code> in <code>cast_imaging_services/.env</code> (and <code>cast_imaging_viewer/.env</code> if the Viewer is deployed) — otherwise redirects and asset URLs will be generated wrong.</li>' +
         '<li>Serving CAST Imaging under a URL path prefix (e.g. <code>https://host/imaging</code>) additionally requires setting <code>APP_CONTEXT</code> and editing <code>cast_imaging_services/docker-compose.override.yml</code> — see CAST\'s reverse-proxy-with-context-URL reference.</li>'
         : '') +
       '</ul>';
@@ -1198,7 +1194,6 @@
         : '<li>Allow outbound HTTPS (443) from the CAST Imaging node to <code>extend.castsoftware.com</code>' + (a.egress==='proxy' ? ' via your configured proxy' : '') + '.</li>') +
       '<li>Generate an <b>API key from the CAST Extend website</b> and configure it in CAST Imaging / CAST Extend client to authenticate extension downloads.</li>' +
       '<li>Obtain a valid <b>CAST Imaging license file</b> from your CAST account team; confirm it covers the modules you selected (MCP/AI: '+(a.mcp?'<b>yes</b>':'no')+'; Highlight integration: '+(a.highlight?'<b>yes</b>':'no')+').</li>' +
-      '<li>Store the license file and the API key in a secrets store — not in plain configuration files under version control.</li>' +
       '</ul>';
 
     var mcpHtml = '';
@@ -1224,18 +1219,17 @@
     if(a.platform === 'kubernetes') everyMachine.push('Installing user/service account confirmed to have sufficient cluster rights (namespace creation, Helm release management) — separate from the CAST-service RBAC below');
     if(a.topology === 'multi') everyMachine.push('Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared (default path — configurable) before install');
     var checklistUnitWord = isK8s ? 'pod' : 'machine';
-    var everyMachineScope;
-    if(a.topology === 'multi'){
+    if(a.topology !== 'single'){
       var machineList = [isK8s ? 'core pods' : 'core node'];
       if(hasAnalysis(a)) machineList.push('analysis-node(s)');
       if(hasNeo4j(a) && a.neo4jDedicated) machineList.push('Neo4j ' + (isK8s ? 'StatefulSet' : 'machine'));
-      everyMachineScope = machineList.join(', ');
-    } else {
-      everyMachineScope = isK8s ? 'single node pool' : 'the single host';
+      var everyMachineScope = machineList.join(', ');
+      groups.push({title:'Every server ' + checklistUnitWord + ' (' + everyMachineScope + ')', key:'every-machine', items:everyMachine});
     }
-    groups.push({title:'Every server ' + checklistUnitWord + ' (' + everyMachineScope + ')', key:'every-machine', items:everyMachine});
+    // Single topology means there's only one server machine/pod group total — folding "every machine"
+    // and "core node" into one group avoids showing the same single host under two separate headings.
 
-    var coreNode = [];
+    var coreNode = a.topology === 'single' ? everyMachine.slice() : [];
     coreNode.push((isK8s ? 'Node pool capacity' : 'Server(s)') + ' provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(topologyLabel(a))+')');
     coreNode.push('PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting]));
     coreNode.push('All firewall rules from Section 3 opened before install day');
@@ -1248,7 +1242,10 @@
     if(a.mcp) coreNode.push('MCP Server + Gatekeeper + OAuth module deployed; LLM provider FQDN allowlisted');
     if(a.highlight) coreNode.push('CAST Highlight FQDNs allowlisted (cloud/auth/binaries)');
     if(a.platform === 'kubernetes') coreNode.push('Cluster namespace, RBAC, StorageClass, and Ingress/TLS secret prepared');
-    groups.push({title:(isK8s?'Core pods':'Core node')+' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+')', key:'core-node', items:coreNode});
+    var coreNodeTitle = a.topology === 'single'
+      ? (isK8s ? 'Single node pool' : 'Single host') + ' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+')'
+      : (isK8s?'Core pods':'Core node')+' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+')';
+    groups.push({title:coreNodeTitle, key:'core-node', items:coreNode});
 
     if(a.topology === 'multi' && hasAnalysis(a)){
       groups.push({title:'Analysis-node ' + checklistUnitWord + '(s)', key:'analysis-node', items:[

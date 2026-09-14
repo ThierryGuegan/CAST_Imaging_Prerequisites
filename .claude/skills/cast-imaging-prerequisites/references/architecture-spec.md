@@ -149,8 +149,8 @@ be a search-and-fix pass, not a rename in isolation.
     `export-v2/doccom/cast-report-generator/`): a standalone tool, not bundled with CAST Imaging.
     The interactive UI variant is Windows-only; a separate CLI-only "Report Generator for
     Dashboards" variant also runs on Linux. It requires Microsoft .NET 8 SDK (its installer offers
-    to install this automatically — no Java JRE/JDK needed) and an API key generated from the CAST
-    Imaging user profile, and connects to Gateway's `/dashboards/rest` path — gated on
+    to install this automatically) and an API key generated from the CAST Imaging user profile, and
+    connects to Gateway's `/dashboards/rest` path — gated on
     `hasDashboards(a)` in both `buildPortRows()` and `buildArchitectureDiagram(a)`, which draws it
     as its own box (`reportGenBox`, positioned mirror-image to the Tester/admin workstation box on
     the other side of Browser) with a solid `FLOW` line straight into Gateway, since it reuses the
