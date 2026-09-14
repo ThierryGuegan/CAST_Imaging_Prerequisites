@@ -82,10 +82,16 @@ be a search-and-fix pass, not a rename in isolation.
 
 1. **Platform & topology** — host platform (Docker / Podman / Kubernetes / Windows Server, radio),
    deployment scenario (select: which components exist — this is what later drives every
-   `has*(a)` predicate), topology (single machine / multi-machine, radio), plus conditional
-   sub-blocks that only show when relevant (analysis-node count when topology is multi and the
-   scenario includes analysis; a Neo4j-dedicated-machine checkbox when topology is multi and the
-   scenario includes the Viewer).
+   `has*(a)` predicate), topology (single machine / multi-machine, radio — dynamically relabeled
+   "Single pod" / "Multi-pod" via `topologyLabel(a)` when `platform === 'kubernetes'`, both for the
+   radio option text itself and everywhere else topology is displayed, e.g. the profile chip and
+   the checklist), plus conditional sub-blocks that only show when relevant (analysis-node count
+   when topology is multi and the scenario includes analysis; a Neo4j-dedicated-machine checkbox
+   when topology is multi, the scenario includes the Viewer, **and** `canDedicateNeo4j(a)` — this
+   "advanced topology" is CAST-documented for Docker and Podman only, not Windows or Kubernetes, so
+   `state()` also forces `neo4jDedicated` to `false` outside those two platforms regardless of the
+   checkbox's raw DOM state, meaning every downstream `a.neo4jDedicated` check is automatically
+   platform-safe without needing its own platform guard).
 
    The scenario `<select>` has exactly these four `value`s — don't infer a different set from the
    predicates alone; the predicates are derived from these four, not the other way around:
