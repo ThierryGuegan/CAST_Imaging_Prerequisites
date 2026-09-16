@@ -297,11 +297,20 @@ what already happens to be drawn.
   callout says a relationship "is not confirmed by the source diagram," the line for it must look
   less certain than a confirmed one — not just carry a caveat label next to an otherwise-identical
   line. The convention: a fine dotted stroke (`stroke-dasharray="2 3"`) at reduced opacity (`.55`)
-  plus a small "link not confirmed" label, as used for Gateway → AI-service. Don't route a
-  *separately confirmed* fact (like the core node's confirmed `:8085` path to the Extend Local
-  Server) through a box whose *own* link is unconfirmed just because it's nearby — that borrows
-  uncertainty the fact doesn't have. Route confirmed facts from Gateway directly instead, even if
-  that means a longer line.
+  plus a small "link not confirmed" label. Don't route a *separately confirmed* fact (like the core
+  node's confirmed `:8085` path to the Extend Local Server) through a box whose *own* link is
+  unconfirmed just because it's nearby — that borrows uncertainty the fact doesn't have. Route
+  confirmed facts from Gateway directly instead, even if that means a longer line. Gateway → AI-
+  service used to be the worked example of this ("link not confirmed" dashed line) until a
+  user-supplied architecture diagram confirmed the real connection: Viewer → AI-service (`http
+  :8082`), not Gateway → AI-service at all — AI-service is only reached through the Viewer, so it
+  now draws as a solid `FLOW` line from `viewerBox`, gated on `viewerBox` existing (no Viewer, no
+  line at all — an unconnected box is more honest than a fabricated Gateway link). The same diagram
+  also confirmed the two MCP ports (Imaging MCP `:8282`, Gatekeeper MCP `:8283`), both reached
+  through Gateway path-routing (`/mcp`, `/mcp/gatekeeper`) exactly like every other routed
+  component — they're pushed into `routedItems` alongside Console/Auth/SSO/Admin/Viewer/Dashboards,
+  not modeled as a separate direct connection the way the network-ports table used to (before this
+  diagram, the MCP client's port was itself marked "not confirmed").
 - **Every line states its port.** Every connector in the diagram has a label naming the port it
   uses (`label(x, y, text, color)`), even ones that look self-explanatory from the box text alone —
   this was violated and then fixed for the PostgreSQL↔ETL↔Neo4j chain and for Viewer→Viewer-APIs.

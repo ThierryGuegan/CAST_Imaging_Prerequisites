@@ -584,6 +584,8 @@
     ];
     if(hasViewer(a)) routedItems.push({key:'viewer', label:'Viewer', sub:'/imaging · :8083'});
     if(hasDashboards(a)) routedItems.push({key:'dash', label:'Dashboards', sub:'/dashboards · :8097'});
+    if(a.mcp) routedItems.push({key:'mcp', label:'Imaging MCP', sub:'/mcp · :8282'});
+    if(a.mcp) routedItems.push({key:'mcp-gw', label:'Gatekeeper MCP', sub:'/mcp/gatekeeper · :8283'});
     var routedRow = layoutRow(routedItems); var yRouted = y; y += boxH+gapY;
 
     var supportItems = [];
@@ -679,9 +681,9 @@
     var analysisBox = byKey(supportRow, 'analysis'), aiBox = byKey(supportRow, 'ai'), viewerApiBox = byKey(supportRow, 'viewerapi');
     var viewerBox = byKey(routedRow, 'viewer');
     if(analysisBox) svg += line(gatewayRow[0].cx, yGateway+boxH, analysisBox.cx, ySupport, ROUTE, 'ah-route', true);
-    if(aiBox){
-      svg += '<line x1="'+gatewayRow[0].cx+'" y1="'+(yGateway+boxH)+'" x2="'+aiBox.cx+'" y2="'+ySupport+'" stroke="'+ROUTE+'" stroke-width="1.5" stroke-dasharray="2 3" opacity=".55" marker-end="url(#ah-route)"/>';
-      svg += label(aiBox.cx+70, ySupport-8, 'link not confirmed', ROUTE);
+    if(viewerBox && aiBox){
+      svg += line(viewerBox.cx-20, yRouted+boxH, aiBox.cx-20, ySupport, FLOW, 'ah-flow');
+      svg += label(viewerBox.cx-75, (yRouted+boxH+ySupport)/2, 'http :8082', FLOW);
     }
     if(viewerBox && viewerApiBox){
       svg += line(viewerBox.cx, yRouted+boxH, viewerApiBox.cx, ySupport, FLOW, 'ah-flow');
@@ -869,11 +871,11 @@
     }
 
     if(a.mcp){
-      rows.push({src:'MCP client (Claude Desktop / IDE / CI pipeline)', dst:'MCP Server (behind Gatekeeper)', port:'443 (exact port not confirmed — verify against your CAST Imaging release)', proto:'HTTPS', purpose:'Primary inbound path for MCP tool calls — Gatekeeper enforces authorization in front of the MCP Server', tag:'mandatory', note:'AI/MCP selected'});
-      rows.push({src:'MCP Server', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'Calls to the configured LLM provider for AI-assisted / MCP natural-language features', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+
+      rows.push({src:'MCP client (Claude Desktop / IDE / CI pipeline)', dst:'Gateway', port:'8090 (or 443 via reverse proxy)', proto:'HTTP/HTTPS', purpose:'Path-routed through Gateway to Imaging MCP (/mcp, internal :8282) and Gatekeeper MCP (/mcp/gatekeeper, internal :8283) — no separate firewall port needed beyond Gateway itself, per CAST\'s architecture reference', tag:'mandatory', note:'AI/MCP selected'});
+      rows.push({src:'Imaging MCP', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'Calls to the configured LLM provider for AI-assisted / MCP natural-language features', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+
         (a.egress === 'airgapped' ? ' — this is an external API with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or an internal-only LLM gateway' :
          a.egress === 'proxy' ? ' — reaches this external API via your configured proxy' : '')});
-      rows.push({src:'MCP Gatekeeper', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — this may be the same embedded Auth service (8092, /oauth2) already listed above, or a separate IdP if the OAuth module is pointed elsewhere', tag:'conditional', note:'AI/MCP selected'});
+      rows.push({src:'Gatekeeper MCP', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — this may be the same embedded Auth service (8092, /oauth2) already listed above, or a separate IdP if the OAuth module is pointed elsewhere', tag:'conditional', note:'AI/MCP selected'});
     }
 
     if(a.repoHttps && hasAnalysis(a)){
@@ -1074,8 +1076,10 @@
       sizingHtml += '<div class="callout info"><b>Audit / structural-analysis engagement selected (Section 10)</b> — also install on the end-user workstation: ' + AUDIT_WORKSTATION_TOOLS.map(function(t){ return '<b>'+esc(t)+'</b>'; }).join(', ') + ' (exact versions/edition per your engagement standards; not CAST-published requirements, listed as given for this deployment). Word/Excel/PowerPoint in this list also cover CAST Report Generator\'s optional Office dependency above.</div>';
     }
 
+    var gatewayPaths = ['/console', '/auth', '/oauth2', '/admin', '/imaging', '/dashboards'];
+    if(a.mcp) gatewayPaths.push('/mcp', '/mcp/gatekeeper');
     var componentRows = [
-      ['Gateway', '8090', 'Single customer-facing entry point — routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards) to every other service below. This is the only port that needs to be exposed/opened inbound to users.']
+      ['Gateway', '8090', 'Single customer-facing entry point — routes by URL path ('+gatewayPaths.join(', ')+') to every other service below. This is the only port that needs to be exposed/opened inbound to users.']
     ];
     componentRows.push(['Console', '8091', 'Delivery/administration console (path /console)']);
     componentRows.push(['Auth service', '8092', 'OAuth2 token endpoint (path /oauth2)']);
@@ -1085,7 +1089,9 @@
     if(hasViewer(a)) componentRows.push(['Viewer', '8083', 'Architecture/dependency graph UI (path /imaging)']);
     if(hasViewer(a)) componentRows.push(['Viewer-APIs (imaging-apis)', '8070', 'REST API layer backing the Viewer']);
     if(hasNeo4j(a)) componentRows.push(['ETL service', '9001', 'Loads analysis results from PostgreSQL into Neo4j for the Viewer']);
-    componentRows.push(['AI-service (ai-manager)', '8082', 'Present in CAST\'s reference architecture regardless of scenario — its exact relationship to the optional MCP/AI integration in Section 8 is not confirmed by the source diagram; treat as related, not confirmed identical']);
+    componentRows.push(['AI-service (ai-manager)', '8082', 'Present in CAST\'s reference architecture regardless of scenario, serving the Viewer/Viewer-APIs — per CAST\'s architecture diagram it is a distinct component unrelated to the MCP/AI integration in Section 8 despite the similar naming']);
+    if(a.mcp) componentRows.push(['Imaging MCP', '8282', 'CAST Imaging MCP Server — handles MCP tool calls, routed from Gateway (path /mcp)']);
+    if(a.mcp) componentRows.push(['Gatekeeper MCP', '8283', 'Enforces tool/application-level authorization for MCP calls, routed from Gateway (path /mcp/gatekeeper)']);
     if(hasDashboards(a)) componentRows.push(['Dashboards', '8097', 'KPI dashboards UI (path /dashboards)']);
     if(hasNeo4j(a)) componentRows.push(['Neo4j', '7687 / 7474 / 6362', 'Graph database for the Viewer (Bolt / HTTP browser interface / backup)']);
     componentRows.push(['PostgreSQL', '2285 (default, configurable)', 'Shared relational database used by every component above that persists data']);
@@ -1232,8 +1238,8 @@
     var mcpHtml = '';
     if(a.mcp){
       mcpHtml = '<h3>{N}. MCP Servers (AI features) — enabled</h3><ul>' +
-        '<li>Deploy the CAST Imaging MCP Server alongside a reachable CAST Imaging instance.</li>' +
-        '<li>Front it with <b>Gatekeeper</b> for tool/application-level authorization policy.</li>' +
+        '<li>Deploy the CAST Imaging MCP Server (<b>Imaging MCP</b>, internal :8282) alongside a reachable CAST Imaging instance — reached through Gateway on the <code>/mcp</code> path, not a separately exposed port.</li>' +
+        '<li>Front it with <b>Gatekeeper MCP</b> (internal :8283, path <code>/mcp/gatekeeper</code>) for tool/application-level authorization policy.</li>' +
         '<li>Configure the <b>OAuth module</b> against an OAuth2/OIDC provider (can reuse your SAML/LDAP IdP if OIDC-capable) so MCP clients authenticate as the requesting user.</li>' +
         '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> (no wildcards).</li>' +
         '<li>Sizing: ~2 vCPU / 4 GB RAM per MCP service (already added to Section 1).</li>' +
