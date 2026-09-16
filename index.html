@@ -982,7 +982,7 @@
     if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
       sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + userBonus.cpu, ram:sizingRows[0].ram + userBonus.ram, disk:sizingRows[0].disk};
     }
-    if(a.mcp) sizingRows = sizingRows.concat([{c:'MCP Server (Imaging + Gatekeeper)' + (isK8s ? ' pods' : ''), cpu:2, ram:4, disk:20}]);
+    if(a.mcp) sizingRows = sizingRows.concat([{c:'Imaging MCP + Gatekeeper MCP' + (isK8s ? ' pods' : ''), cpu:2, ram:4, disk:20}]);
 
     // ---- Machine-count summary: how many server machines/pods + workstation machine(s) this profile needs ----
     // Workstation ROLES (end-user, delivery/analyst) are distinct responsibilities, not necessarily distinct
@@ -1242,7 +1242,7 @@
         '<li>Front it with <b>Gatekeeper MCP</b> (internal :8283, path <code>/mcp/gatekeeper</code>) for tool/application-level authorization policy.</li>' +
         '<li>Configure the <b>OAuth module</b> against an OAuth2/OIDC provider (can reuse your SAML/LDAP IdP if OIDC-capable) so MCP clients authenticate as the requesting user.</li>' +
         '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> (no wildcards).</li>' +
-        '<li>Sizing: ~2 vCPU / 4 GB RAM per MCP service (already added to Section 1).</li>' +
+        '<li>Sizing: ~2 vCPU / 4 GB RAM total for Imaging MCP + Gatekeeper MCP combined (already added to Section 1) — not independently confirmed per-service; split it out yourself if you need per-container limits.</li>' +
         '</ul>';
     }
 
@@ -1278,7 +1278,7 @@
     coreNode.push('CAST Imaging license key obtained, covering the selected modules');
     if(a.auth === 'saml') coreNode.push('SAML metadata exchanged and CAST Imaging registered as a Service Provider at the IdP');
     if(a.auth === 'ldap') coreNode.push('LDAP bind account, base DN(s), and group mapping confirmed');
-    if(a.mcp) coreNode.push('MCP Server + Gatekeeper + OAuth module deployed; LLM provider FQDN allowlisted');
+    if(a.mcp) coreNode.push('Imaging MCP + Gatekeeper MCP + OAuth module deployed; LLM provider FQDN allowlisted');
     if(a.highlight) coreNode.push('CAST Highlight FQDNs allowlisted (cloud/auth/binaries)');
     if(a.email) coreNode.push('SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)');
     if(a.platform === 'kubernetes') coreNode.push('Cluster namespace, RBAC, StorageClass, and Ingress/TLS secret prepared');
