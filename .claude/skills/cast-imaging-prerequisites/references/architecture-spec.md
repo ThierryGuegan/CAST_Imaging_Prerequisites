@@ -146,8 +146,8 @@ be a search-and-fix pass, not a rename in isolation.
     deliberately placed last, after every other questionnaire section, since it's a client-side-only
     add-on rather than a deployment-architecture decision like Sections 1-9. Standard deployments
     only need CAST Report Generator on the end-user workstation; an audit engagement additionally
-    needs the `AUDIT_WORKSTATION_TOOLS` list (VS Code, Notepad++, Word/Excel/PowerPoint, DBeaver,
-    Python) — user-supplied desktop tooling for analysts, labeled as given rather than
+    needs the `AUDIT_WORKSTATION_TOOLS` list (VS Code, Notepad++, KDiff3, Word/Excel/PowerPoint,
+    DBeaver, Python) — user-supplied desktop tooling for analysts, labeled as given rather than
     CAST-confirmed since `doc.castsoftware.com` has no opinion on it.
 
     CAST Report Generator itself, unlike the audit-tooling list, *is* CAST-published (confirmed via
@@ -443,11 +443,11 @@ own.
    was selected.
 6. **CAST Extend access & licensing** (`extendHtml`) — outbound access to CAST's extension/update
    service (direct or via the air-gapped Local Update Server), generating an **API key from the
-   CAST Extend website**, obtaining a **CAST Imaging license file** that covers the selected
-   optional modules, and storing both outside plain configuration files. This section's content
-   doesn't map onto any single questionnaire answer the way the others do, which makes it the
-   easiest of the six to forget entirely when building bottom-up from the state model — write it
-   deliberately, don't expect it to fall out of the `has*(a)` predicates.
+   CAST Extend website**, and obtaining a **CAST Imaging license key** (a key, not a file) that
+   covers the selected optional modules. This section's content doesn't map onto any single
+   questionnaire answer the way the others do, which makes it the easiest of the six to forget
+   entirely when building bottom-up from the state model — write it deliberately, don't expect it
+   to fall out of the `has*(a)` predicates.
 
 After these six, truly optional sections (MCP when `a.mcp` is set — CAST Highlight and email
 notifications are *not* separate sections; they add conditional rows to the ports matrix and stay
