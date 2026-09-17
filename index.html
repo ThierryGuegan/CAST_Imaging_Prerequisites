@@ -236,7 +236,7 @@
           <label class="opt"><input type="radio" name="scale" value="standard">
             <span class="opt-text"><b>150–500 applications</b></span></label>
           <label class="opt"><input type="radio" name="scale" value="enterprise">
-            <span class="opt-text"><b>500+ applications — HA required</b></span></label>
+            <span class="opt-text"><b>500+ applications</b></span></label>
         </div>
         <p class="hint">These bands are this tool's own planning heuristic, not an official CAST-published tier list — but the sizing figures they drive (Section 1) are anchored to CAST's own documented example where one exists (up to 50 applications with 5 parallel analyses).</p>
       </div>
@@ -244,13 +244,13 @@
         <label class="qlabel">How many concurrent end users will consult CAST Imaging?</label>
         <div class="opt-row">
           <label class="opt"><input type="radio" name="users" value="tiny">
-            <span class="opt-text"><b>&lt; 10 users</b><span>Small pilot audience</span></span></label>
+            <span class="opt-text"><b>&lt; 10 users</b></span></label>
           <label class="opt"><input type="radio" name="users" value="small" checked>
-            <span class="opt-text"><b>10–50 users</b><span>Typical single-team adoption</span></span></label>
+            <span class="opt-text"><b>10–50 users</b></span></label>
           <label class="opt"><input type="radio" name="users" value="medium">
-            <span class="opt-text"><b>50–200 users</b><span>Multi-team adoption</span></span></label>
+            <span class="opt-text"><b>50–200 users</b></span></label>
           <label class="opt"><input type="radio" name="users" value="large">
-            <span class="opt-text"><b>200+ users</b><span>Org-wide adoption</span></span></label>
+            <span class="opt-text"><b>200+ users</b></span></label>
         </div>
         <p class="hint">Only affects sizing when your scenario includes the Viewer or Dashboards (see the note in Section 1's sizing) — headless/API-only scenarios aren't affected by concurrent browser traffic.</p>
       </div>
@@ -421,10 +421,10 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-16';
+  var TOOL_VERSION = '2026-09-17';
 
   var LABELS = {
-    scale:{poc:'POC / Evaluation', small:'Small Team', standard:'Standard Production', enterprise:'Enterprise / HA'},
+    scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
     users:{tiny:'< 10 users', small:'10–50 users', medium:'50–200 users', large:'200+ users'},
     platform:{docker:'Docker', podman:'Podman', kubernetes:'Kubernetes', windows:'Windows Server'},
     scenario:{full:'Full (analysis + Viewer + Dashboards)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
@@ -1014,9 +1014,8 @@
       machineSummaryHtml = '<div class="callout info"><b>Minimum footprint: '+totalMachines+' machine'+(totalMachines===1?'':'s')+'</b> — '+serverMachineCount+' '+machineWordSizing+(serverMachineCount===1?'':'s')+' (see Section 1\'s Server components table'+(a.egress==='airgapped' ? '; the Extend Local Server is co-located there, not a separate machine' : '')+') + '+workstationDesc+' (see Workstation components table)'+'.</div>';
     }
 
-    var scaleRangeText = {poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'}[a.scale];
     var usersRangeText = {tiny:'< 10 concurrent users', small:'10–50 concurrent users', medium:'50–200 concurrent users', large:'200+ concurrent users'}[a.users];
-    var scaleProfileHtml = '<div class="callout info"><b>Project scale profile:</b> '+scaleRangeText+', '+usersRangeText+' — drives the sizing baseline below (<b>'+esc(LABELS.scale[a.scale])+'</b> tier).</div>';
+    var scaleProfileHtml = '<div class="callout info"><b>Project scale profile:</b> '+esc(LABELS.scale[a.scale])+', '+usersRangeText+' — drives the sizing baseline below.</div>';
 
     var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
       scaleProfileHtml +
@@ -1040,10 +1039,6 @@
 
     if(a.topology === 'multi' && hasAnalysis(a) && (a.analysisNodes === '2-3' || a.analysisNodes === '4+')){
       sizingHtml += '<div class="callout info">Each analysis-node '+(isK8s?'pod':'machine')+' registers itself against the same imaging-services instance, letting analyses run in parallel across multiple applications. This is CAST Imaging\'s horizontal scaling mechanism for analysis workload — it does not scale imaging-services, imaging-viewer, dashboards, or PostgreSQL themselves.</div>';
-    }
-
-    if(a.scale !== 'poc'){
-      sizingHtml += '<div class="callout info">Anchored to CAST\'s own documented example: managing up to <b>50 applications with up to 5 parallel analyses</b> on one node needs <b>32 GB RAM / 2 TB disk</b> for that node and <b>64 GB RAM / 3 TB disk</b> for its PostgreSQL instance. The figures above meet or exceed this at your selected scale — figures beyond that anchor (standard/enterprise) are a conservative extrapolation, not a CAST-published formula; CAST states app-count-to-sizing isn\'t linear.</div>';
     }
 
     if(a.scale === 'standard' || a.scale === 'enterprise'){

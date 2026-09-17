@@ -104,11 +104,15 @@ be a search-and-fix pass, not a rename in isolation.
 2. **Project scale** — application count band (drives sizing baseline) and concurrent-user band
    (drives a RAM/CPU bonus on the UI-serving node, only when the scenario actually has a UI). Both
    are `opt-row` radio groups (like Platform/Topology), not `<select>`s — read via
-   `document.querySelector('input[name=scale]:checked')` in `state()`. `render()` builds a
-   `scaleProfileHtml` callout at the top of the sizing section spelling out the actual app-count and
-   concurrent-user ranges together (not just the short band label already shown in the profile
-   chips), and is explicit that the bands are this tool's own heuristic while the numbers they drive
-   are anchored to CAST's documented example where one exists (see the Sizing model section below).
+   `document.querySelector('input[name=scale]:checked')` in `state()`. The radio options show only
+   the bare range (e.g. "50–150 applications") — no category name (Small Team/Standard Production/
+   etc.) or descriptive tagline; `LABELS.scale` holds the same bare range strings so the profile chip
+   ("scale: 50–150 applications") stays consistent with the selector instead of surfacing an internal
+   tier name nothing else in the UI shows. `render()` builds a `scaleProfileHtml` callout at the top
+   of the sizing section combining the app-count and concurrent-user ranges into one line — see the
+   Sizing model section below for how the underlying numbers are derived (the explanatory callout
+   that used to cite CAST's documented anchor point here was removed per user request; the anchoring
+   still lives only in `SIZING`'s actual values and in the reference docs, not in the tool's own UI).
 3. **Database** — RDBMS is a fixed fact (PostgreSQL only — CAST doesn't support alternatives, so
    don't build this as a choice), plus a hosting model choice (co-located / dedicated / managed).
 4. **Network egress** — direct outbound / via proxy / air-gapped. This alone reshapes several rows
@@ -228,9 +232,12 @@ managing up to 50 applications with up to 5 parallel analyses on one node needs 
 disk for that node, and 64 GB RAM / 3072 GB disk for its PostgreSQL instance. The `small` tier (whose
 app-count band spans 50) uses this anchor directly; `standard`/`enterprise` are simple, explicitly-
 labeled multiples of it (2x/4x) rather than a researched figure, because CAST states there is no
-linear formula relating app count to sizing — don't tighten those without new primary evidence, and
-keep the `sizingHtml` callout that cites the anchor and calls out the extrapolation as such whenever
-you touch this again. Before this fix, `postgresDedicated`/`postgresManaged` were flat numbers
+linear formula relating app count to sizing — don't tighten those without new primary evidence. The
+tool used to show a `sizingHtml` callout citing this anchor and calling out the extrapolation
+explicitly; it was removed from the UI per user request (2026-09-17), so this reasoning now lives
+only here and in `documentation-map.md` — don't silently drift `standard`/`enterprise` away from
+"2x/4x of the small-tier anchor" just because the UI no longer states the rule out loud. Before this
+fix, `postgresDedicated`/`postgresManaged` were flat numbers
 (512 GB / 1024 GB) applied at every scale — below the anchor's 3072 GB even at `enterprise`, a
 self-contradiction against the tool's own cited source that an audit caught.
 
