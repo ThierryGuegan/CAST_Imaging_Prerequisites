@@ -942,12 +942,24 @@
       'Your scenario ('+LABELS.scenario[a.scenario]+') excludes analysis — these options won\'t add any firewall rows, since there\'s no analysis-node to check out source code.';
 
     // profile chips
-    var chips = ['scale','users','platform','scenario','topology','egress','auth'].map(function(k){
-      return '<span class="chip">'+k+': <b>'+esc(k === 'topology' ? topologyLabel(a) : LABELS[k][a[k]])+'</b></span>';
-    }).join('');
+    // One chip per questionnaire answer that shapes the output, in form order, so the profile
+    // (also carried into the HTML checklist export) fully identifies the configuration.
+    function chip(label, value){ return '<span class="chip">'+esc(label)+': <b>'+esc(value)+'</b></span>'; }
+    var chips = chip('scale', LABELS.scale[a.scale]) + chip('users', LABELS.users[a.users]) +
+      chip('platform', LABELS.platform[a.platform]) + chip('scenario', LABELS.scenario[a.scenario]) +
+      chip('topology', topologyLabel(a));
+    if(a.topology === 'multi' && hasAnalysis(a)) chips += chip('analysis nodes', a.analysisNodes.replace('-', '–'));
+    if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) chips += chip('Neo4j', 'dedicated');
+    chips += chip('database', LABELS.dbHosting[a.dbHosting]) + chip('egress', LABELS.egress[a.egress]) +
+      chip('reverse proxy', LABELS.reverseProxy[a.reverseProxy]) + chip('HTTPS', LABELS.certSource[a.certSource]) +
+      chip('auth', LABELS.auth[a.auth]);
     if(a.mcp) chips += '<span class="chip">MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
     if(a.highlight) chips += '<span class="chip">Highlight: <b>enabled</b></span>';
     if(a.email) chips += '<span class="chip">Email notifications: <b>enabled</b></span>';
+    if(hasAnalysis(a) && (a.repoHttps || a.repoSmb)){
+      chips += chip('source code access', [a.repoHttps ? 'Git/SVN/DevOps over HTTPS' : '', a.repoSmb ? 'SMB file shares' : ''].filter(Boolean).join(' + '));
+    }
+    chips += chip('deployment context', LABELS.auditContext[a.auditContext]);
     document.getElementById('profile-chips').innerHTML = chips;
 
     var sizeSpec = SIZING[a.scale];
@@ -1406,6 +1418,20 @@
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
   }
   document.getElementById('export-html').addEventListener('click', exportHtml);
+
+  // Reverse-proxy default follows the platform (Ingress on Kubernetes, external proxy elsewhere)
+  // until the user picks a value themselves; after that their choice is left alone.
+  var reverseProxyTouched = false;
+  document.getElementById('reverseProxy').addEventListener('change', function(){ reverseProxyTouched = true; });
+  function syncReverseProxyDefault(){
+    if(reverseProxyTouched) return;
+    var platform = document.querySelector('input[name=platform]:checked').value;
+    document.getElementById('reverseProxy').value = platform === 'kubernetes' ? 'ingress' : 'nginx';
+  }
+  document.querySelectorAll('input[name=platform]').forEach(function(radio){
+    radio.addEventListener('change', syncReverseProxyDefault);
+  });
+  syncReverseProxyDefault();
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
