@@ -87,18 +87,19 @@ be a search-and-fix pass, not a rename in isolation.
    scenario includes analysis; a Neo4j-dedicated-machine checkbox when topology is multi and the
    scenario includes the Viewer).
 
-   The scenario `<select>` has exactly these four `value`s — don't infer a different set from the
-   predicates alone; the predicates are derived from these four, not the other way around:
+   The scenario `<select>` has exactly these five `value`s — don't infer a different set from the
+   predicates alone; the predicates are derived from these five, not the other way around:
 
    | `value` | Meaning | Components | `hasAnalysis` | `hasViewer` | `hasDashboards` |
    |---|---|---|---|---|---|
    | `full` | Everything | imaging-services, analysis-node, imaging-viewer, dashboards | ✓ | ✓ | ✓ |
+   | `analysis-dashboards` | Analysis + KPIs, no graph drill-down | imaging-services, analysis-node, dashboards (no Viewer, no Neo4j) | ✓ | | ✓ |
    | `viewer-readonly` | Browse existing results only | imaging-services, imaging-viewer, dashboards (no analysis-node) | | ✓ | ✓ |
    | `dashboards-only` | KPIs only, no graph drill-down | imaging-services, dashboards (no Viewer, no analysis-node) | | | ✓ |
    | `analysis-only` | Headless, API/CI-driven | imaging-services, analysis-node (no UI at all) | ✓ | | |
 
    `hasNeo4j(a)` is just `hasViewer(a)` (Neo4j only exists to serve the Viewer, so don't give it
-   an independent definition). If you ever add a fifth scenario, add its row to this table first,
+   an independent definition). If you ever add another scenario, add its row to this table first,
    then work out which predicates it should satisfy — don't reverse-engineer a scenario from
    predicate behavior you want.
 2. **Project scale** — application count band (drives sizing baseline) and concurrent-user band
@@ -189,7 +190,7 @@ Don't scatter `a.scenario === 'full' || a.scenario === 'analysis-only'` inline t
 name the concept once as a function and call it everywhere:
 
 ```js
-function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-only'; }
+function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-dashboards' || a.scenario === 'analysis-only'; }
 function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
 function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
 function hasNeo4j(a){ return hasViewer(a); }

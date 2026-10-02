@@ -193,6 +193,7 @@
         <label class="qlabel">Deployment scenario — which components do you need?</label>
         <select id="scenario">
           <option value="full" selected>Full: analysis + Viewer + Dashboards (imaging-services, analysis-node, imaging-viewer, dashboards)</option>
+          <option value="analysis-dashboards">Analysis + Dashboards — no Viewer (imaging-services, analysis-node, dashboards; KPIs only, no graph drill-down, no Neo4j)</option>
           <option value="viewer-readonly">Viewer + Dashboards, read-only — no local analysis (imaging-services, imaging-viewer, dashboards; no analysis-node)</option>
           <option value="dashboards-only">Dashboards only, read-only — no Viewer, no local analysis (imaging-services, dashboards; KPIs only, no graph drill-down)</option>
           <option value="analysis-only">Analysis only, headless — no Viewer/Dashboards UI (imaging-services, analysis-node; consumed via Imaging APIs / CI)</option>
@@ -388,12 +389,13 @@
   <main class="results-pane">
     <h2 class="page-title">Your CAST Imaging Deployment Requirements</h2>
     <p class="page-sub" id="generated-date"></p>
-    <p class="page-sub">Generated live from the answers on the left. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.</p>
+    <p class="page-sub" id="generated-live-note">Generated live from the answers on the left. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.</p>
 
     <div class="profile-chips" id="profile-chips"></div>
 
     <div class="toolbar no-print">
       <button class="btn btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
+      <button class="btn btn-print" id="export-html" type="button">⬇ Export as HTML</button>
     </div>
 
     <div class="callout warn no-print">
@@ -421,13 +423,13 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-17';
+  var TOOL_VERSION = '2026-10-02';
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
     users:{tiny:'< 10 users', small:'10–50 users', medium:'50–200 users', large:'200+ users'},
     platform:{docker:'Docker', podman:'Podman', kubernetes:'Kubernetes', windows:'Windows Server'},
-    scenario:{full:'Full (analysis + Viewer + Dashboards)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
+    scenario:{full:'Full (analysis + Viewer + Dashboards)', 'analysis-dashboards':'Analysis + Dashboards (no Viewer)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
     topology:{single:'Single machine', multi:'Multi-machine'},
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
     egress:{direct:'Direct outbound', proxy:'Via proxy', airgapped:'Air-gapped'},
@@ -510,7 +512,7 @@
   // Extra vCPU/RAM folded into the Viewer/Dashboards-serving node for concurrent browser sessions.
   var USER_BONUS = {tiny:{cpu:0, ram:0}, small:{cpu:0, ram:0}, medium:{cpu:2, ram:8}, large:{cpu:4, ram:16}};
 
-  function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-only'; }
+  function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-dashboards' || a.scenario === 'analysis-only'; }
   function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
   function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
   function hasNeo4j(a){ return hasViewer(a); }
@@ -1278,8 +1280,8 @@
     if(a.email) coreNode.push('SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)');
     if(a.platform === 'kubernetes') coreNode.push('Cluster namespace, RBAC, StorageClass, and Ingress/TLS secret prepared');
     var coreNodeTitle = a.topology === 'single'
-      ? (isK8s ? 'Single node pool' : 'Single host') + ' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+')'
-      : (isK8s?'Core pods':'Core node')+' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+')';
+      ? (isK8s ? 'Single node pool' : 'Single host') + ' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+(hasDashboards(a)?' + dashboards':'')+')'
+      : (isK8s?'Core pods':'Core node')+' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+(hasDashboards(a)?' + dashboards':'')+')';
     groups.push({title:coreNodeTitle, key:'core-node', items:coreNode});
 
     if(a.topology === 'multi' && hasAnalysis(a)){
@@ -1361,6 +1363,37 @@
     updateThemeToggleLabel();
   });
   updateThemeToggleLabel();
+
+  // Standalone HTML export: a self-contained copy of the results pane (same stylesheet, current
+  // theme, current checkbox states) that opens in any browser without this tool.
+  function exportHtml(){
+    var pane = document.querySelector('main.results-pane').cloneNode(true);
+    pane.querySelectorAll('.toolbar').forEach(function(el){ el.remove(); });
+    var liveNote = pane.querySelector('#generated-live-note');
+    if(liveNote) liveNote.innerHTML = 'Exported from the CAST Imaging Requirements Builder. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.';
+    var srcBoxes = document.querySelectorAll('main.results-pane input[type=checkbox]');
+    pane.querySelectorAll('input[type=checkbox]').forEach(function(box, i){
+      if(srcBoxes[i] && srcBoxes[i].checked) box.setAttribute('checked', ''); else box.removeAttribute('checked');
+    });
+    var css = Array.prototype.map.call(document.querySelectorAll('head style'), function(st){ return st.textContent; }).join('\n') +
+      '\n.results-pane{height:auto;overflow:visible;max-width:1200px;margin:0 auto;}\n';
+    var theme = document.documentElement.getAttribute('data-theme');
+    var doc = '<!DOCTYPE html>\n<html lang="en"' + (theme ? ' data-theme="' + theme + '"' : '') + '>\n<head>\n<meta charset="UTF-8">\n' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
+      '<title>CAST Imaging — Deployment Requirements</title>\n<style>' + css + '</style>\n</head>\n<body>\n' +
+      pane.outerHTML + '\n</body>\n</html>\n';
+    var blob = new Blob([doc], {type:'text/html;charset=utf-8'});
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    var d = new Date();
+    link.href = url;
+    link.download = 'cast-imaging-requirements-' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.html';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+  document.getElementById('export-html').addEventListener('click', exportHtml);
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
