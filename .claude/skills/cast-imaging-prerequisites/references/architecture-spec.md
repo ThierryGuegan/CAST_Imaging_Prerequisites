@@ -194,7 +194,14 @@ function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysi
 function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
 function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
 function hasNeo4j(a){ return hasViewer(a); }
+function hasUiScenario(a){ return hasViewer(a) || hasDashboards(a); }
+// multi topology only distributes anything when there's an analysis-node or a dedicated Neo4j to move
+function hasDistributedNodes(a){ return a.topology === 'multi' && (hasAnalysis(a) || (hasNeo4j(a) && a.neo4jDedicated)); }
 ```
+
+Gate multi-server-only requirements (shared storage, inter-node paths, UID/service-account
+alignment) on `hasDistributedNodes(a)`, not on `a.topology === 'multi'` — a multi topology with a
+scenario that has nothing to move off the core node still yields one CAST server.
 
 Every row or sizing entry that depends on "does this deployment have a UI at all", "does it run
 analysis", etc. must call the predicate, not re-derive the condition. The single worst bug class
@@ -508,16 +515,15 @@ The pre-installation checklist is grouped by **machine/role**, not by topic — 
 of `{title, key, items}` (e.g. "Core node (imaging-services...)", "Analysis-node machine(s)",
 "Reverse proxy", "End-user workstation"), each pushed conditionally on the same `has*(a)` /
 `a.topology` gates as everything else, so a group for a machine that doesn't exist in this
-configuration simply isn't pushed. Each item renders as a real
-`<input type="checkbox" data-check-key="{group.key}:{index}">`, not a decorative `:before` glyph —
-checked state is persisted to `localStorage` under `checklistStorageKey(key)` via a single
-delegated `change` listener registered once on `#results-content` (outside `render()`, so it
-survives every re-render), and restored by `restoreChecklistState()` called at the end of
-`render()`. If you add a new checklist group or reorder items within one, remember the storage key
-is `group.key + ':' + index` — inserting an item in the middle of an existing group's `items` array
-shifts every later item's persisted key, silently "forgetting" what the user had already checked.
-Append new items to the end of a group's array, or give the item its own stable key, rather than
-inserting in the middle.
+configuration simply isn't pushed. Each item is built with `item(id, html)` and renders as a real
+`<input type="checkbox" data-check-key="{id}">`, not a decorative `:before` glyph — checked state
+is persisted to `localStorage` under `checklistStorageKey(id)` via a single delegated `change`
+listener registered once on `#results-content` (outside `render()`, so it survives every
+re-render), and restored by `restoreChecklistState()` called at the end of `render()`. The id is a
+short, globally unique, stable slug (`curl`, `server-sizing`, `rp-tls`…), never a position: an
+earlier `group.key + ':' + index` scheme made ticks jump to a different item whenever answers
+added, removed or moved items between groups (e.g. single↔multi, Docker→Windows, enabling SAML).
+New items need a new unique id; never reuse an id for a different item.
 
 ## Content freshness marker
 
