@@ -38,7 +38,10 @@ asking the user to paste the page content directly.
 - **MCP Server** can be co-located with other CAST Imaging components or put on a dedicated machine (`mcp-server/docker/`).
 - **JDK 17–21 64-bit with JAVA_HOME** is mandatory on Windows servers (password encryption), optional on Linux (`install/requirements/precheck/`).
 - **Reverse proxy upstream is Gateway :8090** (Nginx `proxy_pass` to 8090 in `install/https-ssl/docker`) — never advise disabling 8090.
-- **CAST's own scenarios are S1 All, S2 Viewer only (no dashboards), S3 Viewer + Analysis, S4 Dashboards only, S5 Dashboards + Analysis** — the tool's scenario list differs (see open questions put to the user); don't change it without the user.
+- **Source code delivery (user decision, 2026-10-02)**: CAST Imaging v3 takes source as a ZIP upload or from a source folder location every analysis-node can read (`imaging/onboard/register-deliver-source-code/`, `administer/global-configuration/source-folder-location/`). The Git/SVN option is requalified as clones made by the customer's own tooling onto that folder (443 from *their* host, conditional) — CAST doesn't pull from repositories.
+- **Delivery/analyst workstation has no JDK requirement** (user decision, 2026-10-02) — JDK is a Windows-server requirement only.
+- **PostgreSQL sizing (user decision, 2026-10-02)**: standard/enterprise PostgreSQL disk is exactly 2x/4x the 3072 GB anchor (6144/12288 GB); a co-located PostgreSQL adds its postgresDedicated figures to the row hosting it.
+- **CAST's own scenarios are S1 All, S2 Viewer only (no dashboards), S3 Viewer + Analysis, S4 Dashboards only, S5 Dashboards + Analysis** — the tool's scenario list differs, and the user decided (2026-10-02) **not** to align it on S1–S5 — don't re-flag.
 
 ## Already-cited pages
 
