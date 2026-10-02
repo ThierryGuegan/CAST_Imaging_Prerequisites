@@ -193,6 +193,7 @@
         <label class="qlabel">Deployment scenario — which components do you need?</label>
         <select id="scenario">
           <option value="full" selected>Full: analysis + Viewer + Dashboards (imaging-services, analysis-node, imaging-viewer, dashboards)</option>
+          <option value="analysis-dashboards">Analysis + Dashboards — no Viewer (imaging-services, analysis-node, dashboards; KPIs only, no graph drill-down, no Neo4j)</option>
           <option value="viewer-readonly">Viewer + Dashboards, read-only — no local analysis (imaging-services, imaging-viewer, dashboards; no analysis-node)</option>
           <option value="dashboards-only">Dashboards only, read-only — no Viewer, no local analysis (imaging-services, dashboards; KPIs only, no graph drill-down)</option>
           <option value="analysis-only">Analysis only, headless — no Viewer/Dashboards UI (imaging-services, analysis-node; consumed via Imaging APIs / CI)</option>
@@ -421,13 +422,13 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-09-17';
+  var TOOL_VERSION = '2026-10-02';
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
     users:{tiny:'< 10 users', small:'10–50 users', medium:'50–200 users', large:'200+ users'},
     platform:{docker:'Docker', podman:'Podman', kubernetes:'Kubernetes', windows:'Windows Server'},
-    scenario:{full:'Full (analysis + Viewer + Dashboards)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
+    scenario:{full:'Full (analysis + Viewer + Dashboards)', 'analysis-dashboards':'Analysis + Dashboards (no Viewer)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
     topology:{single:'Single machine', multi:'Multi-machine'},
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
     egress:{direct:'Direct outbound', proxy:'Via proxy', airgapped:'Air-gapped'},
@@ -510,7 +511,7 @@
   // Extra vCPU/RAM folded into the Viewer/Dashboards-serving node for concurrent browser sessions.
   var USER_BONUS = {tiny:{cpu:0, ram:0}, small:{cpu:0, ram:0}, medium:{cpu:2, ram:8}, large:{cpu:4, ram:16}};
 
-  function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-only'; }
+  function hasAnalysis(a){ return a.scenario === 'full' || a.scenario === 'analysis-dashboards' || a.scenario === 'analysis-only'; }
   function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
   function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
   function hasNeo4j(a){ return hasViewer(a); }
@@ -1278,8 +1279,8 @@
     if(a.email) coreNode.push('SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)');
     if(a.platform === 'kubernetes') coreNode.push('Cluster namespace, RBAC, StorageClass, and Ingress/TLS secret prepared');
     var coreNodeTitle = a.topology === 'single'
-      ? (isK8s ? 'Single node pool' : 'Single host') + ' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+')'
-      : (isK8s?'Core pods':'Core node')+' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+')';
+      ? (isK8s ? 'Single node pool' : 'Single host') + ' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+(hasDashboards(a)?' + dashboards':'')+')'
+      : (isK8s?'Core pods':'Core node')+' (imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+(hasDashboards(a)?' + dashboards':'')+')';
     groups.push({title:coreNodeTitle, key:'core-node', items:coreNode});
 
     if(a.topology === 'multi' && hasAnalysis(a)){
