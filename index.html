@@ -1329,7 +1329,7 @@
     var optionalHtml = optionalSections.map(function(h){ return h.replace('{N}', String(nextNum++)); }).join('');
     var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist for your profile</h3>' +
       machineSummaryHtml +
-      '<p>Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers. Checked boxes are remembered in your browser as you tweak answers or reload the page.</p>' +
+      '<p>Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers. <span class="checklist-persist-note">Checked boxes are remembered in your browser as you tweak answers or reload the page.</span></p>' +
       checklistGroupsHtml;
 
     document.getElementById('results-content').innerHTML =
@@ -1371,6 +1371,9 @@
     pane.querySelectorAll('.toolbar').forEach(function(el){ el.remove(); });
     var liveNote = pane.querySelector('#generated-live-note');
     if(liveNote) liveNote.innerHTML = 'Exported from the CAST Imaging Requirements Builder. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.';
+    pane.querySelectorAll('.checklist-persist-note').forEach(function(el){
+      el.textContent = 'Boxes ticked at export time are shown checked; ticks made in this file are not saved — re-export from the tool to keep them.';
+    });
     var srcBoxes = document.querySelectorAll('main.results-pane input[type=checkbox]');
     pane.querySelectorAll('input[type=checkbox]').forEach(function(box, i){
       if(srcBoxes[i] && srcBoxes[i].checked) box.setAttribute('checked', ''); else box.removeAttribute('checked');
