@@ -13,9 +13,14 @@
     --m-analysis:#b79bfb; --m-analysis-fill:rgba(183,155,251,.16);
     --m-neo4j:#f479bd; --m-neo4j-fill:rgba(244,121,189,.16);
     --m-db:#ffa85c; --m-db-fill:rgba(255,168,92,.16);
-    --heading:#fff; --body-text:#cfd8e2;
+    --heading:#fff; --body-text:#cfd8e2; --on-accent:#04101c;
   }
+  :root[data-theme="light"] .tag.mandatory{background:rgba(185,28,28,.12);color:#991b1b;}
+  :root[data-theme="light"] .tag.conditional{background:rgba(146,64,14,.12);color:#92400e;}
+  :root[data-theme="light"] .tag.optional{background:rgba(15,138,99,.12);color:#0f8a63;}
+  :root[data-theme="light"] .tag.recommended{background:rgba(29,78,216,.12);color:#1d4ed8;}
   :root[data-theme="light"]{
+    --on-accent:#ffffff;
     --bg:#ffffff; --panel:#f8fafc; --panel-alt:#eef2f6; --panel-2:#e2e8f0; --border:#c3ccd6;
     --text:#111827; --text-dim:#4b5563; --accent:#1d4ed8; --accent-2:#0f8a63;
     --warn:#92400e; --danger:#b91c1c; --code-bg:#eef2f6;
@@ -47,7 +52,7 @@
   fieldset{border:1px solid var(--border);border-radius:10px;padding:14px 16px 16px;margin:0 0 16px;background:var(--panel-alt);}
   legend{font-size:12.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;padding:0 6px;}
   .q{margin:12px 0;}
-  .q > label.qlabel{display:block;font-size:13px;color:var(--heading);margin-bottom:6px;font-weight:600;}
+  .q label.qlabel{display:block;font-size:13px;color:var(--heading);margin-bottom:6px;font-weight:600;}
   .opt-row{display:flex;flex-direction:column;gap:6px;}
   .opt{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:7px;border:1px solid transparent;cursor:pointer;}
   .opt:hover{background:rgba(255,255,255,.03);}
@@ -130,6 +135,7 @@
        falls back to var(--text) for box titles) to print-safe colors in one place. What's left
        below are the handful of rules that use a literal hex color instead of a variable. */
     :root{
+      --on-accent:#ffffff;
       --bg:#ffffff; --panel:#f8fafc; --panel-alt:#eef2f6; --panel-2:#e2e8f0; --border:#c3ccd6;
       --text:#111827; --text-dim:#4b5563; --accent:#1d4ed8; --accent-2:#0f8a63;
       --warn:#92400e; --danger:#b91c1c; --code-bg:#eef2f6;
@@ -148,6 +154,7 @@
     .results-pane{height:auto;overflow:visible;padding:0;}
     .toolbar{display:none !important;}
     table, .callout, fieldset, .arch-diagram-frame{break-inside:avoid;}
+    h3, h4{break-after:avoid;}
     .arch-diagram-frame{overflow-x:visible;}
     .arch-diagram-frame svg{min-width:0;}
   }
@@ -286,7 +293,7 @@
           <label class="opt"><input type="radio" name="egress" value="proxy">
             <span class="opt-text"><b>Via authenticated HTTP(S) proxy</b><span>All outbound traffic transits a corporate proxy</span></span></label>
           <label class="opt"><input type="radio" name="egress" value="airgapped">
-            <span class="opt-text"><b>Air-gapped / no internet egress</b><span>Requires a CAST Extend Local Update Server as the only outbound path</span></span></label>
+            <span class="opt-text"><b>Air-gapped / no internet egress</b><span>Requires a CAST Extend Local Update Server (online as the only outbound path, or offline with manual extension uploads)</span></span></label>
         </div>
       </div>
     </fieldset>
@@ -526,14 +533,20 @@
   // The HTTP(S) port clients use to reach the reverse proxy, following the HTTPS answer.
   function clientPort(a){ return a.certSource === 'none' ? '80 (or your proxy\'s HTTP port)' : '443'; }
   function clientProto(a){ return a.certSource === 'none' ? 'HTTP' : 'HTTPS'; }
+  // Shared storage across servers: always with distributed VMs; on Kubernetes CAST defaults to
+  // per-node block storage and only needs shared-access (RWX) volumes for multiple analysis-node pods.
+  function needsSharedStorage(a){
+    if(a.platform === 'kubernetes') return a.topology === 'multi' && hasAnalysis(a) && (ANALYSIS_NODE_COUNT[a.analysisNodes] || 1) > 1;
+    return hasDistributedNodes(a);
+  }
   function sharedStorageText(a){
     if(a.platform === 'windows') return {box:'deploy / delivery / common-data shares · SMB :445', checklist:'Shared deploy/delivery/common-data SMB shares reachable from every server machine under one consistent service account'};
-    if(a.platform === 'kubernetes') return {box:'shared-access (RWX) PersistentVolume / StorageClass', checklist:'Shared-access (ReadWriteMany) StorageClass available for the PersistentVolumes shared by the core and analysis-node pods (e.g. Azure Files on AKS)'};
+    if(a.platform === 'kubernetes') return {box:'shared-access (RWX) PersistentVolume / StorageClass', checklist:'Shared-access (ReadWriteMany) StorageClass available for the PersistentVolumes shared by your multiple analysis-node pods (e.g. Azure Files on AKS, instead of the default per-node Azure Disks)'};
     return {box:'default: /opt/cast/shared (configurable) · SMB :445', checklist:'Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared (default path — configurable) on every server machine before install'};
   }
   function topologyLabel(a){
     return a.platform === 'kubernetes'
-      ? (a.topology === 'multi' ? 'Multi-pod' : 'Single node pool')
+      ? (a.topology === 'multi' ? 'Isolated nodes' : 'Single node pool')
       : LABELS.topology[a.topology];
   }
 
@@ -573,6 +586,7 @@
     function layoutRow(items, w){
       w = w || 180;
       var gap = 16, n = items.length;
+      if(n) w = Math.min(w, (W - 40 - (n-1)*gap) / n);
       var total = n*w + (n-1)*gap;
       var startX = (W - total) / 2;
       return items.map(function(it, i){
@@ -612,9 +626,9 @@
     }
     if(hasViewer(a)) supportItems.push({key:'ai', label:'AI-service', sub:'ai-manager · :8082'});
     if(hasViewer(a)) supportItems.push({key:'viewerapi', label:'Viewer-APIs', sub:'imaging-apis · :8070'});
-    var supportRow = layoutRow(supportItems); var ySupport = y; y += boxH+gapY;
+    var supportRow = layoutRow(supportItems); var ySupport = y; if(supportItems.length) y += boxH+gapY;
 
-    var dataItems = [{key:'pg', label:'PostgreSQL', sub:'default :2285' + (a.dbHosting !== 'colocated' ? ' · '+(a.dbHosting==='managed' ? 'managed DBaaS' : 'own '+machineWord) : '')}];
+    var dataItems = [{key:'pg', label:'PostgreSQL', sub:'default :2285' + (a.dbHosting !== 'colocated' ? ' · '+(a.dbHosting==='managed' ? 'managed DBaaS' : (isK8sDiagram ? 'outside the cluster' : 'own '+machineWord)) : '')}];
     if(hasNeo4j(a)){
       dataItems.push({key:'etl', label:'ETL service', sub:':9001'});
       dataItems.push({key:'neo4j', label:'Neo4j', sub:'Bolt :7687 · :7474 · :6362' + (a.topology === 'multi' && a.neo4jDedicated ? ' · own '+machineWord : '')});
@@ -625,7 +639,7 @@
     if(a.egress === 'airgapped'){
       extendRow = layoutRow([
         {key:'extend', label:'Extend Local Server', sub:(a.platform === 'windows' ? 'CAST_ExtendProxy service' : 'extend-proxy')+' · :8085'},
-        {key:'extendtarget', label:'extend.castsoftware.com', sub:'outbound only · :443'}
+        {key:'extendtarget', label:'extend.castsoftware.com', sub:'online mode only · :443'}
       ], 220); yExtendRow = y; y += boxH+gapY;
     } else {
       extendRow = layoutRow([
@@ -634,7 +648,7 @@
     }
 
     var sharedRow = null, ySharedRow = null;
-    if(hasDistributedNodes(a)){
+    if(needsSharedStorage(a)){
       sharedRow = layoutRow([{key:'shared', label:'Shared storage', sub:sharedStorageText(a).box}], 460); ySharedRow = y; y += boxH;
     }
 
@@ -678,9 +692,9 @@
 
     var ssoBox = byKey(routedRow, 'sso'), adminBox = byKey(routedRow, 'admin');
     var testerHasUi = hasDashboards(a) || hasViewer(a);
+    svg += line(testerBox.cx, yBrowser+boxH, gatewayRow[0].cx+40, yGateway, TESTONLY, 'ah-test', true);
+    svg += label(testerBox.cx+10, (yBrowser+boxH+yGateway)/2, ':8090', TESTONLY);
     if(testerHasUi){
-      svg += line(testerBox.cx, yBrowser+boxH, gatewayRow[0].cx+40, yGateway, TESTONLY, 'ah-test', true);
-      svg += label(testerBox.cx+10, (yBrowser+boxH+yGateway)/2, ':8090', TESTONLY);
       svg += line(testerBox.cx, yBrowser+boxH, ssoBox.cx, yRouted, TESTONLY, 'ah-test', true);
       svg += label(testerBox.cx+40, (yBrowser+boxH+yRouted)/2+18, ':8096', TESTONLY);
     }
@@ -698,9 +712,21 @@
 
     var analysisBox = byKey(supportRow, 'analysis'), aiBox = byKey(supportRow, 'ai'), viewerApiBox = byKey(supportRow, 'viewerapi');
     var viewerBox = byKey(routedRow, 'viewer');
+    // Analysis-node links never cross a box: Gateway reaches it through a gap between routed boxes,
+    // and its outgoing links drop into the lane between rows, then run down a right-hand margin lane.
+    var laneR = W - 10;
+    function bottomLane(fromX, fromY, laneY, laneX, toY, toX, color, marker, dashed){
+      return '<path d="M'+fromX+','+fromY+' L'+fromX+','+laneY+' L'+laneX+','+laneY+' L'+laneX+','+toY+' L'+toX+','+toY+'" fill="none" stroke="'+color+'" stroke-width="1.5"'+(dashed?' stroke-dasharray="5 4"':'')+' marker-end="url(#'+marker+')"/>';
+    }
     if(analysisBox){
-      svg += line(gatewayRow[0].cx-30, yGateway+boxH, analysisBox.cx, ySupport, FLOW, 'ah-flow');
-      svg += label(analysisBox.cx+34, ySupport-8, ':8089', FLOW);
+      var gapX = analysisBox.cx, bestD = 1e9;
+      for(var gi = 0; gi < routedRow.length - 1; gi++){
+        var gx = (routedRow[gi].x + routedRow[gi].w + routedRow[gi+1].x) / 2;
+        if(Math.abs(gx - analysisBox.cx) < bestD){ bestD = Math.abs(gx - analysisBox.cx); gapX = gx; }
+      }
+      var gwX = gatewayRow[0].cx - 40, midY = yRouted - 12, preY = ySupport - 12;
+      svg += '<path d="M'+gwX+','+(yGateway+boxH)+' L'+gwX+','+midY+' L'+gapX+','+midY+' L'+gapX+','+preY+' L'+analysisBox.cx+','+preY+' L'+analysisBox.cx+','+ySupport+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
+      svg += label(analysisBox.cx+28, preY-4, ':8089', FLOW);
     }
     if(viewerBox && aiBox){
       svg += line(viewerBox.cx-20, yRouted+boxH, aiBox.cx-20, ySupport, FLOW, 'ah-flow');
@@ -735,22 +761,26 @@
       var extendBox = extendRow[0], extendTargetBox = extendRow[1];
       svg += box(extendBox, yExtendRow, {stroke:'var(--accent-2)'});
       svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
-      svg += line(extendBox.x+extendBox.w, yExtendRow+boxH/2, extendTargetBox.x, yExtendRow+boxH/2, FLOW, 'ah-flow');
+      svg += line(extendBox.x+extendBox.w, yExtendRow+boxH/2, extendTargetBox.x, yExtendRow+boxH/2, FLOW, 'ah-flow', true);
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-flow)"/>';
       svg += label(60, yExtendRow+boxH/2-8, coreWordDiagram+' :8085', FLOW);
       if(analysisBox){
-        svg += line(analysisBox.cx-20, ySupport+boxH, extendBox.cx+16, yExtendRow, FLOW, 'ah-flow');
-        svg += label(extendBox.cx+44, yExtendRow-6, ':8085', FLOW);
+        var dropX = extendBox.x+extendBox.w-30, aboveY = yExtendRow-14;
+        svg += '<path d="M'+(analysisBox.cx+20)+','+(ySupport+boxH)+' L'+(analysisBox.cx+20)+','+(ySupport+boxH+12)+' L'+(laneR-14)+','+(ySupport+boxH+12)+' L'+(laneR-14)+','+aboveY+' L'+dropX+','+aboveY+' L'+dropX+','+yExtendRow+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
+        svg += label(laneR-120, aboveY-5, 'analysis-node :8085', FLOW);
       }
-      extendNote = ' The Extend Local Server is reached internally on :8085 by the '+coreWordDiagram+(analysisBox ? ' and the analysis-node(s)' : '')+'; it is the only CAST Extend path to the internet (in online mode — it can also run offline, with extensions uploaded manually). Other exceptions you selected (Highlight, MCP/LLM, SAML/LDAP) are listed in Section 3.';
+      var egressExceptions = [];
+      if(a.highlight) egressExceptions.push('CAST Highlight');
+      if(a.auth === 'saml') egressExceptions.push('your SAML IdP, if it is outside your network');
+      extendNote = ' The Extend Local Server is reached internally on :8085 by the '+coreWordDiagram+(analysisBox ? ' and the analysis-node(s)' : '')+'; it is the only CAST Extend path to the internet (in online mode — it can also run offline, with extensions uploaded manually).'+(egressExceptions.length ? ' Other egress exceptions your answers need ('+egressExceptions.join(', ')+') are listed in Section 3.' : '');
     } else if(extendRow){
       var extendTargetBox = extendRow[0];
       svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendTargetBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
       svg += label(60, yExtendRow+boxH/2-8, coreWordDiagram+' :443', FLOW);
       if(analysisBox){
-        svg += line(analysisBox.cx-20, ySupport+boxH, extendTargetBox.cx, yExtendRow, FLOW, 'ah-flow');
-        svg += label(extendTargetBox.cx+30, yExtendRow-6, ':443', FLOW);
+        svg += bottomLane(analysisBox.cx+20, ySupport+boxH, ySupport+boxH+12, laneR-14, yExtendRow+boxH/2, extendTargetBox.x+extendTargetBox.w, FLOW, 'ah-flow');
+        svg += label(laneR-60, yExtendRow+boxH/2-8, 'analysis-node :443', FLOW);
       }
       extendNote = ' The '+coreWordDiagram+(analysisBox ? ' and the analysis-node(s) reach' : (isK8sDiagram ? ' reach' : ' reaches'))+' extend.castsoftware.com'+(a.egress==='proxy' ? ' via your configured proxy' : ' directly')+' — the CAST Extend path; image pulls and any other outbound flows you selected are listed in Section 3.';
     }
@@ -761,7 +791,7 @@
       var marginX = 20;
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L'+marginX+','+(yGateway+boxH/2)+' L'+marginX+','+(ySharedRow+boxH/2)+' L'+sharedRow[0].x+','+(ySharedRow+boxH/2)+'" fill="none" stroke="'+SHARED+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-shared)"/>';
       svg += label(marginX+52, (yGateway+boxH/2+ySharedRow+boxH/2)/2, coreWordDiagram, SHARED);
-      if(analysisBox) svg += line(analysisBox.cx+20, ySupport+boxH, sharedRow[0].cx-80, ySharedRow, SHARED, 'ah-shared', true);
+      if(analysisBox) svg += bottomLane(analysisBox.cx-20, ySupport+boxH, ySupport+boxH+22, laneR-28, ySharedRow+boxH/2, sharedRow[0].x+sharedRow[0].w, SHARED, 'ah-shared', true);
       if(neo4jBox && a.neo4jDedicated) svg += line(neo4jBox.cx, yData+boxH, sharedRow[0].cx+80, ySharedRow, SHARED, 'ah-shared', true);
       sharedNote = ' Every CAST Imaging '+machineWord+' uses this shared storage read/write (including the core '+(isK8sDiagram ? 'pods' : 'node')+') — only representative lines are drawn.';
     }
@@ -771,7 +801,7 @@
     if(hasDashboards(a)) svg += box(reportGenBox, yBrowser);
     svg += box(testerBox, yBrowser, {stroke:'var(--warn)', dash:true, labelColor:'var(--warn)'});
     svg += box(proxyRow[0], yProxy, {stroke:'var(--warn)', strokeWidth:1.6});
-    svg += box(gatewayRow[0], yGateway, {fill:'var(--accent)', stroke:'var(--accent)', labelColor:'#04101c', subColor:'#04101c'});
+    svg += box(gatewayRow[0], yGateway, {fill:'var(--accent)', stroke:'var(--accent)', labelColor:'var(--on-accent)', subColor:'var(--on-accent)'});
     routedRow.forEach(function(b){ svg += box(b, yRouted); });
     supportRow.forEach(function(b){
       var opts = (b.key === 'analysis' && a.topology === 'multi') ? machineBoxOpts(M_ANALYSIS, 'var(--m-analysis-fill)') : {};
@@ -791,11 +821,11 @@
       }).join('') +
       '</defs>';
 
-    var ariaLabel = (typeof counts.serverMachineCount === 'number' ? counts.serverMachineCount+' server '+machineWord+'(s) plus '+counts.workstationRoleCount+' workstation role(s) are required for this configuration; ' : '') + 'Diagram of the CAST Imaging components active for your current answers: the '+(hasUiScenario(a) ? 'browser' : 'API client')+' reaches Gateway on port 8090 only, through the mandatory reverse proxy' + (hasDashboards(a) ? '; the CAST Report Generator workstation reaches Gateway the same way, through the reverse proxy' : '') + '; Gateway internally path-routes to ' + routedItems.map(function(r){return r.label;}).join(', ') + '; ' + (analysisBox||aiBox||viewerApiBox ? 'supporting services (' + supportItems.map(function(r){return r.label;}).join(', ') + ') sit behind it; ' : '') + 'PostgreSQL' + (etlBox ? ' feeds Neo4j through an ETL service' : ' is the sole data store') + '.';
+    var ariaLabel = (typeof counts.serverMachineCount === 'number' ? counts.serverMachineCount+(isK8sDiagram ? ' pod resource request(s)' : ' server machine(s)')+' plus '+counts.workstationRoleCount+' workstation role(s) are required for this configuration; ' : '') + 'Diagram of the CAST Imaging components active for your current answers: the '+(hasUiScenario(a) ? 'browser' : 'API client')+' reaches Gateway on port 8090 only, through the mandatory reverse proxy' + (hasDashboards(a) ? '; the CAST Report Generator workstation reaches Gateway the same way, through the reverse proxy' : '') + '; Gateway internally path-routes to ' + routedItems.map(function(r){return r.label;}).join(', ') + '; ' + (analysisBox||aiBox||viewerApiBox ? 'supporting services (' + supportItems.map(function(r){return r.label;}).join(', ') + ') sit behind it; ' : '') + 'PostgreSQL' + (etlBox ? ' feeds Neo4j through an ETL service' : ' is the sole data store') + '.';
 
     return '<figure class="arch-diagram-frame">' +
       '<svg viewBox="0 0 '+W+' '+totalH+'" role="img" aria-label="'+esc(ariaLabel)+'">' + defs + '<g font-family="Segoe UI, Roboto, sans-serif">' + svg + '</g></svg>' +
-      '<figcaption>'+(typeof counts.serverMachineCount === 'number' ? '<b>'+counts.serverMachineCount+' server '+machineWord+'(s)</b> + <b>'+counts.workstationRoleCount+' workstation role(s)</b> (see sizing table above) — boxes labeled "own '+machineWord+'" run apart; everything else shares the core/all-in-one '+machineWord+'. ' : '')+'Gateway (:8090) is the only component reachable from outside CAST Imaging, and only through the reverse proxy. The amber paths from the tester/admin workstation are setup/testing-only bypasses to '+(testerHasUi?'Gateway, SSO Service, and ':'')+'Control Panel — close them before go-live.'+(hasDashboards(a) ? ' CAST Report Generator reaches Gateway the same way as the browser.' : '')+extendNote+sharedNote+'</figcaption>' +
+      '<figcaption>'+(typeof counts.serverMachineCount === 'number' ? '<b>'+counts.serverMachineCount+' '+(isK8sDiagram ? 'pod resource request(s)' : 'server machine(s)')+'</b> + <b>'+counts.workstationRoleCount+' workstation role(s)</b> (see sizing table above) — boxes labeled "own '+machineWord+'" run apart; everything else shares the '+(isK8sDiagram ? 'core pods' : 'core/all-in-one machine')+'. ' : '')+'Gateway (:8090) is the only component reachable from outside CAST Imaging, and only through the reverse proxy. The amber paths from the tester/admin workstation are setup/testing-only bypasses to '+(testerHasUi?'Gateway, SSO Service, and ':'')+'Control Panel — close them before go-live.'+(hasDashboards(a) ? ' CAST Report Generator reaches Gateway the same way as the browser.' : '')+extendNote+sharedNote+'</figcaption>' +
       '</figure>' +
       '<div class="arch-legend">' +
       '<span><i style="border-color:'+FLOW+'"></i>Direct internal call</span>' +
@@ -823,9 +853,9 @@
     if(isK8s){
       adminRows = [{src:'kubectl / CI pipelines', dst:'Kubernetes API server', port:'6443', proto:'TCP', purpose:'Cluster administration and CAST deployment/upgrade via Helm/manifests', tag:'mandatory'}];
     } else if(a.platform === 'windows'){
-      adminRows = [{src:'Administrator workstation', dst:'CAST Imaging host (Windows)', port:'3389', proto:'RDP', purpose:'Server administration', tag:'mandatory'}];
+      adminRows = [{src:'Administrator workstation', dst:(hasDistributedNodes(a) ? 'Every CAST Imaging machine (Windows)' : 'CAST Imaging host (Windows)'), port:'3389', proto:'RDP', purpose:'Server administration', tag:'mandatory'}];
     } else {
-      adminRows = [{src:'Administrator workstation', dst:'CAST Imaging host (Linux)', port:'22', proto:'SSH', purpose:'Server administration', tag:'mandatory'}];
+      adminRows = [{src:'Administrator workstation', dst:(hasDistributedNodes(a) ? 'Every CAST Imaging machine (Linux)' : 'CAST Imaging host (Linux)'), port:'22', proto:'SSH', purpose:'Server administration', tag:'mandatory'}];
     }
 
     // Rootless Podman can't bind <1024 — only relevant to the client-facing 80/443 listener, and only
@@ -838,21 +868,22 @@
       {src:'End-user browser', dst:proxyDst, port:cPort, proto:cProto, purpose:'Console / Viewer / Dashboards UI access — the mandatory reverse proxy is the only customer-facing endpoint; it forwards to Gateway, which path-routes internally to every other UI service', tag:'mandatory', note:(a.certSource === 'none' ? 'Plain HTTP per your HTTPS answer — HTTPS is recommended' : 'HTTPS per your certificate answer')+podmanPortNote}
     ] : [
       {src:'API client / CI pipeline', dst:proxyDst, port:cPort, proto:cProto, purpose:'This scenario has no Viewer/Dashboards UI — imaging-services is consumed programmatically via CAST\'s REST APIs (delivery, analysis triggering, results retrieval) through the same reverse proxy → Gateway entry point rather than through a browser', tag:'mandatory', note:'Headless scenario — no separate browser-facing UI ports are needed'+podmanPortNote},
-      {src:'API client / CI pipeline', dst:proxyDst, port:cPort, proto:cProto, purpose:'OAuth2 token issuance via Gateway\'s /oauth2 path — internally routed to Auth service (:8092), not a separately exposed port, per Gateway\'s single-entry-point model — for API authentication, since CAST\'s REST APIs may still require a token even without a human browser session', tag:'conditional', note:'Reasonable inference from CAST\'s architecture reference, not independently confirmed for headless API-only use — check your API authentication docs before excluding this'}
+      {src:'API client / CI pipeline', dst:proxyDst, port:cPort, proto:cProto, purpose:'OAuth2 token issuance via Gateway\'s /oauth2 path — internally routed to Auth service (:8092), not a separately exposed port, per Gateway\'s single-entry-point model — for API authentication, since CAST\'s REST APIs may still require a token even without a human browser session', tag:'conditional', note:'Reasonable inference from CAST\'s architecture reference, not independently confirmed for headless API-only use — check your API authentication docs before excluding this'+podmanPortNote}
     ]).concat([
       {src:proxyDst, dst:'Gateway', port:'8090', proto:'HTTP', purpose:'The reverse proxy\'s upstream — Gateway listens on 8090 (not 80) and is CAST Imaging\'s single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below)', tag:'mandatory', note:(a.reverseProxy === 'ingress' ? 'In-cluster Service traffic from the Ingress controller' : undefined)}
     ]).concat(adminRows).concat([
       {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? (isK8s && a.dbHosting !== 'managed' ? 'Outside the cluster — egress from the core pods to the database host must be allowed' : 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened') : undefined)}
     ]);
 
+    var k8sTestNote = isK8s ? ' — on Kubernetes these services are ClusterIP-only; reach them with kubectl port-forward (or a temporary NodePort), not a firewall rule' : '';
+    rows.push({src:'Tester / administrator workstation', dst:'Gateway', port:'8090', proto:'HTTP/HTTPS', purpose:'Validate Gateway directly, bypassing the reverse proxy, before it\'s fully configured (Section 4)', tag:'optional', note:'Setup/testing only — close once your reverse proxy is validated'+k8sTestNote});
     if(hasUi){
-      rows.push({src:'Tester / administrator workstation', dst:'Gateway', port:'8090', proto:'HTTP/HTTPS', purpose:'Validate Gateway directly, bypassing the reverse proxy, before it\'s fully configured (Section 4)', tag:'optional', note:'Setup/testing only — close once your reverse proxy is validated'});
-      rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Validate sign-in (Local/SAML/LDAP, Section 5) directly, bypassing Gateway\'s /auth routing', tag:'optional', note:'Setup/testing only — SSO Service is otherwise internal-only; close before go-live'});
+      rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Validate sign-in (Local/SAML/LDAP, Section 5) directly, bypassing Gateway\'s /auth routing', tag:'optional', note:'Setup/testing only — SSO Service is otherwise internal-only; close before go-live'+k8sTestNote});
     }
     if(hasDashboards(a)){
-      rows.push({src:'CAST Report Generator (client workstation)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Pulls data via CAST Dashboards\' RestAPI (/dashboards/rest), authenticated with an API key, not a browser session', tag:'conditional', note:'Only if you use CAST Report Generator — same entry point as the End-user browser row above'});
+      rows.push({src:'CAST Report Generator (client workstation)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Pulls data via CAST Dashboards\' RestAPI (/dashboards/rest), authenticated with an API key, not a browser session', tag:'conditional', note:'Only if you use CAST Report Generator — same entry point as the End-user browser row above'+podmanPortNote});
     }
-    rows.push({src:'Tester / administrator workstation', dst:'Control Panel (admin-center)', port:'8098–2381', proto:'HTTP/HTTPS', purpose:'Validate admin/configuration directly, bypassing Gateway\'s /admin routing', tag:'optional', note:'Setup/testing only — Control Panel is otherwise internal-only; close before go-live'});
+    rows.push({src:'Tester / administrator workstation', dst:'Control Panel (admin-center)', port:'8098–2381', proto:'HTTP/HTTPS', purpose:'Validate admin/configuration directly, bypassing Gateway\'s /admin routing', tag:'optional', note:'Setup/testing only — Control Panel is otherwise internal-only; close before go-live'+k8sTestNote});
 
     var interNodeNote = isK8s ? 'in-cluster pod-to-pod traffic — allow it in your NetworkPolicy if you enforce one' : 'a real firewall path must be opened';
     if(a.topology === 'multi' && hasAnalysis(a)){
@@ -902,16 +933,16 @@
       rows.push({src:'imaging-services', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote});
       rows.push({src:'imaging-services', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote});
       if(hasAnalysis(a)){
-        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : ''), dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote});
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : '(s)'), dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote});
       }
     }
 
     if(a.mcp){
-      rows.push({src:'MCP client (Claude Desktop / IDE / CI pipeline)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Through the reverse proxy to Gateway, then path-routed to Imaging MCP (/mcp, internal :8282) and Gatekeeper MCP (/mcp/gatekeeper, internal :8283) — no separate firewall port needed beyond Gateway itself, per CAST\'s architecture reference', tag:'mandatory', note:'AI/MCP selected'});
+      rows.push({src:'MCP client (Claude Desktop / IDE / CI pipeline)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Through the reverse proxy to Gateway, then path-routed to Imaging MCP (/mcp, internal :8282) and Gatekeeper MCP (/mcp/gatekeeper, internal :8283) — no separate firewall port needed beyond Gateway itself, per CAST\'s architecture reference', tag:'mandatory', note:'AI/MCP selected'+podmanPortNote});
       rows.push({src:'MCP client host (user workstation / CI)', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'The MCP client (Claude Desktop, IDE assistant, CI agent) calls its configured LLM provider and uses CAST\'s MCP servers as tools — this egress leaves the client host, not the CAST Imaging servers', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+
         (a.egress === 'airgapped' ? (a.llmProvider === 'other' ? ' — keep this gateway reachable from the client hosts inside your air-gapped perimeter' : ' — an external API; client hosts need an explicit exception to your air-gapped egress policy, or switch to an internal LLM gateway') :
          a.egress === 'proxy' ? ' — reaches this external API via your configured proxy' : '')});
-      rows.push({src:'Gatekeeper MCP', dst:'OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — this may be the same embedded Auth service (8092, /oauth2) already listed above, or a separate IdP if the OAuth module is pointed elsewhere', tag:'conditional', note:'AI/MCP selected'});
+      rows.push({src:'Gatekeeper MCP', dst:'External OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — only if the OAuth module points to an external IdP; with CAST\'s embedded Auth service (/oauth2, internal :8092) this stays internal and needs no rule', tag:'conditional', note:'AI/MCP selected'+(a.egress === 'airgapped' ? ' — an external IdP needs an explicit exception to your air-gapped egress policy' : a.egress === 'proxy' ? ' — reaches an external IdP via your configured proxy' : '')});
     }
 
     if(a.repoHttps && hasAnalysis(a)){
@@ -961,16 +992,17 @@
     document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' && hasAnalysis(a) ? ' show' : '');
     document.getElementById('neo4j-dedicated-sub').className = 'sub-block' + (a.topology === 'multi' && hasNeo4j(a) ? ' show' : '');
     document.getElementById('topology-hint').textContent =
-      (a.scale === 'enterprise' && a.topology === 'single') ? 'Single '+unitWord+' is not recommended at Enterprise scale — consider Multi-'+unitWord+(isK8s ? '' : ' or Kubernetes')+'.' :
-      (a.scale === 'poc' && a.topology === 'multi') ? 'Multi-'+unitWord+' is usually unnecessary for a POC — Single '+unitWord+' is simpler.' :
-      (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more '+unitWord+'s to provision and maintain, network connectivity between '+unitWord+'s must be correctly configured, and '+(isK8s ? 'shared storage must use a shared-access (ReadWriteMany) StorageClass.' : a.platform === 'windows' ? 'every machine needs the shared deploy/delivery/common-data SMB shares under one consistent service account.' : 'every machine must mount the same /opt/cast/shared network folder over SMB.') : '';
+      (a.scale === 'enterprise' && a.topology === 'single') ? (isK8s ? 'A single node pool' : 'Single machine')+' is not recommended at Enterprise scale — consider '+(isK8s ? 'isolated nodes' : 'Multi-machine or Kubernetes')+'.' :
+      (a.scale === 'poc' && a.topology === 'multi') ? (isK8s ? 'Node isolation' : 'Multi-machine')+' is usually unnecessary for a POC — '+(isK8s ? 'a single node pool' : 'a single machine')+' is simpler.' :
+      (a.topology === 'multi' && !hasDistributedNodes(a)) ? 'Your scenario has nothing to move off the core '+(isK8s ? 'pods' : 'node')+' (no analysis-node'+(hasNeo4j(a) ? ', Neo4j not dedicated' : '')+') — see the note in results Section 1.' :
+      (a.topology === 'multi') ? 'Suitable for production, large/numerous codebases, and teams that need analysis to run without impacting result browsing. Trade-off: more '+(isK8s ? 'cluster nodes' : 'machines')+' to provision and maintain, network connectivity between them must be correctly configured'+(needsSharedStorage(a) ? ', and '+(isK8s ? 'multiple analysis-node pods need a shared-access (ReadWriteMany) StorageClass.' : a.platform === 'windows' ? 'every machine needs the shared deploy/delivery/common-data SMB shares under one consistent service account.' : 'every machine must mount the same /opt/cast/shared network folder over SMB.') : '.') : '';
     document.getElementById('analysis-nodes-hint').textContent =
       'Each analysis-node registers itself against the same imaging-services instance and can run on its own '+unitWord+' — this is CAST Imaging\'s horizontal scaling mechanism for analysis workload.';
     document.getElementById('neo4j-dedicated-label').textContent = 'Run Neo4j on its own dedicated ' + (isK8s ? 'node (EnforceNeo4jIsolation)' : 'machine');
     document.getElementById('topology-single-label').textContent = isK8s ? 'Single node pool' : 'Single machine';
     document.getElementById('topology-single-desc').textContent = isK8s ? 'All selected components share one node pool, with no dedicated-node isolation (still 2 cluster nodes minimum) — suitable for POC, testing, demo, or small production' : 'All selected components on one host — suitable for POC, testing, demo, or small production';
-    document.getElementById('topology-multi-label').textContent = isK8s ? 'Multi-pod' : 'Multi-machine';
-    document.getElementById('topology-multi-desc').textContent = isK8s ? 'Components distributed across dedicated pods — recommended for production' : 'Components distributed across dedicated hosts — recommended for production';
+    document.getElementById('topology-multi-label').textContent = isK8s ? 'Isolated nodes' : 'Multi-machine';
+    document.getElementById('topology-multi-desc').textContent = isK8s ? 'Analysis-node (and optionally Neo4j) pods isolated on their own cluster nodes — recommended for production' : 'Components distributed across dedicated hosts — recommended for production';
 
     document.getElementById('source-access-hint').textContent = hasAnalysis(a) ? 'CAST Imaging receives source code either as a ZIP uploaded through the Console (no extra port — same reverse proxy entry point) or from a source folder location that every analysis-node can read. Tick what applies beyond ZIP upload.' :
       'Your scenario ('+LABELS.scenario[a.scenario]+') excludes analysis — these options won\'t add any firewall rows, since there\'s no analysis-node to check out source code.';
@@ -1033,6 +1065,11 @@
     if(a.dbHosting === 'colocated'){
       sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + sizeSpec.postgresDedicated.cpu, ram:sizingRows[0].ram + sizeSpec.postgresDedicated.ram, disk:sizingRows[0].disk + sizeSpec.postgresDedicated.disk};
     }
+    // A multi topology that distributes nothing still has one CAST server, so the standalone 32 GB
+    // RAM floor applies to it rather than the 16 GB distributed one.
+    if(a.topology === 'multi' && !hasDistributedNodes(a) && sizingRows[0].ram < 32){
+      sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu, ram:32, disk:sizingRows[0].disk};
+    }
     if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
       sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + userBonus.cpu, ram:sizingRows[0].ram + userBonus.ram, disk:sizingRows[0].disk};
     }
@@ -1067,7 +1104,13 @@
     // PostgreSQL pod) isn't modeled here since this tool has no corresponding input — see the callout below.
     var k8sIsolationActive = a.topology === 'multi' && (hasAnalysis(a) || (hasNeo4j(a) && a.neo4jDedicated));
     var k8sAnalysisReplicaCount = (hasAnalysis(a) && a.topology === 'multi') ? (ANALYSIS_NODE_COUNT[a.analysisNodes] || 1) : 1;
-    var k8sMinNodes = 2 + (k8sIsolationActive ? 1 : 0) + Math.max(0, k8sAnalysisReplicaCount - 1);
+    var k8sFloorNodes = 2 + (k8sIsolationActive ? 1 : 0) + Math.max(0, k8sAnalysisReplicaCount - 1);
+    // The node count must also fit the pod requests themselves at CAST's per-node minimum (4 vCPU / 32 GB).
+    var k8sInCluster = sizingRows.slice(0, k8sPodRequestCount);
+    var k8sSumCpu = k8sInCluster.reduce(function(s, r){ return s + r.cpu; }, 0);
+    var k8sSumRam = k8sInCluster.reduce(function(s, r){ return s + r.ram; }, 0);
+    var k8sCapacityNodes = Math.max(Math.ceil(k8sSumRam / 32), Math.ceil(k8sSumCpu / 4));
+    var k8sMinNodes = Math.max(k8sFloorNodes, k8sCapacityNodes);
     var machineSummaryHtml;
     if(isK8s){
       machineSummaryHtml = '<div class="callout info"><b>'+k8sPodRequestCount+' '+machineWordSizing+'(s)</b> to fit on your cluster'+(a.dbHosting !== 'colocated' ? ' (plus the PostgreSQL instance outside it)' : '')+', requiring <b>'+k8sMinNodes+' cluster node'+(k8sMinNodes===1?'':'s')+' minimum</b> (4 vCPU / 32 GB RAM per node minimum, per CAST\'s Kubernetes hardware doc — see the callout below), plus <b>'+workstationDesc+'</b> to access it.</div>';
@@ -1083,7 +1126,7 @@
       scaleProfileHtml +
       machineSummaryHtml +
       (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk (the default per-component PVC sizes CAST ships are used as-is; their storage classes support online volume expansion, so you can grow a volume later without a rebuild). "Single node pool" vs. one pod per row below mirrors the topology answer (question 1), not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' +
-        '<div class="callout info"><b>Cluster requirements per CAST\'s Kubernetes hardware doc:</b> <b>2 nodes minimum</b>, <b>4 vCPU per node minimum</b>, <b>32 GB RAM per node minimum</b> (64 GB recommended; 128 GB for multiple complex/large applications). Your profile above needs <b>'+k8sMinNodes+' node'+(k8sMinNodes===1?'':'s')+' minimum</b>: the base 2, '+(k8sIsolationActive ? '+1 for running the analysis-node/Neo4j workload on its own dedicated node(s) (this tool\'s multi-machine topology'+(hasNeo4j(a)&&a.neo4jDedicated?' and dedicated-Neo4j checkbox':'')+' — CAST\'s <code>EnforceAnalysisNodeIsolation</code>/<code>EnforceNeo4jIsolation</code> Helm settings, which require <code>EnforceBalancedAffinity: true</code>), ' : '')+(k8sAnalysisReplicaCount > 1 ? '+'+(k8sAnalysisReplicaCount-1)+' for each analysis-node replica beyond the first (<code>AnalysisNodeReplicaCount</code> in <code>values.yaml</code>)' : 'no further additions for a single analysis-node replica')+'. Not modeled here: further isolating the embedded PostgreSQL pod onto its own node (<code>EnforcePostgresIsolation</code>) costs one more node again — CAST\'s own "extra large" example (3 analysis-node replicas + all three isolation flags) reaches 6 nodes minimum. All cluster nodes (and any managed PostgreSQL instance) should sit in the <b>same Availability Zone</b>.</div>' : '') +
+        '<div class="callout info"><b>Cluster requirements per CAST\'s Kubernetes hardware doc:</b> <b>2 nodes minimum</b>, <b>4 vCPU per node minimum</b>, <b>32 GB RAM per node minimum</b> (64 GB recommended; 128 GB for multiple complex/large applications). Your profile above needs <b>'+k8sMinNodes+' node'+(k8sMinNodes===1?'':'s')+' minimum</b>: the base 2, '+(k8sIsolationActive ? '+1 for running the analysis-node/Neo4j workload on its own dedicated node(s) (this tool\'s Isolated nodes topology'+(hasNeo4j(a)&&a.neo4jDedicated?' and dedicated-Neo4j checkbox':'')+' — CAST\'s <code>EnforceAnalysisNodeIsolation</code>/<code>EnforceNeo4jIsolation</code> Helm settings, which require <code>EnforceBalancedAffinity: true</code>), ' : '')+(k8sAnalysisReplicaCount > 1 ? '+'+(k8sAnalysisReplicaCount-1)+' for each analysis-node replica beyond the first (<code>AnalysisNodeReplicaCount</code> in <code>values.yaml</code>)' : (hasAnalysis(a) ? 'no further additions for a single analysis-node replica' : 'no analysis-node in this scenario'))+(k8sCapacityNodes > k8sFloorNodes ? '; but the pod requests below total <b>'+k8sSumCpu+' vCPU / '+k8sSumRam+' GB</b>, which need at least <b>'+k8sCapacityNodes+' nodes</b> at the 4 vCPU / 32 GB per-node minimum — use larger nodes to need fewer' : '')+'. Each node hosting an isolated pod must be at least as large as that pod\'s request. Not modeled here: further isolating the embedded PostgreSQL pod onto its own node (<code>EnforcePostgresIsolation</code>) costs one more node again — CAST\'s own "extra large" example (3 analysis-node replicas + all three isolation flags) reaches 6 nodes minimum. All cluster nodes (and any managed PostgreSQL instance) should sit in the <b>same Availability Zone</b>.</div>' : '') +
       '<h4>Server components</h4>' +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr></thead><tbody>' +
       sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+esc(r.disk)+' GB</td></tr>'; }).join('') +
@@ -1096,7 +1139,7 @@
     }
 
     if(a.topology === 'multi' && !hasDistributedNodes(a)){
-      sizingHtml += '<div class="callout warn"><b>Nothing to distribute in this scenario.</b> Multi-'+unitWord+' only moves the analysis-node(s)'+(hasNeo4j(a) ? ' or a dedicated Neo4j' : '')+' off the core '+(isK8s ? 'pods' : 'node')+', and your scenario ('+esc(LABELS.scenario[a.scenario])+') '+(hasNeo4j(a) ? 'has no analysis-node and Neo4j is not set to dedicated' : 'has no analysis-node')+' — so CAST Imaging still runs on one '+(isK8s ? 'set of core pods' : 'server')+' (plus any dedicated database), and multi-'+unitWord+' requirements such as shared storage don\'t apply. The Single topology gives the same result.</div>';
+      sizingHtml += '<div class="callout warn"><b>Nothing to distribute in this scenario.</b> '+esc(topologyLabel(a))+' only moves the analysis-node(s)'+(hasNeo4j(a) ? ' or a dedicated Neo4j' : '')+' off the core '+(isK8s ? 'pods' : 'node')+', and your scenario ('+esc(LABELS.scenario[a.scenario])+') '+(hasNeo4j(a) ? 'has no analysis-node and Neo4j is not set to dedicated' : 'has no analysis-node')+' — so CAST Imaging still runs on one '+(isK8s ? 'set of core pods' : 'server')+' (plus any dedicated database), and multi-server requirements such as shared storage don\'t apply.</div>';
     }
 
     if(a.dbHosting === 'managed'){
@@ -1107,7 +1150,9 @@
       sizingHtml += '<div class="callout info">Each analysis-node '+(isK8s?'pod':'machine')+' registers itself against the same imaging-services instance, letting analyses run in parallel across multiple applications. This is CAST Imaging\'s horizontal scaling mechanism for analysis workload — it does not scale imaging-services, imaging-viewer, dashboards, or PostgreSQL themselves.</div>';
     }
 
-    sizingHtml += '<div class="callout info"><b>Where these numbers come from.</b> CAST\'s "What hardware do I need?" page gives one concrete example: up to 50 applications with up to 5 parallel analyses need <b>32 GB RAM / 2048 GB disk</b> for the node and <b>64 GB RAM / 3072 GB disk</b> for its PostgreSQL instance — used as-is for 50–150 applications. '+(a.scale === 'poc' ? 'The &lt; 50 applications band assumes a trial with only one or two analyses at a time, so it sits below that example; size up to the 50–150 figures if you expect CAST\'s 5 parallel analyses. ' : '')+(a.scale === 'standard' || a.scale === 'enterprise' ? 'Larger bands are this tool\'s conservative extrapolation (PostgreSQL disk ×2 for 150–500, ×4 for 500+), not a CAST formula — CAST states sizing isn\'t linear in application count. ' : '')+(a.dbHosting === 'colocated' ? 'With PostgreSQL co-located, its own figures are already added to the '+(a.topology === 'single' ? allInOneLabel.toLowerCase() : coreLabel.toLowerCase())+' row above.' : '')+'</div>';
+    if(a.dbHosting === 'colocated'){
+      sizingHtml += '<div class="callout info">PostgreSQL is co-located, so its own CPU/RAM/disk are already included in the '+(a.topology === 'single' ? allInOneLabel.toLowerCase() : coreLabel.toLowerCase())+' row above.</div>';
+    }
 
     if(a.scale === 'standard' || a.scale === 'enterprise'){
       sizingHtml += '<div class="callout warn">Sizing scales with the number of applications delivered, retained snapshot history, and concurrent analyses/users. Re-validate after a pilot batch of real deliveries.</div>';
@@ -1129,7 +1174,7 @@
     sizingHtml += '<h4>Workstation components</h4>' +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Operating system</th><th>Hardware</th><th>Software</th></tr></thead><tbody>' +
       '<tr><td>End-user workstation ('+esc(LABELS.users[a.users])+')</td><td>'+endUserOs+'</td><td>8 GB RAM, 1920×1080 recommended for architecture/dependency graphs</td><td>'+endUserSoftware+'</td></tr>' +
-      (hasAnalysis(a) ? '<tr><td>Delivery / analyst workstation</td><td>Same as End-user workstation</td><td>8 GB RAM minimum, plus local disk for source checkouts</td><td>Browser (ZIP uploads go through the Console) + SCM client tools (optional — only if staff prepare source checkouts themselves; see question 9 for how source reaches the analysis-node). No JDK needed here — CAST requires it on Windows servers only</td></tr>' : '') +
+      (hasAnalysis(a) ? '<tr><td>Delivery / analyst workstation</td><td>Windows, macOS, or Linux — any current browser works</td><td>8 GB RAM minimum, plus local disk for source checkouts</td><td>Browser (ZIP uploads go through the Console) + SCM client tools (optional — only if staff prepare source checkouts themselves; see question 9 for how source reaches the analysis-node). No JDK needed here — CAST requires it on Windows servers only</td></tr>' : '') +
       '</tbody></table></div>';
 
     if(hasDashboards(a)){
@@ -1150,7 +1195,7 @@
     componentRows.push(['Auth service', '8092', 'OAuth2 token endpoint (path /oauth2)']);
     componentRows.push(['SSO Service', '8096', 'Sign-in / SSO broker for Local, SAML, and LDAP identity sources (path /auth)']);
     componentRows.push(['Control Panel (admin-center)', '8098–2381', 'Administration UI (path /admin)']);
-    if(hasAnalysis(a)) componentRows.push(['Analysis-node' + (isK8s?' pod(s)':'(s)'), '8089', 'Runs analyses; registers against the core services (see Section 3 for the machine/pod-to-machine/pod port)']);
+    if(hasAnalysis(a)) componentRows.push(['Analysis-node' + (isK8s?' pod(s)':'(s)'), '8089', 'Runs analyses; registers against the core services'+(a.topology === 'multi' ? ' (see Section 3 for the '+unitWord+'-to-'+unitWord+' port)' : '')]);
     if(hasViewer(a)) componentRows.push(['Viewer', '8083', 'Architecture/dependency graph UI (path /imaging)']);
     if(hasViewer(a)) componentRows.push(['Viewer-APIs (imaging-apis)', '8070', 'REST API layer backing the Viewer']);
     if(hasNeo4j(a)) componentRows.push(['ETL service', '9001', 'Loads analysis results from PostgreSQL into Neo4j for the Viewer']);
@@ -1163,7 +1208,7 @@
     if(a.egress === 'airgapped') componentRows.push(['Extend Local Server (' + (a.platform === 'windows' ? 'CAST_ExtendProxy service' : 'extend-proxy') + ')', '8085', 'On-premises mirror of extend.castsoftware.com for air-gapped installs']);
 
     sizingHtml += '<h4>Named components (architecture overview)</h4>' +
-      '<p>All components below other than Gateway communicate over CAST\'s internal container network and are not individually customer-firewall-configurable in a single- or co-located multi-'+(isK8s?'pod':'machine')+' topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j '+(isK8s?'pods':'machines')+') where a real firewall path is required. Source: CAST\'s architecture reference diagram and <a href="https://doc.castsoftware.com/imaging/install/requirements/hardware/#tcp-ports" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports)</a>.</p>' +
+      '<p>All components below other than Gateway communicate '+(a.platform === 'windows' ? 'locally between CAST\'s Windows services' : 'over CAST\'s internal container network')+' and are not individually customer-firewall-configurable in a single- or co-located multi-'+(isK8s?'pod':'machine')+' topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j '+(isK8s?'pods':'machines')+') where a real firewall path is required. Source: CAST\'s architecture reference diagram and <a href="https://doc.castsoftware.com/imaging/install/requirements/hardware/#tcp-ports" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports)</a>.</p>' +
       buildArchitectureDiagram(a, {serverMachineCount: isK8s ? k8sPodRequestCount : serverMachineCount, workstationRoleCount: workstationRoleCount}) +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Port(s)</th><th>Role</th></tr></thead><tbody>' +
       componentRows.map(function(r){ return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+r[2]+'</td></tr>'; }).join('') +
@@ -1226,7 +1271,11 @@
           ? 'CAST\'s installer deploys an <b>embedded <code>postgres:15</code> container</b> (embedded database mode) — pinned by CAST, nothing for you to choose.'
           : a.dbHosting==='colocated' && isK8s
           ? 'CAST\'s Helm chart deploys PostgreSQL as an in-cluster pod — its version is set by the chart (not confirmed by this tool).'
-          : 'You provision PostgreSQL yourself'+(a.dbHosting==='colocated' ? ' on the CAST Imaging host' : '')+': on Windows, install from EnterpriseDB (CAST ships no PostgreSQL for Windows); on Linux, from the distribution\'s official PostgreSQL repository (or run it in Docker). CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b> for a self-provisioned instance.') +
+          : a.dbHosting==='managed'
+          ? 'Pick a managed PostgreSQL offering (e.g. Amazon RDS, Azure Database for PostgreSQL, Google Cloud SQL) — CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b>.'
+          : a.dbHosting==='colocated'
+          ? 'You provision PostgreSQL yourself on the CAST Imaging host: install an official EnterpriseDB release (CAST ships no PostgreSQL for Windows). CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b>.'
+          : 'You provision PostgreSQL yourself: on Windows, install from EnterpriseDB (CAST ships no PostgreSQL for Windows); on Linux, from the distribution\'s official PostgreSQL repository (or run it in Docker). CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b> for a self-provisioned instance.') +
         ' Confirm the full supported/minimum version range against <a href="https://doc.castsoftware.com/imaging/install/requirements/db/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/db</a> before provisioning'+(a.dbHosting!=='colocated' ? ' your '+esc(LABELS.dbHosting[a.dbHosting]).toLowerCase()+' instance' : '')+'.</td></tr>' +
       '<tr><td>Hosting</td><td>'+esc(LABELS.dbHosting[a.dbHosting])+
         (a.dbHosting==='colocated' && (a.scale==='standard'||a.scale==='enterprise') ? ' — <b>not recommended</b> at this scale; move to a dedicated or managed instance' : '') +
@@ -1320,7 +1369,7 @@
         '<li>Deploy the CAST Imaging MCP Server (<b>Imaging MCP</b>, internal :8282) alongside a reachable CAST Imaging instance — reached through Gateway on the <code>/mcp</code> path, not a separately exposed port.</li>' +
         '<li>Front it with <b>Gatekeeper MCP</b> (internal :8283, path <code>/mcp/gatekeeper</code>) for tool/application-level authorization policy.</li>' +
         '<li>Configure the <b>OAuth module</b> against an OAuth2/OIDC provider (can reuse your SAML/LDAP IdP if OIDC-capable) so MCP clients authenticate as the requesting user.</li>' +
-        '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> (no wildcards).</li>' +
+        '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> on the MCP client hosts, not the CAST Imaging servers (no wildcards).</li>' +
         '<li>Sizing: ~2 vCPU / 4 GB RAM / 20 GB disk total for Imaging MCP + Gatekeeper MCP combined, already folded into the '+(a.topology==='single' ? 'all-in-one' : 'core')+' row in Section 1 (CAST allows co-locating the MCP Server with other CAST Imaging components or giving it a dedicated machine) — not independently confirmed per-service; split it out yourself if you need per-container limits.</li>' +
         '</ul>';
     }
@@ -1339,7 +1388,7 @@
     if(a.platform === 'windows') everyMachine.push(item('win-full-control', 'Installing user confirmed to have <b>Full Control</b> permissions (directly or via group membership) on the root install folder'));
     if(a.platform === 'windows') everyMachine.push(item('win-jdk', '64-bit JDK ≥ 17 LTS and ≤ 21 installed with <code>%JAVA_HOME%</code> set (mandatory on Windows)'));
     if(isK8s) everyMachine.push(item('k8s-cluster-rights', 'Installing user/service account confirmed to have sufficient cluster rights (namespace creation, Helm release management) — separate from the CAST-service RBAC below'));
-    if(hasDistributedNodes(a)) everyMachine.push(item('shared-storage', sharedStorageText(a).checklist));
+    if(needsSharedStorage(a)) everyMachine.push(item('shared-storage', sharedStorageText(a).checklist));
     var checklistUnitWord = isK8s ? 'pod' : 'machine';
     // Kubernetes prerequisites are cluster-wide, not per pod, and a single-server profile has only one
     // server group — in both cases the "every server" items fold into the core group.
@@ -1353,26 +1402,32 @@
 
     var coreNode = separateEveryMachineGroup ? [] : everyMachine.slice();
     coreNode.push(item('server-sizing', (isK8s ? 'Node pool capacity' : 'Server(s)') + ' provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(topologyLabel(a))+')'));
-    coreNode.push(item('pg-hosting', 'PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting])));
+    coreNode.push(item('pg-hosting:'+a.dbHosting, 'PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting])));
+    var pgEmbedded = a.dbHosting === 'colocated' && (a.platform === 'docker' || a.platform === 'podman' || isK8s);
+    if(!pgEmbedded) coreNode.push(item('pg-version', 'PostgreSQL 14.x–18.x (64-bit, 18.x recommended) with UTF-8 and the collation CAST specifies (see Section 2)'));
+    if(a.scale === 'enterprise') coreNode.push(item('pg-ha', 'PostgreSQL high availability (replication) and automated backups planned (see Section 2)'));
     coreNode.push(item('firewall-rules', 'All firewall rules from Section 3 opened before install day'));
-    coreNode.push(a.egress === 'airgapped' ? item('extend-local', 'CAST Extend Local Update Server deployed and reachable') : item('extend-outbound', 'Outbound access to extend.castsoftware.com confirmed' + (a.egress==='proxy' ? ' through the corporate proxy' : '')));
-    if(a.platform === 'docker' || a.platform === 'podman' || isK8s) coreNode.push(a.egress === 'airgapped' ? item('images-mirrored', 'CAST\'s Docker Hub images mirrored into a reachable internal registry') : item('docker-hub', 'Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST\'s images' + (a.egress==='proxy' ? ' through the corporate proxy' : '')));
+    var fleetItems = [];
+    fleetItems.push(a.egress === 'airgapped' ? item('extend-local', 'CAST Extend Local Update Server deployed and reachable') : item('extend-outbound', 'Outbound access to extend.castsoftware.com confirmed' + (a.egress==='proxy' ? ' through the corporate proxy' : '')));
+    if(a.platform === 'docker' || a.platform === 'podman' || isK8s) fleetItems.push(a.egress === 'airgapped' ? item('images-mirrored', 'CAST\'s Docker Hub images mirrored into a reachable internal registry') : item('docker-hub', 'Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST\'s images' + (a.egress==='proxy' ? ' through the corporate proxy' : '')));
+    // Extend access and image pulls apply to every server (core and analysis-nodes alike).
+    if(separateEveryMachineGroup) fleetItems.forEach(function(it){ everyMachine.push(it); });
+    else fleetItems.forEach(function(it){ coreNode.push(it); });
     coreNode.push(item('extend-api-key', 'CAST Extend API key generated and stored securely'));
     coreNode.push(item('license-key', 'CAST Imaging license key obtained, covering the selected modules'));
     if(a.auth === 'saml') coreNode.push(item('saml-sp', 'SAML metadata exchanged and CAST Imaging registered as a Service Provider at the IdP'));
     if(a.auth === 'ldap') coreNode.push(item('ldap-bind', 'LDAP bind account, base DN(s), and group mapping confirmed'));
     if(a.auth === 'ldap') coreNode.push(item('ldaps-ca', 'If using LDAPS (636): directory CA certificate trusted by CAST Imaging\'s SSO Service'));
-    if(a.mcp) coreNode.push(item('mcp', 'Imaging MCP + Gatekeeper MCP + OAuth module deployed; MCP client hosts can reach the LLM provider FQDN'));
-    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (cloud/auth/binaries)'));
+    if(a.mcp) coreNode.push(item('mcp', 'Imaging MCP + Gatekeeper MCP + OAuth module deployed'));
+    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (cloud/auth'+(hasAnalysis(a) ? '/binaries' : '')+')'));
     if(a.email) coreNode.push(item('smtp', 'SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)'));
     if(isK8s){
       var k8sPrep = ['Cluster namespace', 'RBAC', 'StorageClass'];
-      if(a.reverseProxy === 'ingress') k8sPrep.push('Ingress controller');
-      if(a.certSource !== 'none') k8sPrep.push('TLS secret');
+      if(a.reverseProxy === 'ingress' && a.certSource !== 'none') k8sPrep.push('Ingress TLS secret');
       coreNode.push(item('k8s-prep', k8sPrep.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' prepared'));
     }
     var coreComps = 'imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+(hasDashboards(a)?' + dashboards':'')+(a.topology === 'single' && hasAnalysis(a) ? ' + analysis-node' : '');
-    var coreNodeTitle = a.topology === 'single'
+    var coreNodeTitle = (a.topology === 'single' || !hasDistributedNodes(a))
       ? (isK8s ? 'Single node pool' : 'Single host') + ' ('+coreComps+')'
       : (isK8s ? 'Cluster / core pods' : 'Core node')+' ('+coreComps+')';
     groups.push({title:coreNodeTitle, items:coreNode});
@@ -1390,9 +1445,9 @@
       ]});
     }
 
-    var reverseProxyItems = [item('rp-deployed', 'Reverse proxy deployed in front of Gateway — <b>mandatory prerequisite</b> ('+esc(LABELS.reverseProxy[a.reverseProxy])+(a.reverseProxy==='undecided' ? ' — must be decided and deployed before install day' : '')+')')];
+    var reverseProxyItems = [item('rp-deployed:'+a.reverseProxy, 'Reverse proxy deployed in front of Gateway — <b>mandatory prerequisite</b> ('+esc(LABELS.reverseProxy[a.reverseProxy])+(a.reverseProxy==='undecided' ? ' — must be decided and deployed before install day' : '')+(proxyMismatchHtml ? ' — <b>incompatible with your platform</b>, see Section 4' : '')+')')];
     if(a.certSource !== 'none'){
-      reverseProxyItems.push(item('rp-tls', 'TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and configured on the reverse proxy'));
+      reverseProxyItems.push(item('rp-tls:'+a.certSource, 'TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and configured on the reverse proxy'));
     }
     if(a.certSource === 'self-signed') reverseProxyItems.push(item('self-signed-trust', 'Self-signed certificate (or its CA) trusted on every workstation that accesses CAST Imaging'));
     if(a.auth === 'saml' && a.certSource === 'none') reverseProxyItems.push(item('saml-needs-https', '<b>HTTPS enabled</b> — mandatory with SAML SSO; change the "No HTTPS" answer (question 6)'));
@@ -1404,6 +1459,7 @@
     if(hasDashboards(a)){
       endUserItems.push(item('report-generator', 'CAST Report Generator installed (Windows, .NET 8 SDK, API key from CAST Imaging user profile) on workstations that need Word/Excel/PowerPoint report exports — see <a href="https://doc.castsoftware.com/imaging/install/report-generator/" target="_blank" rel="noopener">install/report-generator</a> / <a href="https://doc.castsoftware.com/export-v2/doccom/cast-report-generator/" target="_blank" rel="noopener">export-v2/doccom/cast-report-generator</a>'));
     }
+    if(a.mcp) endUserItems.push(item('mcp-llm', 'MCP client hosts (workstations / CI) can reach the LLM provider ('+esc(LLM_FQDN[a.llmProvider])+')'));
     if(hasAuditContext(a)){
       endUserItems.push(item('audit-tools', 'Audit/structural-analysis engagement tooling installed on end-user workstations: ' + AUDIT_WORKSTATION_TOOLS.join(', ')));
     }
