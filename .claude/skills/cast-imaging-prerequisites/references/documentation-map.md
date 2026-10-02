@@ -30,6 +30,16 @@ asking the user to paste the page content directly.
 | §10 Deployment context (audit, …) — CAST Report Generator | Install/version prerequisites for the report-export tool referenced on the end-user workstation and the corresponding §3 network row | `install/report-generator/`, and CAST Export's own doc site: `doc.castsoftware.com/export-v2/doccom/cast-report-generator/` (a different CAST product's doc tree, not under `imaging/`) — user-supplied PDF exports of both pages, confirmed: standalone tool (not bundled), interactive UI variant is Windows-only (a CLI-only "Report Generator for Dashboards" variant also runs on Linux), requires Microsoft .NET 8 SDK (auto-installed by the installer) and an API key from the CAST Imaging user profile, connects to Gateway's `/dashboards/rest` path (same entry point as browser traffic), does NOT require Microsoft Office to generate reports (only to open/edit output or customize templates), minimum versions CAST Imaging 3.4.0-funcrel / CAST Report Generator 1.29.0-funcrel |
 | §10 Deployment context (audit, …) — the audit-tooling list (VS Code, Notepad++, Office, DBeaver, Python) | Not a `doc.castsoftware.com` concept at all — this is user-supplied engagement/desktop-tooling context, not a CAST-published client-side requirement. Don't search for a doc page to back it; label it in the tool's own text as given, not confirmed | — (no CAST doc source; user-supplied fact) |
 
+## Facts confirmed in the 2026-10-02 full audit (WebSearch snippets of the pages named)
+
+- **AI-service** (`castimaging/ai-service`) is a container *inside imaging-viewer* (with ETL, imaging-apis, Neo4j) — gate it on `hasViewer(a)` (docker S1/S2 install pages).
+- **PostgreSQL**: 14.x–18.x (64-bit) supported, 18.x recommended for self-provisioned instances; Docker/Podman embedded mode uses a `postgres:15` container; CAST ships no PostgreSQL for Windows (`install/requirements/db/`).
+- **CAST Extend Local Server**: Windows service `CAST_ExtendProxy` (Docker image `castimaging/extend-proxy`); can run fully offline with extensions uploaded manually (`doc.castsoftware.com/install/extend-local/`).
+- **MCP Server** can be co-located with other CAST Imaging components or put on a dedicated machine (`mcp-server/docker/`).
+- **JDK 17–21 64-bit with JAVA_HOME** is mandatory on Windows servers (password encryption), optional on Linux (`install/requirements/precheck/`).
+- **Reverse proxy upstream is Gateway :8090** (Nginx `proxy_pass` to 8090 in `install/https-ssl/docker`) — never advise disabling 8090.
+- **CAST's own scenarios are S1 All, S2 Viewer only (no dashboards), S3 Viewer + Analysis, S4 Dashboards only, S5 Dashboards + Analysis** — the tool's scenario list differs (see open questions put to the user); don't change it without the user.
+
 ## Already-cited pages
 
 These appear as live links inside `index.html` itself — if you're auditing the section that
