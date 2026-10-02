@@ -152,7 +152,7 @@
     .tag.optional{background:rgba(15,138,99,.12);color:#0f8a63;}
     .tag.recommended{background:rgba(29,78,216,.12);color:#1d4ed8;}
     .results-pane{height:auto;overflow:visible;padding:0;}
-    .toolbar{display:none !important;}
+    .toolbar, .screen-only{display:none !important;}
     table, .callout, fieldset, .arch-diagram-frame{break-inside:avoid;}
     h3, h4{break-after:avoid;}
     .arch-diagram-frame{overflow-x:visible;}
@@ -172,7 +172,7 @@
 
 <header class="app-header">
   <h1>CAST Imaging — Requirements Builder</h1>
-  <p>Answer the questions on the left to generate the exact architecture &amp; installation prerequisites for <b>your</b> deployment — not a generic checklist.</p>
+  <p class="screen-only">Answer the questions on the left to generate the exact architecture &amp; installation prerequisites for <b>your</b> deployment — not a generic checklist.</p>
   <button id="theme-toggle" class="no-print" type="button"></button>
 </header>
 
@@ -396,7 +396,7 @@
   <main class="results-pane">
     <h2 class="page-title">Your CAST Imaging Deployment Requirements</h2>
     <p class="page-sub" id="generated-date"></p>
-    <p class="page-sub" id="generated-live-note">Generated live from the answers on the left. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.</p>
+    <p class="page-sub" id="generated-live-note"><span class="screen-only">Generated live from the answers on the left. </span>Reference structure: <code>doc.castsoftware.com/imaging/install</code>.</p>
 
     <div class="profile-chips" id="profile-chips"></div>
 
@@ -416,7 +416,7 @@
     <div id="results-content"></div>
 
     <footer class="doc-footer">
-      CAST Imaging — Requirements Builder · Internal planning tool · Regenerated live in your browser
+      CAST Imaging — Requirements Builder · Internal planning tool<span class="screen-only"> · Regenerated live in your browser</span>
       · <span id="tool-version"></span>
     </footer>
   </main>
@@ -725,8 +725,8 @@
         if(Math.abs(gx - analysisBox.cx) < bestD){ bestD = Math.abs(gx - analysisBox.cx); gapX = gx; }
       }
       var gwX = gatewayRow[0].cx - 40, midY = yRouted - 12, preY = ySupport - 12;
-      svg += '<path d="M'+gwX+','+(yGateway+boxH)+' L'+gwX+','+midY+' L'+gapX+','+midY+' L'+gapX+','+preY+' L'+analysisBox.cx+','+preY+' L'+analysisBox.cx+','+ySupport+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
-      svg += label(analysisBox.cx+28, preY-4, ':8089', FLOW);
+      svg += '<path d="M'+gwX+','+(yGateway+boxH)+' L'+gwX+','+midY+' L'+gapX+','+midY+' L'+gapX+','+preY+' L'+analysisBox.cx+','+preY+' L'+analysisBox.cx+','+ySupport+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5"'+(a.topology === 'multi' ? ' marker-start="url(#ah-flow)"' : '')+' marker-end="url(#ah-flow)"/>';
+      svg += label(analysisBox.cx+40, preY-4, a.topology === 'multi' ? ':8089 · both ways' : ':8089', FLOW);
     }
     if(viewerBox && aiBox){
       svg += line(viewerBox.cx-20, yRouted+boxH, aiBox.cx-20, ySupport, FLOW, 'ah-flow');
@@ -887,7 +887,8 @@
 
     var interNodeNote = isK8s ? 'in-cluster pod-to-pod traffic — allow it in your NetworkPolicy if you enforce one' : 'a real firewall path must be opened';
     if(a.topology === 'multi' && hasAnalysis(a)){
-      rows.push({src:'imaging-services (' + coreWord + ')', dst:'analysis-node ' + unitWord + '(s)', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — connectivity is bidirectional; the analysis-node → core return path uses Gateway/imaging-services\' own ports (exact return ports not separately confirmed)'});
+      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services / Gateway (' + coreWord + ')', port:'8090 (Gateway) — plus the other core ports CAST lists on its hardware page', proto:'HTTP/HTTPS', purpose:'Return path: each analysis-node registers against imaging-services and reports job status and results back to it, so connectivity must work in both directions between every analysis-node '+unitWord+' and the '+coreWord, tag:'mandatory', note:'Reasonable inference — CAST\'s multi-machine install pages say to open the hardware-page ports on each machine; the exact analysis-node → core ports aren\'t itemised by this tool'});
+      rows.push({src:'imaging-services (' + coreWord + ')', dst:'analysis-node ' + unitWord + '(s)', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — the return path is the row above'});
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Each analysis-node writes analysis results directly to the '+dbLabel+' database — per CAST\'s architecture reference, this port is used by every component that reads/writes the database, not just imaging-services', tag:'mandatory', note:'Multi-'+unitWord+' topology — '+(a.dbHosting === 'colocated' ? interNodeNote : 'a real firewall path between every analysis-node '+unitWord+' and the database host/service must be opened')+', in addition to imaging-services\' own path above'});
     }
     if(hasDistributedNodes(a) && (a.platform === 'docker' || a.platform === 'podman')){
@@ -904,6 +905,9 @@
 
     if(isK8s){
       rows.push({src:'Worker nodes / kubelets', dst:'Control plane (API server, etcd, scheduler)', port:'Per your cluster\'s own network policy', proto:'TCP', purpose:'Standard Kubernetes control-plane/data-plane communication — provisioning and securing the cluster network is your Kubernetes administrator\'s responsibility, not a CAST-specific requirement', tag:'conditional', note:'Not a CAST-documented port — generic Kubernetes cluster networking, out of scope for this tool'});
+    }
+    if(a.egress === 'proxy'){
+      rows.push({src:(isK8s ? 'Every cluster worker node' : 'Every CAST Imaging machine'), dst:'Corporate HTTP(S) proxy', port:'Per your proxy (commonly 3128 or 8080)', proto:'HTTP(S)', purpose:'Every outbound flow below (CAST Extend, image pulls'+(a.highlight ? ', CAST Highlight' : '')+') transits your authenticated proxy, so servers need a path to it — and the proxy itself must be allowed to reach the destination FQDNs', tag:'mandatory', note:(a.platform === 'docker' || a.platform === 'podman' ? 'The container engine\'s daemon needs its own HTTP(S)_PROXY settings (with credentials if the proxy is authenticated) for image pulls — separate from CAST\'s settings' : isK8s ? 'Configure the proxy on the container runtime of each worker node for image pulls' : 'Configure the proxy for the CAST services and the host as your standards require')+'; proxy port isn\'t a CAST value'});
     }
     if(a.egress === 'airgapped'){
       var extendLocalDst = 'CAST Extend Local Update Server (internal, ' + (a.platform === 'windows' ? 'CAST_ExtendProxy Windows service' : 'extend-proxy container') + ')';
@@ -1532,6 +1536,7 @@
     if(pageTitle) pageTitle.textContent = 'Your CAST Imaging Pre-installation Checklist';
     var checklistHeading = content.querySelector('#checklist-section h3');
     if(checklistHeading) checklistHeading.textContent = checklistHeading.textContent.replace(/^\d+\.\s*/, '');
+    pane.querySelectorAll('.screen-only').forEach(function(el){ el.remove(); });
     var liveNote = pane.querySelector('#generated-live-note');
     if(liveNote) liveNote.innerHTML = 'Exported from the CAST Imaging Requirements Builder. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.';
     pane.querySelectorAll('.checklist-persist-note').forEach(function(el){
