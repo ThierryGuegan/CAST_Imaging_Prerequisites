@@ -395,7 +395,7 @@
 
     <div class="toolbar no-print">
       <button class="btn btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
-      <button class="btn btn-print" id="export-html" type="button">⬇ Export as HTML</button>
+      <button class="btn btn-print" id="export-html" type="button">⬇ Export checklist as HTML</button>
     </div>
 
     <div class="callout warn no-print">
@@ -942,12 +942,24 @@
       'Your scenario ('+LABELS.scenario[a.scenario]+') excludes analysis — these options won\'t add any firewall rows, since there\'s no analysis-node to check out source code.';
 
     // profile chips
-    var chips = ['scale','users','platform','scenario','topology','egress','auth'].map(function(k){
-      return '<span class="chip">'+k+': <b>'+esc(k === 'topology' ? topologyLabel(a) : LABELS[k][a[k]])+'</b></span>';
-    }).join('');
+    // One chip per questionnaire answer that shapes the output, in form order, so the profile
+    // (also carried into the HTML checklist export) fully identifies the configuration.
+    function chip(label, value){ return '<span class="chip">'+esc(label)+': <b>'+esc(value)+'</b></span>'; }
+    var chips = chip('scale', LABELS.scale[a.scale]) + chip('users', LABELS.users[a.users]) +
+      chip('platform', LABELS.platform[a.platform]) + chip('scenario', LABELS.scenario[a.scenario]) +
+      chip('topology', topologyLabel(a));
+    if(a.topology === 'multi' && hasAnalysis(a)) chips += chip('analysis nodes', a.analysisNodes.replace('-', '–'));
+    if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) chips += chip('Neo4j', 'dedicated');
+    chips += chip('database', LABELS.dbHosting[a.dbHosting]) + chip('egress', LABELS.egress[a.egress]) +
+      chip('reverse proxy', LABELS.reverseProxy[a.reverseProxy]) + chip('HTTPS', LABELS.certSource[a.certSource]) +
+      chip('auth', LABELS.auth[a.auth]);
     if(a.mcp) chips += '<span class="chip">MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
     if(a.highlight) chips += '<span class="chip">Highlight: <b>enabled</b></span>';
     if(a.email) chips += '<span class="chip">Email notifications: <b>enabled</b></span>';
+    if(hasAnalysis(a) && (a.repoHttps || a.repoSmb)){
+      chips += chip('source code access', [a.repoHttps ? 'Git/SVN/DevOps over HTTPS' : '', a.repoSmb ? 'SMB file shares' : ''].filter(Boolean).join(' + '));
+    }
+    chips += chip('deployment context', LABELS.auditContext[a.auditContext]);
     document.getElementById('profile-chips').innerHTML = chips;
 
     var sizeSpec = SIZING[a.scale];
@@ -1327,10 +1339,10 @@
     var optionalSections = [mcpHtml].filter(function(h){ return h; });
     var nextNum = 7;
     var optionalHtml = optionalSections.map(function(h){ return h.replace('{N}', String(nextNum++)); }).join('');
-    var checklistHtml = '<h3>'+nextNum+'. Pre-installation checklist for your profile</h3>' +
+    var checklistHtml = '<section id="checklist-section"><h3>'+nextNum+'. Pre-installation checklist for your profile</h3>' +
       machineSummaryHtml +
       '<p>Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers. <span class="checklist-persist-note">Checked boxes are remembered in your browser as you tweak answers or reload the page.</span></p>' +
-      checklistGroupsHtml;
+      checklistGroupsHtml + '</section>';
 
     document.getElementById('results-content').innerHTML =
       sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + optionalHtml + checklistHtml;
@@ -1364,15 +1376,24 @@
   });
   updateThemeToggleLabel();
 
-  // Standalone HTML export: a self-contained copy of the results pane (same stylesheet, current
-  // theme, current checkbox states) that opens in any browser without this tool.
+  // Standalone HTML export of the pre-installation checklist only: page header + profile chips for
+  // context, then the checklist section (same stylesheet, current theme, current checkbox states),
+  // as a self-contained file that opens in any browser without this tool.
   function exportHtml(){
     var pane = document.querySelector('main.results-pane').cloneNode(true);
-    pane.querySelectorAll('.toolbar').forEach(function(el){ el.remove(); });
+    pane.querySelectorAll('.toolbar, .callout.no-print').forEach(function(el){ el.remove(); });
+    var content = pane.querySelector('#results-content');
+    Array.prototype.slice.call(content.childNodes).forEach(function(node){
+      if(node.id !== 'checklist-section') content.removeChild(node);
+    });
+    var pageTitle = pane.querySelector('.page-title');
+    if(pageTitle) pageTitle.textContent = 'Your CAST Imaging Pre-installation Checklist';
+    var checklistHeading = content.querySelector('#checklist-section h3');
+    if(checklistHeading) checklistHeading.textContent = checklistHeading.textContent.replace(/^\d+\.\s*/, '');
     var liveNote = pane.querySelector('#generated-live-note');
     if(liveNote) liveNote.innerHTML = 'Exported from the CAST Imaging Requirements Builder. Reference structure: <code>doc.castsoftware.com/imaging/install</code>.';
     pane.querySelectorAll('.checklist-persist-note').forEach(function(el){
-      el.textContent = 'Boxes ticked at export time are shown checked; ticks made in this file are not saved — re-export from the tool to keep them.';
+      el.textContent = 'Boxes ticked at export time are shown checked; ticks made in this file are not saved — re-export from the tool to keep them. References to other Sections point to the full requirements report (Print / Save as PDF in the tool).';
     });
     var srcBoxes = document.querySelectorAll('main.results-pane input[type=checkbox]');
     pane.querySelectorAll('input[type=checkbox]').forEach(function(box, i){
@@ -1383,20 +1404,34 @@
     var theme = document.documentElement.getAttribute('data-theme');
     var doc = '<!DOCTYPE html>\n<html lang="en"' + (theme ? ' data-theme="' + theme + '"' : '') + '>\n<head>\n<meta charset="UTF-8">\n' +
       '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
-      '<title>CAST Imaging — Deployment Requirements</title>\n<style>' + css + '</style>\n</head>\n<body>\n' +
+      '<title>CAST Imaging — Pre-installation Checklist</title>\n<style>' + css + '</style>\n</head>\n<body>\n' +
       pane.outerHTML + '\n</body>\n</html>\n';
     var blob = new Blob([doc], {type:'text/html;charset=utf-8'});
     var url = URL.createObjectURL(blob);
     var link = document.createElement('a');
     var d = new Date();
     link.href = url;
-    link.download = 'cast-imaging-requirements-' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.html';
+    link.download = 'cast-imaging-checklist-' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.html';
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
   }
   document.getElementById('export-html').addEventListener('click', exportHtml);
+
+  // Reverse-proxy default follows the platform (Ingress on Kubernetes, external proxy elsewhere)
+  // until the user picks a value themselves; after that their choice is left alone.
+  var reverseProxyTouched = false;
+  document.getElementById('reverseProxy').addEventListener('change', function(){ reverseProxyTouched = true; });
+  function syncReverseProxyDefault(){
+    if(reverseProxyTouched) return;
+    var platform = document.querySelector('input[name=platform]:checked').value;
+    document.getElementById('reverseProxy').value = platform === 'kubernetes' ? 'ingress' : 'nginx';
+  }
+  document.querySelectorAll('input[name=platform]').forEach(function(radio){
+    radio.addEventListener('change', syncReverseProxyDefault);
+  });
+  syncReverseProxyDefault();
 
   document.getElementById('form-pane').addEventListener('input', render);
   document.getElementById('form-pane').addEventListener('change', render);
