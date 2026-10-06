@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAST Imaging Prerequisites — Requirements Builder (SharePoint)</title>
+<!--
+  How to use: open this file in a browser, press Ctrl+A then Ctrl+C, and paste (Ctrl+V)
+  into a SharePoint page text web part. Headings, lists, tables and the notice box keep
+  their formatting. Styles are inline on purpose: SharePoint drops <style> blocks on paste.
+-->
+</head>
+<body style="font-family:'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.5;color:#201f1e;max-width:860px;margin:24px auto;padding:0 16px;">
+
+<h1 style="font-size:28px;margin:0 0 8px;">CAST Imaging Prerequisites — Requirements Builder</h1>
+
+<p>An interactive tool that helps you <b>define the architecture and installation prerequisites for your specific CAST Imaging deployment</b>, instead of handing you a generic, one-size-fits-all checklist.</p>
+
+<h2 style="font-size:22px;margin:28px 0 8px;">How to use it</h2>
+<ol>
+  <li>Open <b><code>index.html</code></b> in a browser.</li>
+  <li>Answer the questions on the left (see the table below).</li>
+  <li>Read the document on the right — it <b>regenerates live</b> as you change your answers.</li>
+  <li>Print it / save it as PDF, or export just the checklist as HTML for the teams that own each server.</li>
+</ol>
+
+<h2 style="font-size:22px;margin:28px 0 8px;">What you are asked</h2>
+<table style="border-collapse:collapse;width:100%;" border="1" cellpadding="8">
+  <thead>
+    <tr style="background:#f3f2f1;text-align:left;">
+      <th style="border:1px solid #c8c6c4;width:32%;">Topic</th>
+      <th style="border:1px solid #c8c6c4;">What you choose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Platform &amp; topology</b></td><td style="border:1px solid #c8c6c4;">Where CAST Imaging is installed and how its components are spread across machines.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Deployment scenario</b></td><td style="border:1px solid #c8c6c4;">Which components you need — analysis, Viewer, Dashboards. Five scenarios, from <i>Full</i> to <i>Analysis only, headless</i>.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Project scale</b></td><td style="border:1px solid #c8c6c4;">The size of the deployment, which drives the sizing baseline.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Database</b></td><td style="border:1px solid #c8c6c4;">PostgreSQL hosting model.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Network egress</b></td><td style="border:1px solid #c8c6c4;">How the servers reach the internet: direct, via proxy, or air-gapped.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Reverse proxy</b></td><td style="border:1px solid #c8c6c4;">The mandatory proxy in front of CAST Imaging.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>HTTPS</b></td><td style="border:1px solid #c8c6c4;">Certificate source.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Authentication</b></td><td style="border:1px solid #c8c6c4;">Local, SAML or LDAP.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Optional integrations</b></td><td style="border:1px solid #c8c6c4;">MCP / AI and CAST Highlight.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Source code access</b></td><td style="border:1px solid #c8c6c4;">How source code reaches the analysis-nodes.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Deployment context</b></td><td style="border:1px solid #c8c6c4;">Standard deployment or audit engagement.</td></tr>
+  </tbody>
+</table>
+
+<h2 style="font-size:22px;margin:28px 0 8px;">What you get</h2>
+<p>A document built for exactly the profile you selected — not every possible combination:</p>
+<table style="border-collapse:collapse;width:100%;" border="1" cellpadding="8">
+  <thead>
+    <tr style="background:#f3f2f1;text-align:left;">
+      <th style="border:1px solid #c8c6c4;width:32%;">Section</th>
+      <th style="border:1px solid #c8c6c4;">Content</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Hardware sizing</b></td><td style="border:1px solid #c8c6c4;">Composed from your answers rather than a fixed table per scenario. Includes the Kubernetes cluster-node minimum, an architecture diagram of the components and network paths that apply, and the OS/runtime and storage requirements.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Network ports / FQDN allowlist</b></td><td style="border:1px solid #c8c6c4;">Filtered to the flows your configuration actually needs — no unused rows, no wildcards. Each row is labelled <i>mandatory</i>, <i>conditional</i>, <i>optional</i> or <i>recommended</i>.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Database requirements</b></td><td style="border:1px solid #c8c6c4;">CAST Imaging supports PostgreSQL only; matched to your chosen hosting model. Neo4j requirements are added when your scenario includes the Viewer.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Reverse proxy &amp; HTTPS / TLS</b></td><td style="border:1px solid #c8c6c4;">The reverse proxy is a mandatory prerequisite (Kubernetes Ingress is preselected on Kubernetes). HTTPS/TLS guidance is matched to your certificate source.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Authentication</b></td><td style="border:1px solid #c8c6c4;">Prerequisites for the exact method you picked (Local / SAML / LDAP), all brokered through CAST's embedded SSO Service and Auth service.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>CAST Extend access &amp; licensing</b></td><td style="border:1px solid #c8c6c4;">Steps adapted for direct, proxy or air-gapped egress.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>MCP Server (AI)</b></td><td style="border:1px solid #c8c6c4;">Prerequisites, shown only if you enable that integration.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Pre-installation checklist</b></td><td style="border:1px solid #c8c6c4;">Built from your actual answers and grouped by the machine or role responsible for each item. Ticks are remembered in your browser.</td></tr>
+  </tbody>
+</table>
+
+<h2 style="font-size:22px;margin:28px 0 8px;">Printing and export</h2>
+<ul>
+  <li><b>Print / Save as PDF</b> — the whole result. The questionnaire pane and the "generated live" wording are hidden from the print output.</li>
+  <li><b>Export checklist as HTML</b> — downloads just the checklist, with your profile and your current ticks, as a standalone page you can hand to the teams that own each server.</li>
+  <li><b>Privacy</b> — everything runs client-side in the browser; no data leaves the page.</li>
+</ul>
+
+<table style="border-collapse:collapse;width:100%;margin-top:28px;" border="0" cellpadding="0">
+  <tr>
+    <td style="border-left:5px solid #ffaa44;background:#fff4ce;padding:12px 16px;">
+      <p style="margin:0 0 6px;"><b>Validation notice</b></p>
+      <p style="margin:0;">Recommendations are derived from CAST Imaging's published documentation structure and standard CAST Software deployment practices. Wherever a specific fact couldn't be verified, the tool says so directly in its own text (e.g. "not independently verified here") rather than presenting a guess as confirmed. Always confirm exact minimum versions, default ports, and sizing against the current <a href="https://doc.castsoftware.com/imaging/install/">doc.castsoftware.com/imaging/install</a> for the CAST Imaging release you are deploying.</p>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>
