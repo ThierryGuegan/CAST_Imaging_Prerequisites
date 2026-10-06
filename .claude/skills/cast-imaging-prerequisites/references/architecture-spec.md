@@ -628,18 +628,19 @@ own.
    was selected.
 6. **CAST Extend access & licensing** (`extendHtml`) — in air-gapped mode it ends with an
    **"Air-gapped installation — container images to download"** subsection (`airgapImagesHtml()`),
-   which reproduces CAST's own table from the "Air-gapped installation" section of the Docker S1
-   page (pasted verbatim by the user, 2026-10-06) — Component · Image · Pull & export · Load —
-   filtered to the scenario: imaging-services images always (`gateway`, `admin-center`,
-   `sso-service`, `auth-service`, `console`), `dashboards-v3` with Dashboards, `analysis-node`
-   with analysis, the imaging-viewer group (`etl-service`, `ai-service`, `imaging-apis`, `viewer`,
-   `neo4j`) with the Viewer, `postgres:15` when PostgreSQL is co-located (embedded), `alpine/psql`
-   for a dedicated/managed one (`DB_MODE=external`), `curlimages/curl` and `castimaging/extend-proxy`
-   always. `<ver>` is CAST's placeholder for the release installed (the curl row has its own curl
-   versions). Podman swaps the engine name and says so (inference); Kubernetes lists the images
-   without commands and a private-registry note (no CAST procedure found); Windows has no images;
-   MCP images aren't in the table (their install scripts pull them). The Docker/Podman network table
-   has no registry row, since CAST's procedure is `save`/`load` Update the table when the doc text is
+   which lists CAST's own images (table of the "Air-gapped installation" section of the Docker S1
+   page, pasted verbatim by the user, 2026-10-06) as **Component · Image only** — the user
+   explicitly does *not* want the pull/save/load commands or `.tar` names reproduced — filtered to
+   the scenario and shown for **Docker, Podman and Kubernetes alike**: imaging-services images always
+   (`gateway`, `admin-center`, `sso-service`, `auth-service`, `console`), `dashboards-v3` with Dashboards,
+   `analysis-node` with analysis, the imaging-viewer group (`etl-service`, `ai-service`, `imaging-apis`,
+   `viewer`, `neo4j`) with the Viewer, `postgres:15` when PostgreSQL is co-located (embedded; not on
+   Kubernetes, where the chart's PostgreSQL version isn't confirmed), `alpine/psql` for a dedicated/managed
+   one (`DB_MODE=external`), `curlimages/curl` and `castimaging/extend-proxy` always, and the two MCP
+   images (`castimaging/imaging-mcp-server`, `castimaging/gatekeeper-mcp-server`, Docker Hub pages given by
+   the user) when `a.mcp`. A short note explains the tag (`<ver>` = release installed; curl has its own
+   versions); Kubernetes adds a private-registry note (no CAST procedure found); Windows has no images.
+   The Docker/Podman network table has no registry row, since CAST's procedure is `save`/`load` Update the table when the doc text is
    pasted in verbatim — outbound access to CAST's extension/update
    service (direct or via the air-gapped Local Update Server), generating an **API key from the
    CAST Extend website**, and obtaining a **CAST Imaging license key** (a key, not a file) that

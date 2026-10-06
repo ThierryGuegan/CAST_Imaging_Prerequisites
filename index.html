@@ -1461,12 +1461,9 @@
       if(a.platform === 'windows'){
         return head + '<p>Windows is a native installation: there are no container images to download. Extensions come from the Extend Local Server described above.</p>';
       }
-      var eng = a.platform === 'podman' ? 'podman' : 'docker';
       var imgs = [];
-      // pull/save: command text after the engine name; tar: archive file name; load: file loaded
-      function add(comp, group, image, pull, tar){ imgs.push({comp:comp, group:group, image:image, pull:pull, tar:tar}); }
-      var ver = '<ver>';
-      function std(comp, group, name){ add(comp, group, 'castimaging/'+name, 'castimaging/'+name+':'+ver, name+'.tar'); }
+      function add(comp, group, image){ imgs.push({comp:comp, group:group, image:image}); }
+      function std(comp, group, name){ add(comp, group, 'castimaging/'+name); }
       std('Gateway', 'imaging-services', 'gateway');
       std('Control Panel', 'imaging-services', 'admin-center');
       std('SSO Service', 'imaging-services', 'sso-service');
@@ -1482,32 +1479,24 @@
         std('Neo4j', 'imaging-viewer', 'neo4j');
       }
       if(a.dbHosting === 'colocated' && !isK8s){
-        add('PostgreSQL — required for 3.0.x-funcrel – 3.5.x-funcrel; for 3.6.0-funcrel or later, required only when DB_MODE=embedded', '', 'postgres:15', 'postgres:15', 'postgres15.tar');
+        add('PostgreSQL — required for 3.0.x-funcrel – 3.5.x-funcrel; for 3.6.0-funcrel or later, required only when DB_MODE=embedded', '', 'postgres:15');
       }
-      add('curl — ≥ 3.6.0-funcrel: use curl 8.7.1 for 3.6.0-funcrel, 8.19.0 for 3.6.1-funcrel or later', '', 'curlimages/curl', 'curlimages/curl:'+ver, 'curl.tar');
+      add('curl — ≥ 3.6.0-funcrel: use curl 8.7.1 for 3.6.0-funcrel, 8.19.0 for 3.6.1-funcrel or later', '', 'curlimages/curl');
       if(a.dbHosting !== 'colocated'){
-        add('psql — required in ≥ 3.6.0-funcrel when using a custom/external PostgreSQL instance (DB_MODE=external)', '', 'alpine/psql', 'alpine/psql:latest', 'psql.tar');
+        add('psql — required in ≥ 3.6.0-funcrel when using a custom/external PostgreSQL instance (DB_MODE=external)', '', 'alpine/psql');
       }
-      add('CAST Extend Local Server', '', 'castimaging/extend-proxy', 'castimaging/extend-proxy', 'extend-proxy.tar');
+      add('CAST Extend Local Server', '', 'castimaging/extend-proxy');
       function c(t){ return '<code>'+esc(t)+'</code>'; }
-      var out = head +
-        '<div class="callout info">Per CAST\'s <a href="'+docUrl+'" target="_blank" rel="noopener">Air-gapped installation</a> section: with no internet access the installer cannot pull from Docker Hub, so fetch every image on an internet-connected machine, carry the <code>.tar</code> files to the servers, and load them <b>before running the installer</b>. Depending on your chosen deployment scenario it may not be necessary to download all images — the list below is already limited to <b>'+esc(LABELS.scenario[a.scenario])+'</b> / '+esc(LABELS.dbHosting[a.dbHosting])+' PostgreSQL.</div>';
-      if(isK8s){
-        out += '<p>On Kubernetes the Helm chart pulls the same <code>castimaging/*</code> repositories from Docker Hub; CAST\'s Kubernetes docs found by this tool describe no air-gapped procedure, so push the images to your private registry and point the chart at it (confirm the values in the Helm install pages). Images of CAST\'s Docker table for your scenario:</p>' +
-          '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Image</th></tr></thead><tbody>' +
-          imgs.map(function(i){ return '<tr><td>'+esc(i.comp)+(i.group ? ' ( <code>'+esc(i.group)+'</code> )' : '')+'</td><td>'+c(i.image)+'</td></tr>'; }).join('') +
-          '</tbody></table></div>';
-        return out;
+      if(a.mcp){
+        add('Imaging MCP Server', 'mcp', 'castimaging/imaging-mcp-server');
+        add('Gatekeeper MCP Server', 'mcp', 'castimaging/gatekeeper-mcp-server');
       }
-      out += '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Image</th><th>Pull &amp; export</th><th>Load</th></tr></thead><tbody>' +
-        imgs.map(function(i){
-          return '<tr><td>'+esc(i.comp)+(i.group ? ' ( <code>'+esc(i.group)+'</code> )' : '')+'</td><td>'+c(i.image)+'</td>' +
-            '<td>'+c(eng+' pull '+i.pull)+'<br>'+c(eng+' save '+i.pull+' -o '+i.tar)+'</td>' +
-            '<td>'+c(eng+' load -i '+i.tar)+'</td></tr>';
-        }).join('') +
+      return head +
+        '<div class="callout info">Per CAST\'s <a href="'+docUrl+'" target="_blank" rel="noopener">Air-gapped installation</a> section: with no internet access the installer cannot pull from Docker Hub, so fetch every image below on an internet-connected machine, carry the exported images to the '+(isK8s ? 'environment\'s private registry or nodes' : 'servers')+', and load them <b>before running the installer</b>. Depending on your chosen deployment scenario it may not be necessary to download all images — this list is already limited to <b>'+esc(LABELS.scenario[a.scenario])+'</b> / '+esc(LABELS.dbHosting[a.dbHosting])+' PostgreSQL.</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Image</th></tr></thead><tbody>' +
+        imgs.map(function(i){ return '<tr><td>'+esc(i.comp)+(i.group ? ' ( <code>'+esc(i.group)+'</code> )' : '')+'</td><td>'+c(i.image)+'</td></tr>'; }).join('') +
         '</tbody></table></div>' +
-        '<p><code>&lt;ver&gt;</code> is CAST\'s placeholder for the CAST Imaging release you install — except on the <code>curl</code> row, where it is the curl version given in that row. Copy the <code>.tar</code> files to the air-gapped servers (secure copy or removable media) — to every machine in a distributed install — then check with <code>'+eng+' image ls</code>. '+(a.platform === 'podman' ? 'The table is CAST\'s Docker one; the <code>podman</code> equivalents are this tool\'s inference — check CAST\'s Podman page. ' : '')+'The MCP servers are not part of this table: their own install scripts pull their images (see the MCP pages).</p>';
-      return out;
+        '<p>The tag is the CAST Imaging release you install (<code>&lt;ver&gt;</code> in CAST\'s commands) — except <code>postgres:15</code>, <code>alpine/psql</code> (<code>latest</code>) and the <code>curl</code> version CAST gives in its row. '+(isK8s ? 'On Kubernetes the Helm chart pulls the same repositories from Docker Hub; CAST\'s Kubernetes docs found by this tool describe no air-gapped procedure, so push the images to your private registry and point the chart at it (confirm the values in the Helm install pages). ' : '')+(a.platform === 'podman' ? 'CAST\'s table is written for Docker; the same images apply to Podman. ' : '')+'The MCP images are published on Docker Hub (<a href="https://hub.docker.com/r/castimaging/imaging-mcp-server" target="_blank" rel="noopener">imaging-mcp-server</a>, <a href="https://hub.docker.com/r/castimaging/gatekeeper-mcp-server" target="_blank" rel="noopener">gatekeeper-mcp-server</a>)'+(a.mcp ? ' and are included above.' : '; they only matter if you enable the AI / MCP integration.')+'</p>';
     }
     extendHtml += airgapImagesHtml();
 
