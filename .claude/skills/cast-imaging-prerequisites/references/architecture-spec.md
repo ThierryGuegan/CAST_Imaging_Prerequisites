@@ -97,6 +97,24 @@ Highlight, email, source code access when analysis is in scope and a method is t
 deployment context). Build them through the small `chip(label, value)` helper; when you add a
 questionnaire answer that changes the output, add its chip in the same edit.
 
+## Questionnaire controls: one rule
+
+Single-choice questions are **radio option cards** (`.opt-row` of `label.opt`, bold title plus a
+one-line description) — platform, scenario, topology, analysis-node count, scale, users,
+database hosting, egress, reverse proxy, certificate source, authentication, LLM provider, audit
+context. **Checkboxes are only for independent yes/no toggles** (the integrations, the two
+source-code methods, dedicated Neo4j), and each such group says "tick every … that applies". An
+earlier build mixed `<select>`s, radios and checkboxes for the same kind of question; don't
+reintroduce a `<select>`. `state()` reads every single-choice control with
+`document.querySelector('input[name=…]:checked').value`; to set one programmatically (the
+reverse-proxy default, tests) check the radio and dispatch `change`.
+
+**Client / Project** — an unnumbered fieldset at the very top (so questionnaire numbering and every
+"question N" reference stay put) holds a text input `#clientProject`. `state()` exposes it as
+`a.clientProject` (whitespace-collapsed). It appears under the results title, as the first profile
+chip, in `document.title`, and in both HTML exports (page title, file name slug). It is kept in
+`localStorage['castImagingClientProject']`, always through `esc()`/`textContent` — it is free text.
+
 ## Questionnaire sections (numbered fieldsets)
 
 These are the sections as of the current build. If requirements change, renumber consistently —
@@ -165,7 +183,8 @@ be a search-and-fix pass, not a rename in isolation.
    browser/IdP redirect flow needs an HTTPS callback URL), so if `a.auth==='saml'` and the cert
    source is "none", surface that as an explicit conflict in the HTTPS section's own output — don't
    let the two answers silently contradict each other.
-7. **Authentication** — Local / SAML / LDAP, radio. All three are brokered through CAST's embedded
+7. **User authentication** — how *users* sign in: Local / SAML / LDAP, radio (the legend, the chip and the
+   results heading say "User authentication" to distinguish it from service-to-service auth). All three are brokered through CAST's embedded
    **SSO Service** (8096, `/auth`) and **Auth service** (8092, `/oauth2`) — not "Keycloak"; that was
    this tool's own earlier incorrect guess at the underlying broker's identity before a user-supplied
    architecture diagram confirmed the real component names. Don't build rows that bypass Gateway's
@@ -484,6 +503,22 @@ what already happens to be drawn.
 
 ## Ports/FQDN matrix
 
+**Database links.** Beyond imaging-services' and the analysis-node's own rows, the table has a row for
+the **SSO Service** (a dedicated `keycloak` database on the same PostgreSQL — documented, tagged
+`mandatory`) and one conditional row for **Console, Control Panel and Dashboards** (inferred from
+older Console docs' `aip-config`/`aip-node` schemas and the Measurement Service schema — *not*
+confirmed for v3). The diagram draws SSO as a solid stub and the other three as **dotted,
+reduced-opacity** stubs ("inferred, not confirmed" legend entry), both tee-ing into the core-node
+lane to PostgreSQL. No database link was found for Auth service, Gateway, AI-service, Viewer-APIs,
+Viewer or the MCP servers — don't add one without a source.
+
+**Extend Local Server feed.** Online: it pulls extensions on demand from `extend.castsoftware.com`
+(HTTPS 443). Offline: it is populated manually — an `.extarchive` bundle prepared with ExtendCli on an
+internet-connected host is uploaded to `host:8085` (`POST /api/synchronization/bundle/upload`, API key
+header — documented for the older CAST Extend Offline, shown for the Local Server in search results,
+**not verified** for the current release, and labelled so). The diagram adds an "Offline feed host"
+box under the Local Server (air-gapped only) and the table an "Admin / feed host (offline mode)" row.
+
 The matrix models the **mandatory reverse proxy** explicitly: every client flow (End-user browser,
 API client, CAST Report Generator, MCP client) targets *"Reverse proxy (<chosen kind>)"* on
 `clientPort(a)`, followed by one mandatory **reverse proxy → Gateway :8090** row — Gateway never
@@ -570,7 +605,8 @@ own.
    "Minimum footprint" callout names the roles a single workstation needs to cover
    (`workstationDesc`) rather than implying one machine per role.
 2. **Database requirements** (`dbHtml`) — PostgreSQL configuration/version/hosting, and Neo4j
-   requirements when the scenario includes the Viewer. The Version row branches: embedded
+   requirements **only when the scenario includes the Viewer** (the whole "Neo4j (graph store)"
+   subsection is omitted otherwise — an earlier "Not required" row was noise). The Version row branches: embedded
    `postgres:15` container (Docker/Podman co-located only), Helm-chart pod (Kubernetes co-located,
    version "not confirmed here"), self-installed EnterpriseDB (Windows co-located), a managed
    DBaaS pick, or a self-provisioned instance — always with the supported 14.x–18.x range (18.x
@@ -579,7 +615,10 @@ own.
 3. **Network ports & FQDN allowlist** (`netHtml`) — the full `buildPortRows(a)` table. This is
    where egress mode (direct/proxy/air-gapped) actually shows its effects — as row content and
    notes, not as a separate section.
-4. **Reverse Proxy & HTTPS / TLS** (`httpsHtml`) — the mandatory-proxy callout, platform/proxy
+4. **Reverse Proxy & HTTPS / TLS** (`httpsHtml`) — in air-gapped mode a bullet states that CAST
+   documents **no reverse-proxy path or Gateway route for the Extend Local Server** (it is reached
+   directly on `host:8085`, feed included), with a not-CAST-documented tip for fronting it anyway;
+   don't invent a URI for it — the mandatory-proxy callout, platform/proxy
    mismatch warnings, certificate source, termination point, and platform-specific proxy detail:
    the self-signed trust bullet follows `certSource === 'self-signed'` on every platform, the Nginx
    vHost guidance covers Docker, Podman *and* Windows, and the "disable plain HTTP" advice targets
@@ -587,7 +626,16 @@ own.
    (the original text told users to disable 8090, which would have broken the deployment).
 5. **Authentication prerequisites** (`authHtml`) — prerequisites for whichever of Local/SAML/LDAP
    was selected.
-6. **CAST Extend access & licensing** (`extendHtml`) — outbound access to CAST's extension/update
+6. **CAST Extend access & licensing** (`extendHtml`) — in air-gapped mode it ends with an
+   **"Air-gapped installation — container images to download"** subsection (`airgapImagesHtml()`):
+   a per-scenario image table, a status per image, and the save → transfer → load procedure from
+   CAST's "Air-gapped installation" section of the Docker S1 page. Image names carry a status —
+   *Listed* (named in CAST's table), *Expected* (Docker Hub repository exists, not seen in the table
+   part that could be read), *Unconfirmed* (name to take from the doc) — because that page isn't
+   reachable from this environment; tags are the doc's `<version>` placeholder. No registry row for
+   Docker/Podman (CAST's procedure is `docker save`/`load`); Kubernetes keeps a private-registry row
+   labelled as general practice. Windows has no images. Update the table when the doc text is
+   pasted in verbatim — outbound access to CAST's extension/update
    service (direct or via the air-gapped Local Update Server), generating an **API key from the
    CAST Extend website**, and obtaining a **CAST Imaging license key** (a key, not a file) that
    covers the selected optional modules. This section's content doesn't map onto any single
@@ -659,6 +707,13 @@ every requirement a results section states as mandatory (PostgreSQL version/HA, 
 HTTPS-for-SAML, LDAPS CA trust) needs an item — check this whenever you add a requirement to a
 section. Group titles follow the same wording rules as the rest of the file ("Cluster / core pods",
 "Single node pool", and a multi topology with nothing to distribute is titled like single).
+
+### HTML exports
+
+Two buttons sit beside **Print / Save as PDF**: **Save as HTML** (the whole report, validation
+notice included) and **Export checklist as HTML** (header, chips and checklist only). Both go
+through `exportHtml(mode)` — details below describe the checklist mode; the full mode simply keeps
+every results section.
 
 ### Checklist HTML export
 
