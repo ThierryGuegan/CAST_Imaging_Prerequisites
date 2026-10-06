@@ -29,13 +29,20 @@ document states has to earn that sentence — see the Goal section of `SKILL.md`
   - `.form-pane` (fixed width, sticky, scrolls independently) — the questionnaire, organized into
     numbered `<fieldset>` sections (see below).
   - `.results-pane` (flex:1, scrolls independently) — a "Generated {date} at {time}" timestamp,
-    profile chips, a validation-notice callout, a `#results-content` div that `render()` overwrites
-    wholesale on every change, and a print/PDF button. The timestamp is set from inside `render()`
+    profile chips, a `.toolbar` with two buttons (**Print / Save as PDF** and **Export checklist as
+    HTML** — see "Checklist HTML export" below), a validation-notice callout, a `#results-content`
+    div that `render()` overwrites wholesale on every change, and a footer. The timestamp is set from inside `render()`
     (see Content freshness marker below), not just once at load — it exists to tell the reader when
     the *currently-displayed* content was produced, which is only true if it updates every time the
     content actually changes.
-- A `@media print` block hides the form pane and toolbar so "Print / Save as PDF" produces a clean
-  document of just the generated content. It also redefines the same `:root` custom properties to
+- A `@media print` block hides the form pane, the toolbar and every `.screen-only` element so
+  "Print / Save as PDF" produces a clean document of just the generated content. `.screen-only`
+  marks wording that only makes sense on the live page — the header pitch ("Answer the questions on
+  the left…"), "Generated live from the answers on the left" and the footer's "Regenerated live in
+  your browser" — and the HTML export strips those same elements. `h3, h4 {break-after:avoid}`
+  keeps headings from being orphaned at the bottom of a printed page. (The validation notice is
+  `.callout.warn.no-print`, but the print block only hides the header/toolbar/form pane, so it does
+  still print — an open choice, not an accident to "fix" silently.) It also redefines the same `:root` custom properties to
   a light palette (see below) — print is this tool's only non-dark rendering context, and it went
   a long time silently broken: the print block only ever set `body{background:#fff}`, leaving
   every fieldset/callout/table/chip/diagram box on its own dark `var(--panel*)` background with
@@ -67,12 +74,28 @@ document states has to earn that sentence — see the Goal section of `SKILL.md`
     doesn't invert automatically: `.opt:hover`'s `rgba(255,255,255,.03)` highlight is invisible on
     a white background, so `:root[data-theme="light"] .opt:hover` overrides it to
     `rgba(0,0,0,.04)`.
+- **Tag pills and the Gateway box have light-theme variants of their own.** The four `.tag.*`
+  badges use light-on-dark colours by default (`#ff9c92`, `#f2b84b`, `#59d0a0`, `#7cc4ff`), which are
+  washed out on white — the print block overrides them, and so does `:root[data-theme="light"]`
+  (copy of the print rules). The Gateway box is filled with `var(--accent)`, so its text uses the
+  `--on-accent` token (`#04101c` in dark, `#ffffff` in light and in print) instead of a literal hex.
 - The architecture diagram's `box()` helper defaults its title-text fill to `var(--text)` (not a
   hardcoded `#fff`) for exactly this reason: it's visually identical to `#fff` against the normal
   dark `--text` value (`#e6edf3`, off-white), but automatically goes dark in print *and* in the
   interactive light toggle once `--text` is redefined there — no per-box-type override needed
   either place. Any new box-title color should default through a variable the same way; a literal
   hex here is the same trap the rest of the page fell into.
+
+## Profile chips
+
+`#profile-chips` shows one chip per questionnaire answer that shapes the output, in form order, so
+the profile (which also heads the HTML checklist export) fully identifies the configuration it was
+built from: scale, users, platform, scenario, topology (via `topologyLabel(a)`), then conditionally
+the analysis-node count (multi + analysis) and "Neo4j: dedicated" (multi + Viewer + dedicated), then
+database hosting, egress, reverse proxy, HTTPS, auth, and the optional chips (MCP/AI with provider,
+Highlight, email, source code access when analysis is in scope and a method is ticked, and the
+deployment context). Build them through the small `chip(label, value)` helper; when you add a
+questionnaire answer that changes the output, add its chip in the same edit.
 
 ## Questionnaire sections (numbered fieldsets)
 
@@ -85,7 +108,11 @@ be a search-and-fix pass, not a rename in isolation.
    `has*(a)` predicate), topology (single machine / multi-machine, radio), plus conditional
    sub-blocks that only show when relevant (analysis-node count when topology is multi and the
    scenario includes analysis; a Neo4j-dedicated-machine checkbox when topology is multi and the
-   scenario includes the Viewer).
+   scenario includes the Viewer). On Kubernetes the two topology options are relabelled by
+   `render()` — **Single node pool** (no dedicated-node isolation, still 2 cluster nodes minimum)
+   and **Isolated nodes** (analysis-node, and optionally Neo4j, pods isolated on their own cluster
+   nodes) — because "single/multi pod" was never what the choice meant there; `topologyLabel(a)`
+   returns the same words for the chips and callouts.
 
    The scenario `<select>` has exactly these five `value`s — don't infer a different set from the
    predicates alone; the predicates are derived from these five, not the other way around:
@@ -123,7 +150,13 @@ be a search-and-fix pass, not a rename in isolation.
    This is a **mandatory prerequisite independent of HTTPS** — CAST Imaging is not intended to run
    with Gateway directly internet-facing, so don't fold this into the HTTPS section or make it
    conditional on HTTPS being enabled. Kept as its own section (split out from HTTPS after an
-   earlier draft combined them and blurred that independence).
+   earlier draft combined them and blurred that independence). The select **defaults to the
+   platform's natural choice** — Kubernetes Ingress on Kubernetes, an external reverse proxy
+   elsewhere — via `syncReverseProxyDefault()`, which keeps following the platform until the user
+   changes the select themselves (`reverseProxyTouched`), after which their choice is never
+   overwritten. Impossible pairs (IIS + ARR off Windows, Ingress off Kubernetes) aren't blocked;
+   the HTTPS section shows a warning callout (`proxyMismatchHtml`) and the checklist item says
+   "incompatible with your platform".
 6. **HTTPS** — certificate source and TLS termination point. Kept separate from egress (Section 4)
    and from Reverse proxy (Section 5) because all three are orthogonal decisions a reader might
    answer differently. The certificate-source choice includes a real "no HTTPS — serve over plain
@@ -141,10 +174,16 @@ be a search-and-fix pass, not a rename in isolation.
 8. **Optional integrations** — MCP/AI (with LLM provider sub-select), CAST Highlight, email
    notifications. Each is a checkbox that adds rows/sections conditionally rather than replacing
    anything.
-9. **Source code access** — which delivery protocols are in play (HTTPS / SMB). These only
-   produce port rows when the scenario actually includes analysis — gate on `hasAnalysis(a)`, and
-   show an explanatory hint (not just silently hide the checkboxes) when they're inert for the
-   current scenario, so the user isn't left wondering why nothing changed.
+9. **Source code access** — how source reaches the analysis-nodes. CAST Imaging v3 takes source as
+   a **ZIP upload** through the Console (no extra port — it uses the normal reverse-proxy entry
+   point) or from a **source folder location** every analysis-node can read (CAST recommends a
+   shared network drive). The two checkboxes therefore mean: *Git/SVN/DevOps clones prepared by
+   your own tooling* (`repoHttps` — port 443 from the customer's clone/CI host, tagged
+   `conditional`, explicitly **not** a CAST Imaging component: CAST doesn't pull from repositories
+   itself) and *Source folder on SMB file shares* (`repoSmb` — 445 from every analysis-node,
+   `mandatory`). Both only produce rows when the scenario includes analysis — gate on
+   `hasAnalysis(a)`; the hint under the legend always explains the ZIP-or-folder model, and says
+   so explicitly when the options are inert for the current scenario.
 10. **Deployment context (audit, …)** — currently just the Audit context field (`hasAuditContext(a)`,
     standard vs. audit/structural-analysis engagement), named generically since more
     non-architectural, client-side deployment-context flags may join it here later —
@@ -152,7 +191,7 @@ be a search-and-fix pass, not a rename in isolation.
     add-on rather than a deployment-architecture decision like Sections 1-9. Standard deployments
     only need CAST Report Generator on the end-user workstation; an audit engagement additionally
     needs the `AUDIT_WORKSTATION_TOOLS` list (VS Code, Notepad++, KDiff3, Word/Excel/PowerPoint,
-    DBeaver, Python) — user-supplied desktop tooling for analysts, labeled as given rather than
+    DBeaver, Python 3.15) — user-supplied desktop tooling for analysts, labeled as given rather than
     CAST-confirmed since `doc.castsoftware.com` has no opinion on it.
 
     CAST Report Generator itself, unlike the audit-tooling list, *is* CAST-published (confirmed via
@@ -171,10 +210,15 @@ be a search-and-fix pass, not a rename in isolation.
     Word/Excel/PowerPoint requirement, even though in practice one satisfies the other when both
     apply.
 
-Section numbers appear throughout the generated output as literal text ("see Section 3", "see
-Section 5"). If you ever renumber a fieldset, grep the whole file for `Section \d` and fix every
-reference in the same pass — a renumber that only touches the `<legend>` tags leaves the prose
-pointing at the wrong section.
+Two numbering schemes coexist and must never be mixed in prose. **"Section N" always means a
+*results* section** (1 Hardware sizing, 2 Database, 3 Network ports, 4 Reverse Proxy & HTTPS,
+5 Authentication, 6 CAST Extend, 7 MCP when enabled, then the checklist); **questionnaire
+fieldsets are always written "question N"** (e.g. "see question 9", "the HTTPS answer (question
+6)"). An early build wrote "Section 7" for the authentication *questionnaire* fieldset inside
+results text, which pointed at the MCP/checklist section instead. If you ever renumber either
+scheme, grep the whole file for `Section \d` and `question \d` and fix every reference in the same
+pass — a renumber that only touches headings or `<legend>` tags leaves the prose pointing at the
+wrong place.
 
 ## State model
 
@@ -200,8 +244,14 @@ function hasDistributedNodes(a){ return a.topology === 'multi' && (hasAnalysis(a
 ```
 
 Gate multi-server-only requirements (shared storage, inter-node paths, UID/service-account
-alignment) on `hasDistributedNodes(a)`, not on `a.topology === 'multi'` — a multi topology with a
-scenario that has nothing to move off the core node still yields one CAST server.
+alignment, the "every server" admin rows) on `hasDistributedNodes(a)`, not on
+`a.topology === 'multi'` — a multi topology with a scenario that has nothing to move off the core
+node still yields one CAST server, and `render()` says so in a "Nothing to distribute in this
+scenario" callout. Two more small shared helpers follow the same rule of being named once:
+`needsSharedStorage(a)` (VM platforms: `hasDistributedNodes(a)`; Kubernetes: only when several
+analysis-node pods run, since CAST defaults to per-node block storage there) and
+`clientPort(a)`/`clientProto(a)` (443/HTTPS, or 80/HTTP when the HTTPS answer is "none" — the port
+clients use to reach the reverse proxy).
 
 Every row or sizing entry that depends on "does this deployment have a UI at all", "does it run
 analysis", etc. must call the predicate, not re-derive the condition. The single worst bug class
@@ -242,12 +292,27 @@ app-count band spans 50) uses this anchor directly; `standard`/`enterprise` are 
 labeled multiples of it (2x/4x) rather than a researched figure, because CAST states there is no
 linear formula relating app count to sizing — don't tighten those without new primary evidence. The
 tool used to show a `sizingHtml` callout citing this anchor and calling out the extrapolation
-explicitly; it was removed from the UI per user request (2026-09-17), so this reasoning now lives
-only here and in `documentation-map.md` — don't silently drift `standard`/`enterprise` away from
-"2x/4x of the small-tier anchor" just because the UI no longer states the rule out loud. Before this
-fix, `postgresDedicated`/`postgresManaged` were flat numbers
-(512 GB / 1024 GB) applied at every scale — below the anchor's 3072 GB even at `enterprise`, a
-self-contradiction against the tool's own cited source that an audit caught.
+explicitly; it was removed from the UI per user request (2026-09-17) and **re-added by mistake
+during an audit, then removed again** — so this reasoning lives only here and in
+`documentation-map.md`. Don't re-add it, and don't silently drift `standard`/`enterprise` away
+from "2x/4x of the small-tier anchor" just because the UI no longer states the rule out loud.
+PostgreSQL disk is exactly 3072 / 6144 / 12288 GB for `small` / `standard` / `enterprise`; the
+`poc` band (< 50 applications) deliberately sits below CAST's "up to 50 applications" example
+because it assumes only one or two parallel analyses. Before this fix, `postgresDedicated`/
+`postgresManaged` were flat numbers (512 GB / 1024 GB) applied at every scale — below the anchor's
+3072 GB even at `enterprise`, a self-contradiction against the tool's own cited source that an
+audit caught.
+
+**Three adjustments are applied to `sizingRows[0]` (the all-in-one or core row) after the rows are
+built, in this order:** (1) when `dbHosting === 'colocated'`, the row also carries
+`postgresDedicated` CPU/RAM/disk — without this the all-in-one server was *smaller* than CAST's
+own figure for the PostgreSQL instance alone — and a short callout says so; (2) when topology is
+`multi` but `!hasDistributedNodes(a)`, RAM is raised to the standalone 32 GB floor (that one row is
+the only CAST server, so the 16 GB "distributed" floor doesn't apply); (3) the concurrent-user
+bonus (UI scenarios only). The **MCP servers** (2 vCPU / 4 GB / 20 GB) are then folded into the same
+row and named in its label — CAST allows co-locating them with other components — rather than
+listed as a separate server, which used to produce a sub-floor "extra machine" and a nonsensical
+"2 servers" footprint on a single-machine topology.
 
 **Kubernetes cluster-node floor is a separate model from the pod-request rows above it** — a real
 gap found auditing against CAST's own "What hardware do I need?" doc (user-supplied PDF). The
@@ -258,10 +323,15 @@ complex/large applications), scaling via `AnalysisNodeReplicaCount` (+1 node per
 replica beyond the first) and the `EnforceAnalysisNodeIsolation`/`EnforceNeo4jIsolation` Helm flags
 (+1 node total for isolating that workload onto its own dedicated node — the doc only ever shows
 these two enabled together, so don't assume they're independently additive without new evidence).
-`render()` computes this as `k8sMinNodes` (base 2 + isolation bonus + replica-count bonus) right next
-to `serverMachineCount`, and surfaces it in both the `isK8s` branch of `machineSummaryHtml` and a
-dedicated callout in `sizingHtml` — don't let the two drift, same discipline as the machine-count
-summary below. `EnforcePostgresIsolation` (isolating the *embedded* PostgreSQL pod onto its own
+`render()` computes this as `k8sMinNodes = max(k8sFloorNodes, k8sCapacityNodes)`: the floor is base 2
++ isolation bonus + replica-count bonus (the replica count only counts in `multi` topology — a
+hidden analysis-node answer must not leak into a single node pool), and the capacity term is the
+number of 4 vCPU / 32 GB nodes needed to hold the listed pod requests (`ceil(ΣRAM/32)`,
+`ceil(ΣvCPU/4)`) — otherwise the default profile asked for 96 GB of pods on a "2 node" cluster. A
+PostgreSQL that is dedicated or managed sits *outside* the cluster, so `k8sPodRequestCount`
+excludes its row. It is surfaced in both the `isK8s` branch of `machineSummaryHtml` and a dedicated
+callout in `sizingHtml` — don't let the two drift, same discipline as the machine-count summary
+below. `EnforcePostgresIsolation` (isolating the *embedded* PostgreSQL pod onto its own
 node) is **not** modeled in `k8sMinNodes` — this tool has no input representing it — so the callout
 says so explicitly rather than silently under-counting; don't add it without first adding a real
 input for it.
@@ -278,7 +348,10 @@ should contain from `componentRows`/`buildPortRows()` for the box you're changin
 what already happens to be drawn.
 
 - **Layout is computed, not hardcoded.** A small `layoutRow(items, width)` helper takes an array of
-  `{key, label, sub}` box specs and returns them centered as a group at a given box width — every
+  `{key, label, sub}` box specs and returns them centered as a group at a given box width (shrunk
+  to `(W-40-gaps)/n` when the row would overflow the viewBox — eight routed boxes with MCP enabled
+  used to be clipped on both edges); a row with no items doesn't reserve vertical space either
+  (`dashboards-only` has no supporting services) — every
   row (routed services, supporting services, data tier) is built by pushing conditional items onto
   an array *before* calling `layoutRow`, the same way `buildPortRows()` pushes conditional rows.
   This is what makes boxes that don't apply to the current answers disappear and the *remaining*
@@ -320,7 +393,10 @@ what already happens to be drawn.
   user-supplied architecture diagram confirmed the real connection: Viewer → AI-service (`http
   :8082`), not Gateway → AI-service at all — AI-service is only reached through the Viewer, so it
   now draws as a solid `FLOW` line from `viewerBox`, gated on `viewerBox` existing (no Viewer, no
-  line at all — an unconnected box is more honest than a fabricated Gateway link). The same diagram
+  line at all — an unconnected box is more honest than a fabricated Gateway link). AI-service
+  is part of imaging-viewer (alongside ETL, imaging-apis and Neo4j), so the box itself, its
+  `componentRows` entry and its line are all gated on `hasViewer(a)`; Gateway's routed-path list
+  likewise names `/imaging` and `/dashboards` only when those components exist. The same diagram
   also confirmed the two MCP ports (Imaging MCP `:8282`, Gatekeeper MCP `:8283`), both reached
   through Gateway path-routing (`/mcp`, `/mcp/gatekeeper`) exactly like every other routed
   component — they're pushed into `routedItems` alongside Console/Auth/SSO/Admin/Viewer/Dashboards,
@@ -340,7 +416,15 @@ what already happens to be drawn.
   box's far edge for a shorter diagonal hop. Never let two independent lines share the exact same
   start point *and* nearly the same path — the one drawn later will visually swallow the earlier
   one (this happened to Analysis-node's lines to the Extend Local Server and to shared storage
-  until their start x-offsets were separated).
+  until their start x-offsets were separated). **No line may cross a box**: an audit screenshotted
+  every combination and found the analysis-node links cutting through SSO Service, AI-service,
+  Viewer-APIs and PostgreSQL. The current routes: Gateway → analysis-node is drawn as one path
+  through the 16 px gap between two routed boxes nearest the analysis box (two-way arrow in multi
+  topology — see the return-path row in the ports matrix); the analysis-node's links to the Extend
+  box and to shared storage leave from its *bottom* edge into the lane between rows
+  (`bottomLane(...)`), then run down a right-hand margin lane (`laneR`, each link on its own
+  x-offset) and enter the target from the side. Check both a dark and a light screenshot of a
+  full+MCP+multi+air-gapped diagram and a headless one after touching any line.
 - **Boxes present regardless of scenario need a connection drawn for every confirmed relationship,
   not just the most obvious one.** Gateway/imaging-services connects to PostgreSQL unconditionally
   (`buildPortRows()` has always had this row with no gate) — the diagram went a long time only
@@ -354,39 +438,66 @@ what already happens to be drawn.
   a separate machine that, per the user's own answers, doesn't exist. Match every connection's
   condition to the same predicate that gates the fact it represents, not just to "does this box
   exist."
-- **The Tester/admin workstation box and its three bypass lines** (Gateway `:8090` always,
-  Control Panel `:8098–2381` always, SSO Service `:8096` only when `hasDashboards(a)||hasViewer(a)`)
-  must mirror `buildPortRows()`'s own tester rows exactly, including the `hasUi`-style gate on the
-  SSO Service line. Position this box independently from Browser (don't put them in the same
+- **The Tester/admin workstation box and its three bypass lines** (Gateway `:8090` always —
+  including headless scenarios —, Control Panel `:8098–2381` always, SSO Service `:8096` only when
+  `hasUiScenario(a)`) must mirror `buildPortRows()`'s own tester rows exactly, including the gate on
+  the SSO Service line. (A fix PR once moved the Gateway line inside the UI gate and made the
+  headless diagram disagree with the ports table; the next audit caught it.) The "Browser" box
+  becomes "API client / CI" when `!hasUiScenario(a)`, and the CAST Report Generator box connects to
+  the **reverse proxy**, not straight to Gateway, like every other client. Position this box independently from Browser (don't put them in the same
   `layoutRow` call) — centering them as a pair shifts Browser off the vertical axis it needs to
   share with Reverse proxy and Gateway below it.
-- **The Extend Local Server is optional, `extend.castsoftware.com` is not.** Every egress mode
-  needs a path to `extend.castsoftware.com` — `direct`/`proxy` egress connects the core node to it
-  directly (solid line, via the same margin-routing pattern), `airgapped` egress instead shows the
-  optional Local Server (dashed border, "air-gapped only" in its label) as an intermediate hop.
+- **The Extend Local Server is optional, `extend.castsoftware.com` is not — except offline.** In
+  `direct`/`proxy` egress the core node *and the analysis-node(s)* connect to
+  `extend.castsoftware.com` directly (solid lines, margin-routed); `airgapped` egress instead shows
+  the Local Server as the intermediate hop (the core node and analysis-node(s) both reach it on
+  `:8085`), and its own link to `extend.castsoftware.com` is **dashed and labelled "online mode
+  only"** because CAST documents an offline mode (no external connection, extensions uploaded
+  manually). On Windows the Local Server is the `CAST_ExtendProxy` service, elsewhere the
+  `extend-proxy` container — use the right word in box subtitles and row destinations. The caption
+  lists only the egress exceptions the answers actually create (Highlight, an external SAML IdP),
+  never a generic "other exceptions you selected".
   Gating the whole `extend.castsoftware.com` box on `a.egress==='airgapped'` — so it disappeared
   entirely for the two more common egress modes — was a real bug found auditing this box.
 - **Machine-count summary — derive it from `sizingRows`, never recompute it separately.**
   `render()` computes `serverMachineCount` (`sizingRows.length`, minus 1 if `dbHosting==='managed'`
-  since that row is a cloud service you don't provision — the Extend Local Server is never counted
+  since that row is a cloud service you don't provision; on Kubernetes the pod count is
+  `k8sPodRequestCount`, which also leaves out a dedicated database — the Extend Local Server is never counted
   here, since it's co-located with whichever host runs Gateway/imaging-services, not a separately
   provisioned machine) and `workstationRoleCount` (1 for the end-user workstation, +1 when
   `hasAnalysis(a)` for the delivery/analyst workstation; note `workstationMachineCount` is always
   `1` since one physical workstation can cover multiple roles — `workstationDesc` is the
-  human-readable string built from these two) right after `sizingRows` is finalized (after the MCP
-  row is concatenated), then passes both into `buildArchitectureDiagram(a, counts)` and into the
+  human-readable string built from these two) right after `sizingRows` is finalized (MCP is already
+  folded into row 0 by then), then passes both into `buildArchitectureDiagram(a, counts)` and into the
   `<h3>1. Hardware sizing...</h3>` callout. Don't add a second, independent count inside the diagram
   function itself — that's exactly the kind of drift that produces a diagram/text mismatch when
   `sizingRows`'s composition changes later. The diagram renders the totals as its own header line
   (`counts.serverMachineCount` / `counts.workstationRoleCount`) and appends `· own {machine|pod}` to
   the `sub` text of every box that isn't part of the implicit core/all-in-one node (Analysis-node(s),
-  a dedicated Neo4j, a dedicated/managed PostgreSQL) — this per-box annotation, not a bounding
+  a dedicated Neo4j, a dedicated/managed PostgreSQL — "outside the cluster" instead of "own pod" for
+  a dedicated database on Kubernetes). On Kubernetes the header and caption say "pod resource
+  request(s)" and "core pods", never "server machine(s)" or "core/all-in-one machine". This per-box annotation, not a bounding
   rectangle around groups of boxes, is the safe way to show grouping: a single rectangle spanning
   multiple rows can't correctly exclude one box sitting inside a row it otherwise needs to enclose
   (e.g. Analysis-node sits in the same row as AI-service/Viewer-APIs, which *are* part of the core
   node), so don't attempt that without solving the exclusion problem first.
 
 ## Ports/FQDN matrix
+
+The matrix models the **mandatory reverse proxy** explicitly: every client flow (End-user browser,
+API client, CAST Report Generator, MCP client) targets *"Reverse proxy (<chosen kind>)"* on
+`clientPort(a)`, followed by one mandatory **reverse proxy → Gateway :8090** row — Gateway never
+appears as the destination of a client flow. (An early version listed `443` and `8090` as two
+browser alternatives straight to Gateway, which skipped the proxy the tool itself calls mandatory.)
+Other conventions worth keeping: the **return path** analysis-node → imaging-services/Gateway is its
+own mandatory row in multi topology, labelled as an inference (CAST's multi-machine pages say to
+open the hardware-page ports on each machine, but the exact ports aren't itemised) next to the
+core → analysis-node `:8089` row; with the `proxy` egress answer a mandatory
+**servers → corporate HTTP(S) proxy** row (port "per your proxy") notes that the container engine
+needs its own `HTTP(S)_PROXY` for image pulls; the LLM row's source is the **MCP client host**, not
+the CAST servers; the Gatekeeper → IdP row only applies to an *external* IdP; SSH/RDP admin rows say
+"every CAST Imaging machine" when `hasDistributedNodes(a)`; Kubernetes tester rows mention
+`kubectl port-forward`.
 
 `buildPortRows(a)` returns an array of row objects: `{src, dst, port, proto, purpose, tag, note}`.
 `tag` is one of `mandatory` / `conditional` / `optional` / `recommended` and drives both a visual
@@ -401,7 +512,9 @@ past audits, worth repeating because they're easy to forget under a deadline:
   the caveat appended — not just the first row that happened to introduce it. When you add an
   alternative/replacement row for a different branch (like the headless API-access row that
   replaces the browser rows), copy forward every note that still applies, don't just copy the
-  purpose text.
+  purpose text. The rootless-Podman note belongs on every row that reaches the reverse proxy on
+  80/443 (browser, API/OAuth2, Report Generator, MCP client) — and *not* on Gateway's 8090, which
+  is above 1024; an earlier version had it exactly backwards.
 - **No wildcards, no bundling alternatives as if simultaneous.** If three ports are alternatives
   (pick one), say "pick one" explicitly (see the SMTP row) — don't list all three as if all were
   required. If several FQDNs are genuinely all required together, it's fine to list them in one
@@ -457,12 +570,21 @@ own.
    "Minimum footprint" callout names the roles a single workstation needs to cover
    (`workstationDesc`) rather than implying one machine per role.
 2. **Database requirements** (`dbHtml`) — PostgreSQL configuration/version/hosting, and Neo4j
-   requirements when the scenario includes the Viewer.
+   requirements when the scenario includes the Viewer. The Version row branches: embedded
+   `postgres:15` container (Docker/Podman co-located only), Helm-chart pod (Kubernetes co-located,
+   version "not confirmed here"), self-installed EnterpriseDB (Windows co-located), a managed
+   DBaaS pick, or a self-provisioned instance — always with the supported 14.x–18.x range (18.x
+   recommended). High availability at enterprise scale is labelled as this tool's heuristic, not a
+   CAST rule.
 3. **Network ports & FQDN allowlist** (`netHtml`) — the full `buildPortRows(a)` table. This is
    where egress mode (direct/proxy/air-gapped) actually shows its effects — as row content and
    notes, not as a separate section.
-4. **HTTPS / TLS** (`httpsHtml`) — certificate source, termination point, and any platform-specific
-   reverse-proxy configuration detail.
+4. **Reverse Proxy & HTTPS / TLS** (`httpsHtml`) — the mandatory-proxy callout, platform/proxy
+   mismatch warnings, certificate source, termination point, and platform-specific proxy detail:
+   the self-signed trust bullet follows `certSource === 'self-signed'` on every platform, the Nginx
+   vHost guidance covers Docker, Podman *and* Windows, and the "disable plain HTTP" advice targets
+   the proxy's own port-80 listener — **never Gateway's 8090, which is the proxy's upstream**
+   (the original text told users to disable 8090, which would have broken the deployment).
 5. **Authentication prerequisites** (`authHtml`) — prerequisites for whichever of Local/SAML/LDAP
    was selected.
 6. **CAST Extend access & licensing** (`extendHtml`) — outbound access to CAST's extension/update
@@ -512,7 +634,7 @@ elsewhere in the function.
 ### The checklist
 
 The pre-installation checklist is grouped by **machine/role**, not by topic — `groups` is an array
-of `{title, key, items}` (e.g. "Core node (imaging-services...)", "Analysis-node machine(s)",
+of `{title, items}` (e.g. "Core node (imaging-services...)", "Analysis-node machine(s)",
 "Reverse proxy", "End-user workstation"), each pushed conditionally on the same `has*(a)` /
 `a.topology` gates as everything else, so a group for a machine that doesn't exist in this
 configuration simply isn't pushed. Each item is built with `item(id, html)` and renders as a real
@@ -523,7 +645,34 @@ re-render), and restored by `restoreChecklistState()` called at the end of `rend
 short, globally unique, stable slug (`curl`, `server-sizing`, `rp-tls`…), never a position: an
 earlier `group.key + ':' + index` scheme made ticks jump to a different item whenever answers
 added, removed or moved items between groups (e.g. single↔multi, Docker→Windows, enabling SAML).
-New items need a new unique id; never reuse an id for a different item.
+New items need a new unique id; never reuse an id for a different item. The storage key is
+`castImagingChecklist:v2:<id>` — bump the version if ids are ever re-meant wholesale. Where an
+item's *meaning* depends on an answer, put the answer in the id (`pg-hosting:<dbHosting>`,
+`rp-deployed:<reverseProxy>`, `rp-tls:<certSource>`) so a tick for "co-located" doesn't silently
+carry over to "managed". Group rules that audits had to fix: the separate **"Every server machine"**
+group exists only on VM platforms with `hasDistributedNodes(a)` (otherwise its items fold into the
+core/single group, and on Kubernetes they're cluster-wide, not per pod — no `curl` item there);
+Extend access and image-pull items belong to that "every server" group, since analysis-nodes need
+them too; MCP client → LLM reachability goes in the End-user workstation group; the Delivery/
+analyst workstation group and the Report Generator item exist only with analysis / dashboards; and
+every requirement a results section states as mandatory (PostgreSQL version/HA, self-signed trust,
+HTTPS-for-SAML, LDAPS CA trust) needs an item — check this whenever you add a requirement to a
+section. Group titles follow the same wording rules as the rest of the file ("Cluster / core pods",
+"Single node pool", and a multi topology with nothing to distribute is titled like single).
+
+### Checklist HTML export
+
+`exportHtml()` (the **Export checklist as HTML** button) downloads
+`cast-imaging-checklist-YYYY-MM-DD.html`, a self-contained page for handing the checklist to the
+teams that own each server: it clones `main.results-pane`, removes the toolbar, every `.screen-only`
+and `.callout.no-print` element, and everything in `#results-content` except `#checklist-section`;
+retitles the page; strips the section number from the checklist heading; rewrites the live-note and
+the persistence note (ticks made in the exported file are not saved, and "Section N" references point
+to the full report); copies each checkbox's current `checked` state to the `checked` attribute
+*by index* (so every checkbox in the results pane must be a checklist checkbox); and inlines the
+page's `<style>` blocks and current `data-theme`. It contains no script. Test it with
+`acceptDownloads` + `waitForEvent('download')`, reopen the file, and check there are no tables/SVG,
+the ticks survived, and no live-page wording remains.
 
 ## Content freshness marker
 

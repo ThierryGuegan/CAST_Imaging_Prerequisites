@@ -5,27 +5,35 @@ prerequisites for your specific CAST Imaging deployment**, instead of handing yo
 generic, one-size-fits-all checklist.
 
 Open **`index.html`** in a browser. Answer the questions on the left — platform &
-topology, deployment scenario (which components you need: analysis, Viewer,
-Dashboards), project scale, database, network egress, HTTPS, authentication, optional
-MCP/AI and CAST Highlight integrations, source-code access methods — and the document on
-the right regenerates live:
+topology, deployment scenario (which components you need: analysis, Viewer, Dashboards —
+five scenarios, from *Full* to *Analysis only, headless*), project scale, database,
+network egress, reverse proxy, HTTPS, authentication, optional MCP/AI and CAST Highlight
+integrations, how source code reaches the analysis-nodes, and the deployment context
+(standard or audit engagement) — and the document on the right regenerates live:
 
 - Hardware sizing for exactly the profile you selected (not every possible combination),
-  composed from your answers rather than a fixed table per scenario.
+  composed from your answers rather than a fixed table per scenario — including the
+  Kubernetes cluster-node minimum, an architecture diagram of the components and network
+  paths that apply, and the OS/runtime and storage requirements.
 - A network ports / FQDN allowlist matrix filtered to the flows your configuration
   actually needs — no unused rows, no wildcards, each row confidence-labeled as
   mandatory, conditional, optional, or recommended.
 - Database requirements (CAST Imaging supports PostgreSQL only) matched to your chosen
   hosting model, plus Neo4j requirements when your scenario includes the Viewer.
-- HTTPS/TLS guidance matched to your certificate source and termination point.
+- Reverse proxy (a mandatory prerequisite — Kubernetes Ingress is preselected on
+  Kubernetes) and HTTPS/TLS guidance matched to your certificate source.
 - Authentication prerequisites for the exact method you picked (Local / SAML / LDAP),
   all brokered through CAST's embedded SSO Service and Auth service.
 - CAST Extend access and licensing steps, adapted for direct/proxy/air-gapped egress.
 - MCP Server (AI) prerequisites, only shown if you enable that integration.
-- A pre-installation checklist built from your actual answers.
+- A pre-installation checklist built from your actual answers, grouped by the machine or
+  role responsible for each item. Ticks are remembered in your browser.
 
-The whole result can be printed / saved as PDF (the questionnaire pane is hidden from
-the print output). Everything runs client-side in the browser — no data leaves the page.
+The whole result can be printed / saved as PDF (the questionnaire pane and the
+"generated live" wording are hidden from the print output). The **Export checklist as
+HTML** button downloads just the checklist, with your profile and your current ticks, as a
+standalone page you can hand to the teams that own each server. Everything runs
+client-side in the browser — no data leaves the page.
 
 > **Validation notice.** Recommendations are derived from CAST Imaging's published
 > documentation structure and standard CAST Software deployment practices. Wherever a
@@ -51,7 +59,8 @@ from the skill itself:
 
 Concretely, the skill:
 
-- **Audits and fixes** any section of `index.html` against
+- **Audits and fixes** any section of `index.html` — or the whole tool, as parallel
+  read-only passes followed by a second pass on the fix's own diff — against
   [`references/documentation-map.md`](.claude/skills/cast-imaging-prerequisites/references/documentation-map.md),
   which maps every questionnaire section to the specific `doc.castsoftware.com` page(s)
   that should back its claims — and hunts for the recurring bug shapes this file has
@@ -64,9 +73,14 @@ Concretely, the skill:
   predicate pattern, the sizing/ports data shapes, the confidence-labeling convention) —
   without exempting a fresh build from the same fact-checking and testing discipline
   applied to a one-line fix.
-- **Tests every change** with Playwright across the input matrix before shipping, and
-  reconciles with `origin/main` before opening a PR, since PRs on this repo tend to merge
-  fast.
+- **Tests every change** with Playwright across the input matrix before shipping (JS
+  errors, garbage text, duplicate checklist ids, diagram screenshots in both themes, print
+  and export), and reconciles with `origin/main` before opening a PR, since PRs on this
+  repo tend to merge fast.
+- **Remembers decisions.** Facts the user supplied, choices they made (e.g. the scenario
+  list stays as is) and questions that are still open (e.g. the analysis-node port on
+  Windows) are recorded in `references/documentation-map.md` so the next audit doesn't
+  re-ask or silently "fix" them.
 
 See the skill's `SKILL.md` for the full workflow.
 

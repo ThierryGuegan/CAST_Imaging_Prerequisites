@@ -20,6 +20,8 @@ index.html is a single-file, client-side requirements builder: a questionnaire o
 
 This is a repeatable audit-and-fix loop, not a one-off task — apply it fresh each time, even for a topic you've checked before, since fixes elsewhere in the file can introduce new inconsistencies.
 
+**Auditing the whole tool** ("audit", "check everything"): run it as four independent read-only passes in parallel — (1) sizing/topology/diagram, (2) network ports/egress/integrations/source access, (3) database/reverse proxy/HTTPS/auth/checklist, (4) workstation/UI/print/export/robustness — each reporting "real bugs" separately from "needs user input", then consolidate, fix the confirmed bugs, and put the judgement calls (a fact the user supplied, a decision about wording or scope, anything only backed by a search snippet) to the user rather than deciding for them. Follow it with a **second pass aimed at the first pass's own diff** — it reliably finds regressions. Record every answer the user gives in `references/documentation-map.md` so the next audit doesn't re-ask.
+
 ## 0. Building index.html from scratch
 
 If index.html doesn't exist, or you've been asked to rebuild/regenerate/recreate it, don't start
@@ -65,6 +67,10 @@ These are the categories that have repeatedly turned out to hide real bugs in th
 - **Self-contradiction.** A hardcoded number in a table that violates a floor or rule stated in a callout elsewhere in the same section (e.g., a sizing row below the disk/RAM minimum the tool itself claims to enforce). Search for related callouts/constraints before trusting a hardcoded value.
 - **Vague or duplicated source/purpose text.** A row whose `src` is generic ("CAST Imaging") when a specific component is more accurate and more consistent with neighboring rows (`imaging-services`, `analysis-node`, `SSO Service`, `imaging-viewer`...). If two rows share a purpose but one is more specific, prefer the specific one and ask whether the vague one should be split or removed.
 - **Silent conflation.** A single row bundling several distinct options as if all were simultaneously required (e.g., listing three alternative SMTP ports as "needed" instead of "pick one").
+- **Gating on the answer instead of the effect.** A multi-machine requirement (shared storage, inter-node firewall paths, UID alignment, "every machine" rows) gated on `a.topology === 'multi'` appears even when the scenario has nothing to move off the core node. Use `hasDistributedNodes(a)` / `needsSharedStorage(a)`, and check the Kubernetes variant separately — the same requirement often differs there (RWX storage only for several analysis-node pods).
+- **Positional or stale identifiers.** Checklist ticks keyed by `group + index` jumped to a different item whenever an answer added or removed one; an id that survives a change of *meaning* (`pg-hosting` going from co-located to managed) keeps a tick that no longer applies. Items need stable ids, and the id should include the answer the wording depends on.
+- **Mixed numbering schemes.** In results text "Section N" means a results section and the questionnaire is "question N". A reference that uses the other scheme points at the wrong place (the authentication *question* once read as "Section 7", which is the MCP/checklist section). Grep both `Section \d` and `question \d` after any renumber or reference edit.
+- **Regressions from your own fix.** A second audit of a large fix PR found: an advice sentence about port 8090 that was wrong in the first place, a gate moved too far (the tester → Gateway line disappeared in headless scenarios), a removed-on-request callout reintroduced, labels that overflowed the viewBox, and lines crossing boxes. After a big fix, audit the diff itself (`git diff <before> <after> -- index.html`) before calling it done.
 - **Diagram/text mismatch.** The architecture diagram (`buildArchitectureDiagram(a)`) omits a connection, port, or component that a table, callout, or note elsewhere in the same file confirms exists — or draws a connection with more confidence (solid, same color as confirmed routes) than the text next to it claims. This was the single most common bug shape found auditing the diagram box-by-box: the Extend Local Server appeared with no inbound connection at all, the shared-storage box's own caption said "including the core node" while no line to the core node existed, Control Panel's confirmed port range (`8098–2381`) was silently truncated to `8098` in three of four places it appeared, and — the largest instance — Gateway/imaging-services had no connection to PostgreSQL at all despite `buildPortRows()` having had an unconditional row for exactly that connection the whole time. When auditing the diagram, don't just check that a box exists and its own label is right — trace every row in `componentRows`/`buildPortRows()` that mentions the component and confirm each one has a corresponding line in the diagram, not just the ones that were obviously due for an update.
 
 ## 4. Fix it
@@ -73,10 +79,11 @@ Edit index.html directly. Keep changes scoped to what the audit actually found �
 
 ## 5. Test before you trust it
 
-Playwright + Chromium are pre-installed for this: `NODE_PATH=/opt/node22/lib/node_modules node -e "..."` with `chromium.launch({executablePath:'/opt/pw-browsers/chromium'})`. Every fix needs two things:
+Playwright + Chromium are pre-installed for this: `NODE_PATH=/opt/node22/lib/node_modules node -e "..."` with `chromium.launch({executablePath:'/opt/pw-browsers/chromium'})`. Every fix needs the first two of these (and the third whenever the diagram, print or export is involved):
 
 1. **A targeted check** — render the specific rows/tables your fix touches, across the combinations that exercise the new condition (e.g., if you gated something on `hasAnalysis(a)`, check it with a scenario that has analysis and one that doesn't).
-2. **A full sweep for regressions** — loop over platform × scenario × topology (add dbHosting/egress/auth when the fix touches those), clicking through the relevant inputs, with `page.on('pageerror', ...)` and `page.on('console', msg => msg.type()==='error' ...)` counters. Zero errors is the bar; don't ship on a hunch.
+2. **A full sweep for regressions** — loop over platform × scenario × topology (add dbHosting/egress/auth when the fix touches those), clicking through the relevant inputs, with `page.on('pageerror', ...)` and `page.on('console', msg => msg.type()==='error' ...)` counters. Zero errors is the bar; don't ship on a hunch. Also scan each rendered `#results-content` for `undefined`, `NaN`, `[object` and duplicate `data-check-key` values — a sweep with zero JS errors can still print garbage or collide checklist ids. (`#neo4jDedicated` is hidden unless topology is multi and the scenario has the Viewer: set it with `$eval(... e.checked=v; e.dispatchEvent(new Event('change',{bubbles:true})))` rather than `check()`.)
+3. **A look at the diagram.** For anything touching `buildArchitectureDiagram`, screenshot `.arch-diagram-frame` for a few combinations (a full + MCP + multi + air-gapped one, a headless one, a Kubernetes one) in dark *and* light theme and actually read them: label overlaps, clipped boxes and lines crossing boxes are invisible to every other check. Also check print (`page.emulateMedia({media:'print'})`) and the checklist HTML export (`acceptDownloads` + `waitForEvent('download')`) when you touch anything visible in either.
 
 Print the rendered table/section text for a couple of representative combinations so you can eyeball the actual wording, not just the error count — a fix can run error-free and still read wrong.
 
@@ -92,8 +99,7 @@ refactors, comments).
 Work happens on the existing branch for this task (check `git branch` / recent commits if unsure which one). Commit with a message that explains *why* the change matters, ending with:
 
 ```
-Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
-Claude-Session: <this session's URL, if known>
+<the attribution lines your session instructions specify — e.g. Co-Authored-By and Claude-Session>
 ```
 
 Before opening a PR, this repo has a real quirk worth knowing: PRs here tend to get merged (auto-merge or a very fast manual merge) within moments of opening — sometimes before you've finished pushing related follow-up commits. So every time, before opening a PR:
