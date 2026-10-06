@@ -627,14 +627,19 @@ own.
 5. **Authentication prerequisites** (`authHtml`) — prerequisites for whichever of Local/SAML/LDAP
    was selected.
 6. **CAST Extend access & licensing** (`extendHtml`) — in air-gapped mode it ends with an
-   **"Air-gapped installation — container images to download"** subsection (`airgapImagesHtml()`):
-   a per-scenario image table, a status per image, and the save → transfer → load procedure from
-   CAST's "Air-gapped installation" section of the Docker S1 page. Image names carry a status —
-   *Listed* (named in CAST's table), *Expected* (Docker Hub repository exists, not seen in the table
-   part that could be read), *Unconfirmed* (name to take from the doc) — because that page isn't
-   reachable from this environment; tags are the doc's `<version>` placeholder. No registry row for
-   Docker/Podman (CAST's procedure is `docker save`/`load`); Kubernetes keeps a private-registry row
-   labelled as general practice. Windows has no images. Update the table when the doc text is
+   **"Air-gapped installation — container images to download"** subsection (`airgapImagesHtml()`),
+   which reproduces CAST's own table from the "Air-gapped installation" section of the Docker S1
+   page (pasted verbatim by the user, 2026-10-06) — Component · Image · Pull & export · Load —
+   filtered to the scenario: imaging-services images always (`gateway`, `admin-center`,
+   `sso-service`, `auth-service`, `console`), `dashboards-v3` with Dashboards, `analysis-node`
+   with analysis, the imaging-viewer group (`etl-service`, `ai-service`, `imaging-apis`, `viewer`,
+   `neo4j`) with the Viewer, `postgres:15` when PostgreSQL is co-located (embedded), `alpine/psql`
+   for a dedicated/managed one (`DB_MODE=external`), `curlimages/curl` and `castimaging/extend-proxy`
+   always. `<ver>` is CAST's placeholder for the release installed (the curl row has its own curl
+   versions). Podman swaps the engine name and says so (inference); Kubernetes lists the images
+   without commands and a private-registry note (no CAST procedure found); Windows has no images;
+   MCP images aren't in the table (their install scripts pull them). The Docker/Podman network table
+   has no registry row, since CAST's procedure is `save`/`load` Update the table when the doc text is
    pasted in verbatim — outbound access to CAST's extension/update
    service (direct or via the air-gapped Local Update Server), generating an **API key from the
    CAST Extend website**, and obtaining a **CAST Imaging license key** (a key, not a file) that
