@@ -4,7 +4,9 @@ An interactive tool that helps you **define the architecture and installation
 prerequisites for your specific CAST Imaging deployment**, instead of handing you a
 generic, one-size-fits-all checklist.
 
-Open **`index.html`** in a browser. Answer the questions on the left — platform &
+Open **`index.html`** in a browser. Optionally name the **client / project** at the top of
+the left pane (it appears in the generated page, the printed copy and the saved files), then
+answer the questions on the left — platform &
 topology, deployment scenario (which components you need: analysis, Viewer, Dashboards —
 five scenarios, from *Full* to *Analysis only, headless*), project scale, database,
 network egress, reverse proxy, HTTPS, authentication, optional MCP/AI and CAST Highlight
@@ -30,9 +32,11 @@ integrations, how source code reaches the analysis-nodes, and the deployment con
   role responsible for each item. Ticks are remembered in your browser.
 
 The whole result can be printed / saved as PDF (the questionnaire pane and the
-"generated live" wording are hidden from the print output). The **Export checklist as
-HTML** button downloads just the checklist, with your profile and your current ticks, as a
-standalone page you can hand to the teams that own each server. Everything runs
+"generated live" wording are hidden from the print output), or saved with **Save as HTML**
+as a standalone page. The **Export checklist as HTML** button downloads just the checklist,
+with your profile and your current ticks, as a standalone page you can hand to the teams
+that own each server. In air-gapped mode the document also lists the container images to
+download and how to carry them to the servers. Everything runs
 client-side in the browser — no data leaves the page.
 
 > **Validation notice.** Recommendations are derived from CAST Imaging's published
