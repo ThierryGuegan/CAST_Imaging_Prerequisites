@@ -1,6 +1,6 @@
 ---
 name: cast-imaging-prerequisites
-description: Audit and fix a section of index.html, the interactive CAST Imaging deployment-requirements builder in this repo — or build index.html from scratch if it's missing or you're asked to rebuild/regenerate/recreate it. Use this whenever the user says "check the network ports for X", "check the hardware sizing for X", "check X" for any platform/scenario/section of the tool (docker, podman, kubernetes, windows, authentication, MCP, source code access, email, extensions, database, HTTPS, etc.), asks you to review, audit, verify, or double-check part of the requirements builder against CAST's documentation, or asks you to build/rebuild/regenerate/scaffold/recreate the tool (including "build a new index.html from scratch"). Also use it any time you're about to edit index.html's JS logic for correctness, since it captures both the tool's architecture and the verify-fix-test-ship loop this repo expects.
+description: Audit and fix a section of cast-imaging-requirements-builder.html, the interactive CAST Imaging deployment-requirements builder in this repo — or build cast-imaging-requirements-builder.html from scratch if it's missing or you're asked to rebuild/regenerate/recreate it. Use this whenever the user says "check the network ports for X", "check the hardware sizing for X", "check X" for any platform/scenario/section of the tool (docker, podman, kubernetes, windows, authentication, MCP, source code access, email, extensions, database, HTTPS, etc.), asks you to review, audit, verify, or double-check part of the requirements builder against CAST's documentation, or asks you to build/rebuild/regenerate/scaffold/recreate the tool (including "build a new cast-imaging-requirements-builder.html from scratch"). Also use it any time you're about to edit cast-imaging-requirements-builder.html's JS logic for correctness, since it captures both the tool's architecture and the verify-fix-test-ship loop this repo expects.
 ---
 
 # CAST Imaging tool audit
@@ -8,7 +8,7 @@ description: Audit and fix a section of index.html, the interactive CAST Imaging
 ## Goal
 
 This tool derives recommendations from CAST Imaging's published documentation structure and
-standard CAST deployment practices — that sentence is index.html's own validation notice to its
+standard CAST deployment practices — that sentence is cast-imaging-requirements-builder.html's own validation notice to its
 users, and it is the bar every claim in the file has to clear. This skill's job is to keep that
 promise true: every fact the tool asserts (a port, a supported engine, a mandatory-vs-optional
 label, a component name) should trace back to a CAST doc, a directly-confirmed correction, or a
@@ -16,15 +16,15 @@ clearly-labeled inference — never to an invented plausible-sounding detail. Wh
 something, the fix is to say so in the tool's own text (see the "not independently verified"
 precedent already in the file), not to silently assert it.
 
-index.html is a single-file, client-side requirements builder: a questionnaire on the left (platform, scenario, topology, database hosting, egress, auth, integrations...) drives JS in `render()` that generates sizing tables, a network-port/FQDN matrix, and prerequisite checklists on the right. Every section is supposed to react correctly to every combination of answers. Because it's one big file that's grown incrementally, the most valuable thing you can do when asked to "check X" is hunt for places where a row or number reflects a *stale* assumption instead of the *current* combination of answers on screen.
+cast-imaging-requirements-builder.html is a single-file, client-side requirements builder: a questionnaire on the left (platform, scenario, topology, database hosting, egress, auth, integrations...) drives JS in `render()` that generates sizing tables, a network-port/FQDN matrix, and prerequisite checklists on the right. Every section is supposed to react correctly to every combination of answers. Because it's one big file that's grown incrementally, the most valuable thing you can do when asked to "check X" is hunt for places where a row or number reflects a *stale* assumption instead of the *current* combination of answers on screen.
 
 This is a repeatable audit-and-fix loop, not a one-off task — apply it fresh each time, even for a topic you've checked before, since fixes elsewhere in the file can introduce new inconsistencies.
 
 **Auditing the whole tool** ("audit", "check everything"): run it as four independent read-only passes in parallel — (1) sizing/topology/diagram, (2) network ports/egress/integrations/source access, (3) database/reverse proxy/HTTPS/auth/checklist, (4) workstation/UI/print/export/robustness — each reporting "real bugs" separately from "needs user input", then consolidate, fix the confirmed bugs, and put the judgement calls (a fact the user supplied, a decision about wording or scope, anything only backed by a search snippet) to the user rather than deciding for them. Follow it with a **second pass aimed at the first pass's own diff** — it reliably finds regressions. Record every answer the user gives in `references/documentation-map.md` so the next audit doesn't re-ask.
 
-## 0. Building index.html from scratch
+## 0. Building cast-imaging-requirements-builder.html from scratch
 
-If index.html doesn't exist, or you've been asked to rebuild/regenerate/recreate it, don't start
+If cast-imaging-requirements-builder.html doesn't exist, or you've been asked to rebuild/regenerate/recreate it, don't start
 from a blank page and improvise the architecture — read `references/architecture-spec.md` first.
 It documents the layout, the questionnaire sections, the state model, the `has*(a)` predicate
 pattern, the sizing and ports-matrix data shapes, and the confidence-labeling convention this tool
@@ -39,14 +39,14 @@ replace fact-checking the *content* you fill that shape with.
 
 ## 1. Read before you judge
 
-Find every place in index.html that touches the topic you were asked about — the questionnaire HTML, the relevant part of `render()` or `buildPortRows()`, and any shared helpers it calls (`hasAnalysis`, `hasViewer`, `hasNeo4j`, `coreComponentList`, etc.). Don't just read the one line that looks relevant; read how that value flows in from `state()` and out into the displayed HTML. Most real bugs here are about *wiring*, not facts: a row that's missing a condition it should have, or built from the wrong variable.
+Find every place in cast-imaging-requirements-builder.html that touches the topic you were asked about — the questionnaire HTML, the relevant part of `render()` or `buildPortRows()`, and any shared helpers it calls (`hasAnalysis`, `hasViewer`, `hasNeo4j`, `coreComponentList`, etc.). Don't just read the one line that looks relevant; read how that value flows in from `state()` and out into the displayed HTML. Most real bugs here are about *wiring*, not facts: a row that's missing a condition it should have, or built from the wrong variable.
 
 ## 2. Verify against the primary source, but don't let a dead end stop you
 
 The user's info comes from `doc.castsoftware.com`. In this environment that domain is blocked at the network egress level for direct fetch — expect `WebFetch` to fail with `EGRESS_BLOCKED` on every attempt, not just some. Don't waste more than one try confirming that before falling back to `WebSearch`, which reaches the same content via cached snippets and usually surfaces enough to work with.
 
 Don't guess which doc page might be relevant — `references/documentation-map.md` maps every
-section of index.html to the specific `doc.castsoftware.com` page(s) that should back its
+section of cast-imaging-requirements-builder.html to the specific `doc.castsoftware.com` page(s) that should back its
 claims (plus which pages are already cited as live links inside the file itself). Read it before
 searching so you're verifying against the right page on the first try, not a plausible-sounding
 wrong one.
@@ -70,12 +70,12 @@ These are the categories that have repeatedly turned out to hide real bugs in th
 - **Gating on the answer instead of the effect.** A multi-machine requirement (shared storage, inter-node firewall paths, UID alignment, "every machine" rows) gated on `a.topology === 'multi'` appears even when the scenario has nothing to move off the core node. Use `hasDistributedNodes(a)` / `needsSharedStorage(a)`, and check the Kubernetes variant separately — the same requirement often differs there (RWX storage only for several analysis-node pods).
 - **Positional or stale identifiers.** Checklist ticks keyed by `group + index` jumped to a different item whenever an answer added or removed one; an id that survives a change of *meaning* (`pg-hosting` going from co-located to managed) keeps a tick that no longer applies. Items need stable ids, and the id should include the answer the wording depends on.
 - **Mixed numbering schemes.** In results text "Section N" means a results section and the questionnaire is "question N". A reference that uses the other scheme points at the wrong place (the authentication *question* once read as "Section 7", which is the MCP/checklist section). Grep both `Section \d` and `question \d` after any renumber or reference edit.
-- **Regressions from your own fix.** A second audit of a large fix PR found: an advice sentence about port 8090 that was wrong in the first place, a gate moved too far (the tester → Gateway line disappeared in headless scenarios), a removed-on-request callout reintroduced, labels that overflowed the viewBox, and lines crossing boxes. After a big fix, audit the diff itself (`git diff <before> <after> -- index.html`) before calling it done.
+- **Regressions from your own fix.** A second audit of a large fix PR found: an advice sentence about port 8090 that was wrong in the first place, a gate moved too far (the tester → Gateway line disappeared in headless scenarios), a removed-on-request callout reintroduced, labels that overflowed the viewBox, and lines crossing boxes. After a big fix, audit the diff itself (`git diff <before> <after> -- cast-imaging-requirements-builder.html`) before calling it done.
 - **Diagram/text mismatch.** The architecture diagram (`buildArchitectureDiagram(a)`) omits a connection, port, or component that a table, callout, or note elsewhere in the same file confirms exists — or draws a connection with more confidence (solid, same color as confirmed routes) than the text next to it claims. This was the single most common bug shape found auditing the diagram box-by-box: the Extend Local Server appeared with no inbound connection at all, the shared-storage box's own caption said "including the core node" while no line to the core node existed, Control Panel's confirmed port range (`8098–2381`) was silently truncated to `8098` in three of four places it appeared, and — the largest instance — Gateway/imaging-services had no connection to PostgreSQL at all despite `buildPortRows()` having had an unconditional row for exactly that connection the whole time. When auditing the diagram, don't just check that a box exists and its own label is right — trace every row in `componentRows`/`buildPortRows()` that mentions the component and confirm each one has a corresponding line in the diagram, not just the ones that were obviously due for an update.
 
 ## 4. Fix it
 
-Edit index.html directly. Keep changes scoped to what the audit actually found — don't refactor unrelated code or invent new features while you're in there. When a fix affects wording used in multiple places (e.g., a shared label), check whether other rows reference the same concept and keep them consistent.
+Edit cast-imaging-requirements-builder.html directly. Keep changes scoped to what the audit actually found — don't refactor unrelated code or invent new features while you're in there. When a fix affects wording used in multiple places (e.g., a shared label), check whether other rows reference the same concept and keep them consistent.
 
 ## 5. Test before you trust it
 

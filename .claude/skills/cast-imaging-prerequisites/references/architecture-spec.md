@@ -1,6 +1,6 @@
-# index.html architecture spec
+# cast-imaging-requirements-builder.html architecture spec
 
-Use this when index.html doesn't exist yet, or you've been asked to rebuild it from scratch. It
+Use this when cast-imaging-requirements-builder.html doesn't exist yet, or you've been asked to rebuild it from scratch. It
 describes the shape the tool has converged on through many audit-and-fix passes — not because the
 shape is sacred, but because each piece exists to solve a real problem that showed up during
 those passes. If you deviate from something here, know *why* the original version did it that way
@@ -175,7 +175,7 @@ be a search-and-fix pass, not a rename in isolation.
    overwritten. Impossible pairs (IIS + ARR off Windows, Ingress off Kubernetes) aren't blocked;
    the HTTPS section shows a warning callout (`proxyMismatchHtml`) and the checklist item says
    "incompatible with your platform".
-6. **HTTPS** — certificate source and TLS termination point. Kept separate from egress (Section 4)
+6. **HTTPS / TLS certificate** (legend renamed from the bare "HTTPS", which didn't say what was being asked) — certificate source and TLS termination point. Kept separate from egress (Section 4)
    and from Reverse proxy (Section 5) because all three are orthogonal decisions a reader might
    answer differently. The certificate-source choice includes a real "no HTTPS — serve over plain
    HTTP" option, not just CA-issued/self-signed — HTTPS itself is highly recommended but not

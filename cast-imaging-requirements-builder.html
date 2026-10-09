@@ -339,7 +339,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>6 · HTTPS</legend>
+      <legend>6 · HTTPS / TLS certificate</legend>
       <div class="q">
         <label class="qlabel">TLS certificate source</label>
         <div class="opt-row">
@@ -1118,7 +1118,7 @@
     if(a.topology === 'multi' && hasAnalysis(a)) chips += chip('analysis nodes', a.analysisNodes.replace('-', '–'));
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) chips += chip('Neo4j', 'dedicated');
     chips += chip('database', LABELS.dbHosting[a.dbHosting]) + chip('egress', LABELS.egress[a.egress]) +
-      chip('reverse proxy', LABELS.reverseProxy[a.reverseProxy]) + chip('HTTPS', LABELS.certSource[a.certSource]) +
+      chip('reverse proxy', LABELS.reverseProxy[a.reverseProxy]) + chip('HTTPS / TLS certificate', LABELS.certSource[a.certSource]) +
       chip('user authentication', LABELS.auth[a.auth]);
     if(a.mcp) chips += '<span class="chip">MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
     if(a.highlight) chips += '<span class="chip">Highlight: <b>enabled</b></span>';
@@ -1412,7 +1412,7 @@
       '<div class="callout warn"><b>A reverse proxy is a mandatory prerequisite.</b> A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is required for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing.</div>' +
       '<div class="callout info"><b>HTTPS/SSL itself is not mandatory, but highly recommended'+(a.auth==='saml' ? ' — except with SAML SSO (Section 5), where it is mandatory' : '')+'.</b> CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment — which in practice means almost every deployment beyond a fully offline POC.' + (a.auth==='saml' ? ' SAML SSO is the one exception: browsers and IdPs require an HTTPS redirect/callback URL, so HTTPS is a hard requirement whenever SAML is selected (Reasonable inference from standard SAML browser-redirect behavior, not a CAST-specific rule).' : '') + '</div>' +
       (a.auth==='saml' && a.certSource==='none' ?
-        '<div class="callout danger"><b>Conflict: SAML SSO requires HTTPS, but "No HTTPS" is selected (question 6, HTTPS).</b> Pick CA-issued or self-signed there before proceeding — CAST Imaging cannot complete the SAML browser-redirect flow over plain HTTP.</div>'
+        '<div class="callout danger"><b>Conflict: SAML SSO requires HTTPS, but "No HTTPS" is selected (question 6, HTTPS / TLS certificate).</b> Pick CA-issued or self-signed there before proceeding — CAST Imaging cannot complete the SAML browser-redirect flow over plain HTTP.</div>'
         : '') +
       proxyMismatchHtml +
       '<ul>' +
