@@ -503,14 +503,19 @@ what already happens to be drawn.
 
 ## Ports/FQDN matrix
 
-**Database links.** Beyond imaging-services' and the analysis-node's own rows, the table has a row for
-the **SSO Service** (a dedicated `keycloak` database on the same PostgreSQL — documented, tagged
-`mandatory`) and one conditional row for **Console, Control Panel and Dashboards** (inferred from
-older Console docs' `aip-config`/`aip-node` schemas and the Measurement Service schema — *not*
-confirmed for v3). The diagram draws SSO as a solid stub and the other three as **dotted,
-reduced-opacity** stubs ("inferred, not confirmed" legend entry), both tee-ing into the core-node
-lane to PostgreSQL. No database link was found for Auth service, Gateway, AI-service, Viewer-APIs,
-Viewer or the MCP servers — don't add one without a source.
+**Database links — confirmed by CAST (user-supplied, 2026-10-09).** Directly connected to PostgreSQL:
+**Control Panel, SSO Service, Auth Service, Console, Dashboards, analysis-node and imaging-viewer**;
+*not* connected: **Gateway, the Extend Local Server, the Imaging MCP and Gatekeeper MCP servers**. The
+table has a row for the SSO Service (its dedicated `keycloak` database), one for Auth Service /
+Console / Control Panel / Dashboards (all `mandatory`, same core-node path), and — with the Viewer —
+one for imaging-viewer (confirmed at component level only; the ETL service's read is the drawn
+line). The diagram draws one solid bus from those routed boxes tee-ing into the core-node lane to
+PostgreSQL, with a label naming them; the Database section gets a "Connected components" row with
+CAST's `pg_hba.conf` and encrypted-connection pages. The earlier dotted "inferred, not confirmed"
+styling for these links is gone — don't reintroduce it for facts CAST has confirmed. **Imaging MCP's
+semantic and text2cypher tools connect to Neo4j** (not PostgreSQL): a conditional Bolt `:7687` row and
+a dashed diagram path down the right margin, only when the scenario has the Viewer; the MCP section
+says so (and that Neo4j is absent from a no-Viewer scenario).
 
 **Extend Local Server feed.** Online: it pulls extensions on demand from `extend.castsoftware.com`
 (HTTPS 443). Offline: it is populated manually — an `.extarchive` bundle prepared with ExtendCli on an
