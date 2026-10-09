@@ -470,7 +470,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-10-06';
+  var TOOL_VERSION = '2026-10-09';
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
@@ -788,9 +788,10 @@
     var pgBox = byKey(dataRow, 'pg'), etlBox = byKey(dataRow, 'etl'), neo4jBox = byKey(dataRow, 'neo4j');
     svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L40,'+(yGateway+boxH/2)+' L40,'+(yData+boxH/2)+' L'+pgBox.x+','+(yData+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
     svg += label(85, yData+boxH/2-8, coreWordDiagram+' :2285', FLOW);
-    // Which core-node containers use the database. SSO Service: documented (a dedicated "keycloak"
-    // database). Console, Control Panel, Dashboards: inferred, not confirmed for v3 — drawn dotted.
-    // Both buses tee into the core-node lane (x=40), which already carries the :2285 path to PostgreSQL.
+    // Which core-node containers connect to PostgreSQL — confirmed by CAST (2026-10-09): Control Panel, SSO
+    // Service, Auth Service, Console, Dashboards (plus analysis-node and imaging-viewer, drawn separately).
+    // Gateway, Extend Local Server and the MCP servers do not. The bus tees into the core-node lane (x=40),
+    // which already carries the :2285 path to PostgreSQL.
     function dbBus(keys, busY, dotted){
       var bx = keys.map(function(k){ return byKey(routedRow, k); }).filter(Boolean);
       if(!bx.length) return '';
@@ -800,9 +801,17 @@
       var maxX = Math.max.apply(null, bx.map(function(b){ return b.cx; }));
       return out + '<path d="M'+maxX+','+busY+' L40,'+busY+'"'+attrs+'/>';
     }
-    svg += dbBus(['sso'], yRouted+boxH+6, false);
-    svg += dbBus(['console', 'admin', 'dash'], yRouted+boxH+13, true);
-    svg += label(180, yRouted+boxH+30, 'SSO → PostgreSQL :2285 ("keycloak" DB) · dotted: not confirmed', FLOW);
+    svg += dbBus(['sso', 'auth', 'console', 'admin', 'dash'], yRouted+boxH+8, false);
+    svg += label(210, yRouted+boxH+30, 'SSO, Auth, Console, Control Panel'+(hasDashboards(a) ? ', Dashboards' : '')+' → PostgreSQL :2285', FLOW);
+    // Imaging MCP's semantic / text2cypher tools connect to Neo4j (not PostgreSQL).
+    if(a.mcp && neo4jBox){
+      var mcpBox = byKey(routedRow, 'mcp');
+      if(mcpBox){
+        var mcpLane = laneR - 42, mcpY = yRouted+boxH+24;
+        svg += '<path d="M'+mcpBox.cx+','+(yRouted+boxH)+' L'+mcpBox.cx+','+mcpY+' L'+mcpLane+','+mcpY+' L'+mcpLane+','+(yData+boxH/2)+' L'+(neo4jBox.x+neo4jBox.w)+','+(yData+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-flow)"/>';
+        svg += label(mcpLane-110, mcpY-5, 'MCP semantic / text2cypher → Neo4j :7687', FLOW);
+      }
+    }
     if(analysisBox){
       svg += line(analysisBox.cx-24, ySupport+boxH, pgBox.cx-24, yData, FLOW, 'ah-flow');
       svg += label(analysisBox.cx-70, (ySupport+boxH+yData)/2, 'writes :2285', FLOW);
@@ -897,7 +906,6 @@
       '<span><i style="border-color:'+FLOW+'"></i>Direct internal call</span>' +
       '<span><i class="dash" style="border-color:'+ROUTE+'"></i>Gateway path-routing</span>' +
       '<span><i class="dash" style="border-color:'+TESTONLY+'"></i>Setup/testing-only bypass</span>' +
-      '<span><i style="border-color:'+FLOW+';border-top-style:dotted;opacity:.6"></i>Database link inferred, not confirmed by CAST\'s docs (Console, Control Panel'+(hasDashboards(a) ? ', Dashboards' : '')+')</span>' +
       (sharedRow ? '<span><i class="dash" style="border-color:'+SHARED+'"></i>Shared-storage read/write</span>' : '') +
       (analysisBox && a.topology === 'multi' ? '<span><i class="box" style="background:var(--m-analysis-fill);border-color:'+M_ANALYSIS+'"></i>Analysis-node '+machineWord+'(s)</span>' : '') +
       (neo4jBox && a.topology === 'multi' && a.neo4jDedicated ? '<span><i class="box" style="background:var(--m-neo4j-fill);border-color:'+M_NEO4J+'"></i>Dedicated Neo4j '+machineWord+'</span>' : '') +
@@ -954,8 +962,11 @@
 
     // Core-node containers that use PostgreSQL. imaging-services' own row above already covers the
     // network path (they share the core node); these rows say *who* uses it, with honest confidence.
-    rows.push({src:'SSO Service (core node)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'The SSO Service stores its data in a dedicated "keycloak" database on the same PostgreSQL instance (per CAST\'s Windows install and accounts pages)', tag:'mandatory', note:'Same network path as imaging-services\' row above'+(a.dbHosting !== 'colocated' ? ' — the dedicated/managed database must also host this database and its user' : '')});
-    rows.push({src:'Console, Control Panel'+(hasDashboards(a) ? ', Dashboards' : '')+' (core node)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Probably use the same PostgreSQL instance for their configuration/persistence'+(hasDashboards(a) ? ' and measurement schemas' : '')+' — CAST\'s older Console documentation lists "aip-config"/"aip-node" schemas, but the per-container v3 connections aren\'t confirmed', tag:'conditional', note:'Inference, not confirmed for CAST Imaging v3 — no firewall rule beyond the imaging-services path above. Auth service, Gateway, AI-service, Viewer-APIs and the MCP servers: no database link found in CAST\'s docs'});
+    rows.push({src:'SSO Service (core node)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'The SSO Service connects directly to PostgreSQL — it keeps its data in a dedicated "keycloak" database on the same instance', tag:'mandatory', note:'Confirmed by CAST (directly connected). Same network path as imaging-services\' row above'+(a.dbHosting !== 'colocated' ? ' — the dedicated/managed database must also host this database and its user' : '')});
+    rows.push({src:'Auth Service, Console, Control Panel'+(hasDashboards(a) ? ', Dashboards' : '')+' (core node)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'These containers connect directly to PostgreSQL', tag:'mandatory', note:'Confirmed by CAST (directly connected). They share the core node with imaging-services, so no firewall rule beyond that path — but pg_hba.conf must allow them. Gateway, the Extend Local Server and the MCP servers do not connect to PostgreSQL'});
+    if(hasViewer(a)){
+      rows.push({src:'imaging-viewer ('+(isK8s ? 'pods' : 'containers')+', incl. ETL service)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'imaging-viewer is documented as a directly connected component (the ETL service reads the analysis data from PostgreSQL to load Neo4j)', tag:'mandatory', note:'Confirmed by CAST at component level — which of its containers connect isn\'t itemised; same host as the core node unless you split it'});
+    }
     var interNodeNote = isK8s ? 'in-cluster pod-to-pod traffic — allow it in your NetworkPolicy if you enforce one' : 'a real firewall path must be opened';
     if(a.topology === 'multi' && hasAnalysis(a)){
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services / Gateway (' + coreWord + ')', port:'8090 (Gateway) — plus the other core ports CAST lists on its hardware page', proto:'HTTP/HTTPS', purpose:'Return path: each analysis-node registers against imaging-services and reports job status and results back to it, so connectivity must work in both directions between every analysis-node '+unitWord+' and the '+coreWord, tag:'mandatory', note:'Reasonable inference — CAST\'s multi-machine install pages say to open the hardware-page ports on each machine; the exact analysis-node → core ports aren\'t itemised by this tool'});
@@ -1022,6 +1033,9 @@
       rows.push({src:'MCP client host (user workstation / CI)', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'The MCP client (Claude Desktop, IDE assistant, CI agent) calls its configured LLM provider and uses CAST\'s MCP servers as tools — this egress leaves the client host, not the CAST Imaging servers', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+
         (a.egress === 'airgapped' ? (a.llmProvider === 'other' ? ' — keep this gateway reachable from the client hosts inside your air-gapped perimeter' : ' — an external API; client hosts need an explicit exception to your air-gapped egress policy, or switch to an internal LLM gateway') :
          a.egress === 'proxy' ? ' — reaches this external API via your configured proxy' : '')});
+      if(hasNeo4j(a)){
+        rows.push({src:'Imaging MCP (semantic and text2cypher tools)', dst:'Neo4j ('+(a.topology === 'multi' && a.neo4jDedicated ? (isK8s ? 'pod isolated on its own node' : 'dedicated machine') : 'with imaging-viewer')+')', port:'7687', proto:'Bolt/TCP', purpose:'Some Imaging MCP tools (semantic search and text2cypher) query the graph database directly; the MCP servers do not connect to PostgreSQL', tag:'conditional', note:'Per CAST — only for those tools'});
+      }
       rows.push({src:'Gatekeeper MCP', dst:'External OAuth2/OIDC Identity Provider', port:'443', proto:'HTTPS', purpose:'Token validation and OAuth2 flows for MCP client authentication — only if the OAuth module points to an external IdP; with CAST\'s embedded Auth service (/oauth2, internal :8092) this stays internal and needs no rule', tag:'conditional', note:'AI/MCP selected'+(a.egress === 'airgapped' ? ' — an external IdP needs an explicit exception to your air-gapped egress policy' : a.egress === 'proxy' ? ' — reaches an external IdP via your configured proxy' : '')});
     }
 
@@ -1291,7 +1305,7 @@
     if(a.mcp) componentRows.push(['Gatekeeper MCP', '8283', 'Enforces tool/application-level authorization for MCP calls, routed from Gateway (path /mcp/gatekeeper)']);
     if(hasDashboards(a)) componentRows.push(['Dashboards', '8097', 'KPI dashboards UI (path /dashboards)']);
     if(hasNeo4j(a)) componentRows.push(['Neo4j', '7687 / 7474 / 6362', 'Graph database for the Viewer (Bolt / HTTP browser interface / backup)']);
-    componentRows.push(['PostgreSQL', '2285 (default, configurable)', 'Shared relational database used by every component above that persists data']);
+    componentRows.push(['PostgreSQL', '2285 (default, configurable)', 'Relational database used directly by Control Panel, SSO Service, Auth Service, Console, Dashboards, analysis-node and imaging-viewer (per CAST) — not by Gateway, the Extend Local Server or the MCP servers']);
     if(a.egress === 'airgapped') componentRows.push(['Extend Local Server (' + (a.platform === 'windows' ? 'CAST_ExtendProxy service' : 'extend-proxy') + ')', '8085', 'On-premises mirror of extend.castsoftware.com for air-gapped installs']);
 
     sizingHtml += '<h4>Named components (architecture overview)</h4>' +
@@ -1352,6 +1366,7 @@
 
     var dbHtml = '<h3>2. Database requirements</h3>' +
       '<h4>PostgreSQL (RDBMS)</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
+      '<tr><td>Connected components</td><td>Directly connected to PostgreSQL (per CAST): <b>Control Panel, SSO Service, Auth Service, Console'+(hasDashboards(a) ? ', Dashboards' : '')+(hasAnalysis(a) ? ', analysis-node' : '')+(hasViewer(a) ? ', imaging-viewer' : '')+'</b>. Not connected: Gateway, the Extend Local Server, the MCP servers. Make sure each of these hosts can reach the database host and port, and that <code>pg_hba.conf</code> allows them — see <a href="https://doc.castsoftware.com/imaging/install/db/post-install/#configure-network-access-via-pg_hbaconf" target="_blank" rel="noopener">Configure network access via pg_hba.conf</a>. For certificate-based database connections CAST lists analysis-node, imaging-services, imaging-viewer and dashboards as the connected components (<a href="https://doc.castsoftware.com/imaging/install/db/encrypted/components/" target="_blank" rel="noopener">encrypted connections</a>).</td></tr>' +
       '<tr><td>Engine</td><td>PostgreSQL — port <b>2285 by default</b> (configurable), not the PostgreSQL community default of 5432 — the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data.</td></tr>' +
       '<tr><td>Version</td><td>' +
         (a.dbHosting==='colocated' && (a.platform==='docker'||a.platform==='podman')
@@ -1504,6 +1519,7 @@
     if(a.mcp){
       mcpHtml = '<h3>{N}. MCP Servers (AI features) — enabled</h3><ul>' +
         '<li>Deploy the CAST Imaging MCP Server (<b>Imaging MCP</b>, internal :8282) alongside a reachable CAST Imaging instance — reached through Gateway on the <code>/mcp</code> path, not a separately exposed port.</li>' +
+        '<li>Database access: the MCP servers do <b>not</b> connect to PostgreSQL. Some Imaging MCP tools (<b>semantic search</b> and <b>text2cypher</b>) connect to <b>Neo4j</b>'+(hasNeo4j(a) ? ' (Bolt 7687, part of your Viewer scenario)' : ' — which is not part of your scenario ('+esc(LABELS.scenario[a.scenario])+' has no Viewer), so those tools have no Neo4j to connect to unless you add one')+'.</li>' +
         '<li>Front it with <b>Gatekeeper MCP</b> (internal :8283, path <code>/mcp/gatekeeper</code>) for tool/application-level authorization policy.</li>' +
         '<li>Configure the <b>OAuth module</b> against an OAuth2/OIDC provider (can reuse your SAML/LDAP IdP if OIDC-capable) so MCP clients authenticate as the requesting user.</li>' +
         '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> on the MCP client hosts, not the CAST Imaging servers (no wildcards).</li>' +
