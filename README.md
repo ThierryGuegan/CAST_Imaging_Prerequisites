@@ -4,7 +4,7 @@ An interactive tool that helps you **define the architecture and installation
 prerequisites for your specific CAST Imaging deployment**, instead of handing you a
 generic, one-size-fits-all checklist.
 
-Open **`index.html`** in a browser. Optionally name the **client / project** at the top of
+Open **`cast-imaging-requirements-builder.html`** in a browser. Optionally name the **client / project** at the top of
 the left pane (it appears in the generated page, the printed copy and the saved files), then
 answer the questions on the left — platform &
 topology, deployment scenario (which components you need: analysis, Viewer, Dashboards —
@@ -54,7 +54,7 @@ exists to keep the validation notice above true, not just printed. Its goal, ver
 from the skill itself:
 
 > This tool derives recommendations from CAST Imaging's published documentation
-> structure and standard CAST deployment practices — that sentence is `index.html`'s own
+> structure and standard CAST deployment practices — that sentence is `cast-imaging-requirements-builder.html`'s own
 > validation notice to its users, and it is the bar every claim in the file has to clear.
 > The skill's job is to keep that promise true: every fact the tool asserts (a port, a
 > supported engine, a mandatory-vs-optional label, a component name) should trace back to
@@ -63,7 +63,7 @@ from the skill itself:
 
 Concretely, the skill:
 
-- **Audits and fixes** any section of `index.html` — or the whole tool, as parallel
+- **Audits and fixes** any section of `cast-imaging-requirements-builder.html` — or the whole tool, as parallel
   read-only passes followed by a second pass on the fix's own diff — against
   [`references/documentation-map.md`](.claude/skills/cast-imaging-prerequisites/references/documentation-map.md),
   which maps every questionnaire section to the specific `doc.castsoftware.com` page(s)
@@ -71,7 +71,7 @@ Concretely, the skill:
   produced before (missing gates on `has*(a)` predicates, terminology drift between VM
   and Kubernetes language, self-contradicting a stated sizing floor, vague source text,
   silently bundling alternatives as if all were required).
-- **Can build `index.html` from scratch**, using
+- **Can build `cast-imaging-requirements-builder.html` from scratch**, using
   [`references/architecture-spec.md`](.claude/skills/cast-imaging-prerequisites/references/architecture-spec.md)
   as the blueprint for the tool's converged shape (two-pane layout, the state model, the
   predicate pattern, the sizing/ports data shapes, the confidence-labeling convention) —
@@ -92,10 +92,10 @@ See the skill's `SKILL.md` for the full workflow.
 
 These are **frozen snapshots from one validation run**, not live copies of the tool — do
 not edit them, and do not treat them as ground truth going forward. `index_ref.html` was
-a copy of `index.html` at that point in time; `index_test.html` was built from scratch by
+a copy of `cast-imaging-requirements-builder.html` at that point in time; `index_test.html` was built from scratch by
 an agent with access to *only* the skill's three reference files, to check whether the
 skill alone is sufficient to reproduce the real tool. That comparison found a real gap
 (the six fixed output sections weren't enumerated anywhere, so the blind build invented
 its own taxonomy and never produced a "CAST Extend access & licensing" section at all),
 which is now fixed in `architecture-spec.md`. Both files are kept only as a record of
-that finding — `index.html` has moved on since and these two intentionally have not.
+that finding — `cast-imaging-requirements-builder.html` has moved on since and these two intentionally have not.
