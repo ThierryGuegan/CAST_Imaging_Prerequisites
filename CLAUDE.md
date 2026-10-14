@@ -19,7 +19,7 @@ left regenerates a sizing / ports / checklist document on the right. See `README
 - Single-choice question → radio option cards (no `<select>`); checkboxes only for independent toggles.
 - In generated text, "Section N" = a *results* section, "question N" = a *questionnaire* fieldset.
 - Checklist items have stable ids (`item(id, html)`); keep ids unique and put the answer in the id when the wording depends on it.
-- Free text from the user (client/project name) always goes through `esc()` / `textContent`.
+- Free text from the user (client/project name, imported JSON) always goes through `esc()` / `textContent` / `.value`, never into HTML. New questionnaire controls go inside `#form-pane` with a `name`/`id` so Save/Import answers (JSON) picks them up; bump `ANSWERS_SCHEMA` if a value's meaning changes.
 - Diagram: no line may cross a box; check dark *and* light screenshots after touching it.
 - Bump `TOOL_VERSION` when a fact the tool asserts changes.
 - `index_ref.html` and `index_test.html` are frozen validation snapshots — do not edit them. The two PDFs are CAST reference material supplied by the maintainer.

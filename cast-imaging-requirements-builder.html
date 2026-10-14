@@ -443,6 +443,10 @@
       <button class="btn btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
       <button class="btn btn-print" id="save-html" type="button">💾 Save as HTML</button>
       <button class="btn btn-print" id="export-html" type="button">⬇ Export checklist as HTML</button>
+      <button class="btn secondary" id="save-json" type="button" title="Download your answers (and checklist ticks) as a JSON file to reuse later">📥 Save answers (JSON)</button>
+      <button class="btn secondary" id="import-json" type="button" title="Load answers saved earlier from a JSON file">📤 Import answers (JSON)</button>
+      <input type="file" id="import-json-file" accept="application/json,.json" hidden>
+      <span id="io-status" class="hint" role="status" aria-live="polite" style="align-self:center;margin:0;"></span>
     </div>
 
     <div class="callout warn no-print">
@@ -1723,6 +1727,105 @@
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
   }
   document.getElementById('export-html').addEventListener('click', function(){ exportHtml('checklist'); });
+
+  // ---- Save / import the answers as JSON, to reuse a configuration later or share it ----
+  // The file holds the questionnaire answers (every control in the form pane, read from the DOM so new
+  // questions are included automatically), the ticked checklist items, and whether the reverse-proxy
+  // choice was picked by hand. Import validates everything against the form's own controls and ignores
+  // what it doesn't recognise; nothing in the file is ever evaluated or inserted as HTML.
+  var ANSWERS_FORMAT = 'cast-imaging-requirements-builder/answers';
+  var ANSWERS_SCHEMA = 1;
+  function ioStatus(msg, isError){
+    var el = document.getElementById('io-status');
+    el.textContent = msg;
+    el.style.color = isError ? 'var(--danger)' : '';
+  }
+  function collectAnswers(){
+    var answers = {};
+    document.querySelectorAll('#form-pane input[type=radio]:checked').forEach(function(el){ answers[el.name] = el.value; });
+    document.querySelectorAll('#form-pane input[type=checkbox]').forEach(function(el){ answers[el.id] = el.checked; });
+    document.querySelectorAll('#form-pane input[type=text]').forEach(function(el){ answers[el.id] = el.value; });
+    return answers;
+  }
+  function collectTicks(){
+    var ticks = [], prefix = checklistStorageKey('');
+    try {
+      for(var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i);
+        if(k && k.indexOf(prefix) === 0 && localStorage.getItem(k) === '1') ticks.push(k.slice(prefix.length));
+      }
+    } catch(e){}
+    return ticks.sort();
+  }
+  function saveAnswers(){
+    var name = clientProjectName();
+    var payload = {
+      format: ANSWERS_FORMAT, schema: ANSWERS_SCHEMA, toolVersion: TOOL_VERSION, savedAt: new Date().toISOString(),
+      answers: collectAnswers(), reverseProxyChosenByUser: reverseProxyTouched, checklistTicks: collectTicks()
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2) + '\n'], {type:'application/json;charset=utf-8'});
+    var url = URL.createObjectURL(blob), link = document.createElement('a'), d = new Date();
+    link.href = url;
+    link.download = 'cast-imaging-answers-' + (name && slugify(name) ? slugify(name) + '-' : '') + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.json';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    ioStatus('Answers saved (' + Object.keys(payload.answers).length + ' answers, ' + payload.checklistTicks.length + ' ticked checklist items).', false);
+  }
+  function applyAnswers(data){
+    if(!data || typeof data !== 'object' || data.format !== ANSWERS_FORMAT) throw new Error('This file is not a saved answers file from this tool.');
+    if(typeof data.schema !== 'number' || data.schema > ANSWERS_SCHEMA) throw new Error('This file comes from a newer version of the tool (schema ' + data.schema + ').');
+    var answers = data.answers;
+    if(!answers || typeof answers !== 'object' || Array.isArray(answers)) throw new Error('The file has no answers.');
+    var applied = 0, ignored = [];
+    // radios: the value must be one of the group's own options
+    var groups = {};
+    document.querySelectorAll('#form-pane input[type=radio]').forEach(function(el){ (groups[el.name] = groups[el.name] || []).push(el); });
+    Object.keys(groups).forEach(function(name){
+      if(!(name in answers)) return;
+      var match = groups[name].filter(function(el){ return el.value === answers[name]; })[0];
+      if(match){ match.checked = true; applied++; } else ignored.push(name);
+    });
+    document.querySelectorAll('#form-pane input[type=checkbox]').forEach(function(el){
+      if(!(el.id in answers)) return;
+      if(typeof answers[el.id] === 'boolean'){ el.checked = answers[el.id]; applied++; } else ignored.push(el.id);
+    });
+    document.querySelectorAll('#form-pane input[type=text]').forEach(function(el){
+      if(!(el.id in answers)) return;
+      if(typeof answers[el.id] === 'string'){ el.value = answers[el.id].slice(0, el.maxLength > 0 ? el.maxLength : 200); applied++; } else ignored.push(el.id);
+    });
+    reverseProxyTouched = data.reverseProxyChosenByUser === true;
+    // checklist ticks: replace the stored ones
+    var prefix = checklistStorageKey('');
+    try {
+      var stale = [];
+      for(var i = 0; i < localStorage.length; i++){ var k = localStorage.key(i); if(k && k.indexOf(prefix) === 0) stale.push(k); }
+      stale.forEach(function(k){ localStorage.removeItem(k); });
+      (Array.isArray(data.checklistTicks) ? data.checklistTicks : []).forEach(function(id){
+        if(typeof id === 'string' && /^[A-Za-z0-9:_-]{1,80}$/.test(id)) localStorage.setItem(prefix + id, '1');
+      });
+    } catch(e){}
+    render();
+    return {applied: applied, ignored: ignored};
+  }
+  document.getElementById('save-json').addEventListener('click', saveAnswers);
+  document.getElementById('import-json').addEventListener('click', function(){ document.getElementById('import-json-file').click(); });
+  document.getElementById('import-json-file').addEventListener('change', function(ev){
+    var input = ev.target, file = input.files && input.files[0];
+    if(!file) return;
+    if(file.size > 1024 * 1024){ ioStatus('File too large for a saved answers file.', true); input.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var res = applyAnswers(JSON.parse(String(reader.result)));
+        ioStatus('Imported ' + res.applied + ' answers from ' + file.name + (res.ignored.length ? ' — ignored (unknown value): ' + res.ignored.join(', ') : '') + '.', res.ignored.length > 0);
+      } catch(e){
+        ioStatus(e instanceof SyntaxError ? 'This file is not valid JSON.' : e.message, true);
+      }
+      input.value = '';
+    };
+    reader.onerror = function(){ ioStatus('The file could not be read.', true); input.value = ''; };
+    reader.readAsText(file);
+  });
   document.getElementById('save-html').addEventListener('click', function(){ exportHtml('full'); });
 
   try {
