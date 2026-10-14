@@ -719,6 +719,22 @@ HTTPS-for-SAML, LDAPS CA trust) needs an item — check this whenever you add a 
 section. Group titles follow the same wording rules as the rest of the file ("Cluster / core pods",
 "Single node pool", and a multi topology with nothing to distribute is titled like single).
 
+### Save / import answers (JSON)
+
+`#save-json` / `#import-json` (toolbar) round-trip the whole configuration. The file is
+`{format:'cast-imaging-requirements-builder/answers', schema:1, toolVersion, savedAt, answers, reverseProxyChosenByUser, checklistTicks}`.
+`answers` is **read from the form pane's own controls** (checked radios by group name, checkboxes by id,
+text inputs by id), so a new questionnaire control is saved and restored with no extra code — keep new
+controls inside `#form-pane` with a `name`/`id`. `checklistTicks` are the ids ticked in
+`localStorage['castImagingChecklist:v2:<id>']`; import *replaces* them. `reverseProxyChosenByUser`
+restores `reverseProxyTouched`, so an imported choice isn't overwritten by the platform default.
+Import never trusts the file: JSON parse in try/catch, size cap (1 MB), `format`/`schema` check
+(a newer schema is refused), radio values must match one of the group's own options, checkboxes must be
+booleans, text is length-capped and only ever set as a value (no HTML), tick ids must match
+`/^[A-Za-z0-9:_-]{1,80}$/`; anything unrecognised is skipped and listed in `#io-status`. If you change what
+an answer *means* or rename a value, bump `ANSWERS_SCHEMA` and map old files rather than silently
+mis-restoring them. The buttons live in `.toolbar`, so print and both HTML exports omit them.
+
 ### HTML exports
 
 Two buttons sit beside **Print / Save as PDF**: **Save as HTML** (the whole report, validation

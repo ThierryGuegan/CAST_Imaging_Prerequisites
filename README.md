@@ -35,7 +35,10 @@ The whole result can be printed / saved as PDF (the questionnaire pane and the
 "generated live" wording are hidden from the print output), or saved with **Save as HTML**
 as a standalone page. The **Export checklist as HTML** button downloads just the checklist,
 with your profile and your current ticks, as a standalone page you can hand to the teams
-that own each server. In air-gapped mode the document also lists the container images to
+that own each server. **Save answers (JSON)** downloads everything you filled in — the questionnaire
+and the checklist ticks — and **Import answers (JSON)** loads it back later (or on another machine), so a
+configuration can be reused, compared or shared; the file is validated and unknown values are ignored.
+In air-gapped mode the document also lists the container images to
 download and how to carry them to the servers. Everything runs
 client-side in the browser — no data leaves the page.
 
