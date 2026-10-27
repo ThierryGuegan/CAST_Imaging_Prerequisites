@@ -363,6 +363,8 @@
             <span class="opt-text"><b>Local accounts</b><span>No external identity provider</span></span></label>
           <label class="opt"><input type="radio" name="auth" value="saml">
             <span class="opt-text"><b>SAML 2.0 SSO</b><span>Azure AD/Entra ID, Okta, ADFS, PingFederate…</span></span></label>
+          <label class="opt"><input type="radio" name="auth" value="oidc">
+            <span class="opt-text"><b>OpenID Connect (OIDC)</b><span>Microsoft Entra ID, Okta, Auth0… — any OIDC-compliant identity provider</span></span></label>
           <label class="opt"><input type="radio" name="auth" value="ldap">
             <span class="opt-text"><b>LDAP / Active Directory</b><span>Directory-based authentication</span></span></label>
         </div>
@@ -474,7 +476,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-10-09';
+  var TOOL_VERSION = '2026-10-27';
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
@@ -486,7 +488,7 @@
     egress:{direct:'Direct outbound', proxy:'Via proxy', airgapped:'Air-gapped'},
     certSource:{'ca-issued':'CA-issued', 'self-signed':'Self-signed', 'none':'No HTTPS (plain HTTP)'},
     reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', iis:'IIS + ARR', undecided:'Not decided yet'},
-    auth:{local:'Local accounts', saml:'SAML 2.0 SSO', ldap:'LDAP / Active Directory'},
+    auth:{local:'Local accounts', saml:'SAML 2.0 SSO', oidc:'OpenID Connect (OIDC)', ldap:'LDAP / Active Directory'},
     llmProvider:{anthropic:'Anthropic API', openai:'OpenAI API', 'azure-openai':'Azure OpenAI', other:'Custom / internal LLM gateway'},
     auditContext:{standard:'Standard deployment', audit:'Audit / structural-analysis engagement'}
   };
@@ -568,6 +570,10 @@
   function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
   function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
   function hasNeo4j(a){ return hasViewer(a); }
+  // Federated sign-in needs HTTPS on CAST Imaging: CAST's OIDC page lists it as a prerequisite; for SAML it is
+  // this tool's inference (browser/IdP redirect flow).
+  function authNeedsHttps(a){ return a.auth === 'saml' || a.auth === 'oidc'; }
+  function authShortName(a){ return a.auth === 'oidc' ? 'OpenID Connect' : 'SAML SSO'; }
   function hasAuditContext(a){ return a.auditContext === 'audit'; }
   function hasUiScenario(a){ return hasViewer(a) || hasDashboards(a); }
   // Multi topology only splits anything across servers when there's an analysis-node or a dedicated
@@ -848,6 +854,7 @@
       var egressExceptions = [];
       if(a.highlight) egressExceptions.push('CAST Highlight');
       if(a.auth === 'saml') egressExceptions.push('your SAML IdP, if it is outside your network');
+      if(a.auth === 'oidc') egressExceptions.push('your OIDC identity provider, if it is outside your network');
       svg += box(feedBox, yFeedRow, {fill:'var(--code-bg)', dash:true});
       svg += line(feedBox.cx, yFeedRow, extendBox.cx, yExtendRow+boxH, FLOW, 'ah-flow', true);
       svg += label(feedBox.cx+150, yFeedRow-gapY/2+4, 'offline feed: upload :8085', FLOW);
@@ -957,7 +964,7 @@
     var k8sTestNote = isK8s ? ' — on Kubernetes these services are ClusterIP-only; reach them with kubectl port-forward (or a temporary NodePort), not a firewall rule' : '';
     rows.push({src:'Tester / administrator workstation', dst:'Gateway', port:'8090', proto:'HTTP/HTTPS', purpose:'Validate Gateway directly, bypassing the reverse proxy, before it\'s fully configured (Section 4)', tag:'optional', note:'Setup/testing only — close once your reverse proxy is validated'+k8sTestNote});
     if(hasUi){
-      rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Validate sign-in (Local/SAML/LDAP, Section 5) directly, bypassing Gateway\'s /auth routing', tag:'optional', note:'Setup/testing only — SSO Service is otherwise internal-only; close before go-live'+k8sTestNote});
+      rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Validate sign-in (Local/SAML/OIDC/LDAP, Section 5) directly, bypassing Gateway\'s /auth routing', tag:'optional', note:'Setup/testing only — SSO Service is otherwise internal-only; close before go-live'+k8sTestNote});
     }
     if(hasDashboards(a)){
       rows.push({src:'CAST Report Generator (client workstation)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Pulls data via CAST Dashboards\' RestAPI (/dashboards/rest), authenticated with an API key, not a browser session', tag:'conditional', note:'Only if you use CAST Report Generator — same entry point as the End-user browser row above'+podmanPortNote});
@@ -1052,6 +1059,10 @@
 
     if(a.auth === 'saml'){
       rows.push({src:'SSO Service', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'SSO metadata exchange and assertion validation — brokered through CAST\'s embedded SSO Service (port 8096, /auth path), not imaging-services directly', tag:'mandatory', note:'SAML selected'});
+    }
+    if(a.auth === 'oidc'){
+      rows.push({src:'SSO Service (Keycloak, core node)', dst:'OIDC identity provider — discovery (.well-known/openid-configuration), token, UserInfo and JWKS endpoints', port:'443', proto:'HTTPS', purpose:'Keycloak contacts these endpoints directly, server to server — the token exchange is not a browser redirect — to fetch the discovery document and signing keys and to validate tokens', tag:'mandatory', note:'Per CAST\'s OpenID Connect page; a failure usually means a firewall or proxy blocks the host'+(a.egress === 'proxy' ? ' (whether Keycloak can use an egress proxy for these calls isn\'t covered by CAST\'s page)' : a.egress === 'airgapped' ? ' — an identity provider inside your network is typical; a cloud one (Entra ID, Okta, Auth0) needs an explicit exception to your air-gapped egress policy' : '')});
+      rows.push({src:'End-user browser', dst:'OIDC identity provider — authorization endpoint', port:'443', proto:'HTTPS', purpose:'The user is redirected to the provider to sign in and back to the redirect URI (https://<imaging-fqdn>/auth/realms/aip-realm/broker/<idp-alias>/endpoint, through the reverse proxy)', tag:'conditional', note:'Reasonable inference from the redirect flow — CAST\'s page states only that the token exchange is server to server'});
     }
     if(a.auth === 'ldap'){
       rows.push({src:'SSO Service', dst:'LDAP / Active Directory server', port:'389 (LDAP / StartTLS) or 636 (LDAPS) — pick one', proto:'TCP', purpose:'Directory lookup and authentication — brokered through CAST\'s embedded SSO Service (port 8096, /auth path), not imaging-services directly', tag:'mandatory', note:'LDAP selected'});
@@ -1298,7 +1309,7 @@
     ];
     componentRows.push(['Console', '8091', 'Delivery/administration console (path /console)']);
     componentRows.push(['Auth service', '8092', 'OAuth2 token endpoint (path /oauth2)']);
-    componentRows.push(['SSO Service', '8096', 'Sign-in / SSO broker for Local, SAML, and LDAP identity sources (path /auth)']);
+    componentRows.push(['SSO Service', '8096', 'Sign-in / SSO broker (Keycloak, realm aip-realm) for Local, SAML, OpenID Connect and LDAP identity sources (path /auth)']);
     componentRows.push(['Control Panel (admin-center)', '8098–2381', 'Administration UI (path /admin)']);
     if(hasAnalysis(a)) componentRows.push(['Analysis-node' + (isK8s?' pod(s)':'(s)'), '8089', 'Runs analyses; registers against the core services'+(a.topology === 'multi' ? ' (see Section 3 for the '+unitWord+'-to-'+unitWord+' port)' : '')]);
     if(hasViewer(a)) componentRows.push(['Viewer', '8083', 'Architecture/dependency graph UI (path /imaging)']);
@@ -1414,9 +1425,9 @@
     }
     var httpsHtml = '<h3>4. Reverse Proxy &amp; HTTPS / TLS</h3>' +
       '<div class="callout warn"><b>A reverse proxy is a mandatory prerequisite.</b> A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is required for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing.</div>' +
-      '<div class="callout info"><b>HTTPS/SSL itself is not mandatory, but highly recommended'+(a.auth==='saml' ? ' — except with SAML SSO (Section 5), where it is mandatory' : '')+'.</b> CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment — which in practice means almost every deployment beyond a fully offline POC.' + (a.auth==='saml' ? ' SAML SSO is the one exception: browsers and IdPs require an HTTPS redirect/callback URL, so HTTPS is a hard requirement whenever SAML is selected (Reasonable inference from standard SAML browser-redirect behavior, not a CAST-specific rule).' : '') + '</div>' +
-      (a.auth==='saml' && a.certSource==='none' ?
-        '<div class="callout danger"><b>Conflict: SAML SSO requires HTTPS, but "No HTTPS" is selected (question 6, HTTPS / TLS certificate).</b> Pick CA-issued or self-signed there before proceeding — CAST Imaging cannot complete the SAML browser-redirect flow over plain HTTP.</div>'
+      '<div class="callout info"><b>HTTPS/SSL itself is not mandatory, but highly recommended'+(authNeedsHttps(a) ? ' — except with '+authShortName(a)+' (Section 5), where it is mandatory' : '')+'.</b> CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment — which in practice means almost every deployment beyond a fully offline POC.' + (a.auth==='saml' ? ' SAML SSO is an exception: browsers and IdPs require an HTTPS redirect/callback URL, so HTTPS is a hard requirement whenever SAML is selected (Reasonable inference from standard SAML browser-redirect behavior, not a CAST-specific rule).' : '') + (a.auth==='oidc' ? ' OpenID Connect is the other exception: CAST\'s OpenID Connect page lists access to CAST Imaging via HTTPS, already set up and configured, as a requirement before you register the client application.' : '') + '</div>' +
+      (authNeedsHttps(a) && a.certSource==='none' ?
+        '<div class="callout danger"><b>Conflict: '+authShortName(a)+' requires HTTPS, but "No HTTPS" is selected (question 6, HTTPS / TLS certificate).</b> Pick CA-issued or self-signed there before proceeding — '+(a.auth === 'oidc' ? 'CAST\'s OpenID Connect setup assumes CAST Imaging is already reachable over HTTPS.' : 'CAST Imaging cannot complete the SAML browser-redirect flow over plain HTTP.')+'</div>'
         : '') +
       proxyMismatchHtml +
       '<ul>' +
@@ -1453,6 +1464,23 @@
         '<li><b>HTTPS on CAST Imaging itself is mandatory with SAML</b> (Section 4) — the browser/IdP redirect flow requires an HTTPS callback URL; plain HTTP is not a valid choice here.' + (a.certSource==='none' ? ' <b>Your current HTTPS answer ("No HTTPS", question 6) conflicts with this — change it before proceeding.</b>' : '') + '</li>' +
         '<li>Keep a local break-glass administrator account in case of IdP outage.</li>' +
         '</ul>';
+    } else if(a.auth === 'oidc'){
+      authHtml += '<p>CAST Imaging authenticates users through an <b>OpenID Connect</b>-compliant identity provider (Microsoft Entra ID, Okta, Auth0…). The setup is done in parallel on two sides: at your identity provider, where CAST Imaging is registered as a client application, and in the <b>Keycloak</b> authentication system provided with CAST Imaging (realm <code>aip-realm</code>), where the provider is declared and its claims are mapped onto CAST Imaging groups. The Keycloak side is identical whichever provider you use. Source: CAST\'s <i>Authentication – OpenID Connect</i> page (<a href="https://doc.castsoftware.com/imaging/install/authentication/" target="_blank" rel="noopener">install/authentication</a>).</p>' +
+        '<h4>Prerequisites</h4><ul>' +
+        '<li>Access to CAST Imaging via <b>HTTPS</b> already set up and configured (Section 4).</li>' +
+        '<li>Administrator access to your identity provider (to register a client application) and to Keycloak, using the <code>kcadmin</code> account.</li>' +
+        '<li>The clock of the machine hosting <code>imaging-services</code> must be accurate and synchronized (NTP): token validation is time sensitive, and the token exchange between Keycloak and your provider is a direct server-to-server call, not a browser redirect.</li>' +
+        '<li>Network: the SSO Service host must reach the provider\'s discovery, token, UserInfo and JWKS endpoints server to server (see Section 3); a failure to retrieve the discovery document or signing keys usually means a firewall or proxy, not wrong URLs.</li>' +
+        '</ul><h4>Configuration steps</h4><ol>' +
+        '<li><b>Alias and redirect URI.</b> Choose a short, lowercase, hyphenated alias (e.g. <code>my-idp</code>, no spaces or special characters); it forms the redirect URI your provider needs: <code>https://&lt;imaging-fqdn&gt;/auth/realms/aip-realm/broker/&lt;idp-alias&gt;/endpoint</code>.</li>' +
+        '<li><b>Register CAST Imaging at your provider</b> as a <b>confidential / web</b> application (not public or single-page), entering the redirect URI character for character, and generate a client secret (often shown only once). Collect the <b>Client ID</b>, the <b>Client secret</b> and the <b>discovery endpoint</b> (<code>.well-known/openid-configuration</code>) — or, where none is published, the authorization, token, UserInfo and JWKS URLs.</li>' +
+        '<li><b>Claims.</b> CAST Imaging requires <code>email</code>, <code>given_name</code> and <code>family_name</code> (emitted by most providers once the <code>profile</code> and <code>email</code> scopes are enabled; Keycloak imports them automatically — no mapper needed, unlike SAML). For group-based permissions (recommended) your provider must also emit a role/group claim (e.g. <code>roles</code>, <code>groups</code>, <code>memberOf</code>): confirm its exact name, the values it carries and any extra scope it needs.</li>' +
+        '<li><b>Declare the provider in Keycloak</b> (<code>aip-realm</code> → Identity providers → <i>OpenID Connect v1.0</i>): alias, discovery endpoint, Client ID and secret, a client authentication method (<i>Client secret sent as post</i> is the most widely supported and the default when your provider\'s docs say nothing; also basic, JWT with the secret, or JWT with a private key), and scopes <code>openid email profile</code> plus any scope the role/group claim needs. Optionally enable <i>Trust Email</i> and set <i>Allowed clock skew</i> to a few seconds. Then check that the Redirect URI Keycloak shows is identical to the one registered.</li>' +
+        '<li><b>Groups and mappers.</b> Group import is not supported: create each group in Keycloak (its name = the exact claim value) and add a <i>Claim to Group</i> mapper per group (sync mode <i>Force</i> recommended; use <i>Regex Attribute Values</i> such as <code>^architect$</code> when the claim is an array). Don\'t add mappers for <code>email</code>, <code>given_name</code> or <code>family_name</code>.</li>' +
+        '<li><b>Permissions.</b> By default OIDC users have none: grant the <code>ADMIN</code> profile to at least one OIDC user — CAST recommends doing it with local authentication (<code>admin</code> / <code>admin</code>) and <i>User Permissions</i> — then assign profiles to the synchronized groups in CAST Imaging (<i>User permissions</i> → Users → Refresh).</li>' +
+        '<li><b>Test</b> the login in a private browsing window. A prompt for first/last name means the standard claims aren\'t arriving.</li>' +
+        '<li><b>Disable the existing authentication methods.</b> CAST highly recommends disabling or deleting the Local Authentication users/groups (temporarily switch OIDC off so they become visible, then re-enable it) so nobody can use a back-door login.</li>' +
+        '</ol><p><b>Troubleshooting (per CAST):</b> if the provider isn\'t offered at login, set the realm\'s <i>Login theme</i> to <code>keycloak</code>; decode the ID token (browser DevTools → Network → Preserve log) to check the claims; invalid/expired-token errors are often clock drift; the user is authenticated but in no group when the mapper\'s claim name or value (case included) doesn\'t match the token.</p>';
     } else {
       authHtml += '<ul>' +
         '<li>LDAP(S) server hostname/port, and a bind (service) account with read access.</li>' +
@@ -1573,6 +1601,15 @@
     coreNode.push(item('extend-api-key', 'CAST Extend API key generated and stored securely'));
     coreNode.push(item('license-key', 'CAST Imaging license key obtained, covering the selected modules'));
     if(a.auth === 'saml') coreNode.push(item('saml-sp', 'SAML metadata exchanged and CAST Imaging registered as a Service Provider at the IdP'));
+    if(a.auth === 'oidc'){
+      coreNode.push(item('oidc-register', 'OIDC client registered at the identity provider as a confidential/web application, with the redirect URI <code>https://&lt;imaging-fqdn&gt;/auth/realms/aip-realm/broker/&lt;idp-alias&gt;/endpoint</code>; Client ID, Client secret and discovery endpoint (or the four endpoint URLs) obtained'));
+      coreNode.push(item('oidc-claims', 'Identity provider emits <code>email</code>, <code>given_name</code>, <code>family_name</code> and — for group-based permissions — a role/group claim whose exact name and values are confirmed'));
+      coreNode.push(item('oidc-clock', 'Clock of the <code>imaging-services</code> machine(s) synchronized (NTP) — token validation is time sensitive'));
+      coreNode.push(item('oidc-network', 'SSO Service host can reach the provider\'s discovery, token, UserInfo and JWKS endpoints server to server (Section 3)'));
+      coreNode.push(item('oidc-keycloak', 'Identity provider declared in Keycloak (<code>aip-realm</code>), with a group and a <i>Claim to Group</i> mapper created for each entitlement level'));
+      coreNode.push(item('oidc-admin', '<code>ADMIN</code> profile granted to at least one OIDC user (via local authentication and User Permissions) and the OIDC login tested in a private browsing window'));
+      coreNode.push(item('oidc-disable-local', 'Existing authentication methods (Local Authentication users/groups) disabled or deleted once OIDC works — CAST highly recommends it'));
+    }
     if(a.auth === 'ldap') coreNode.push(item('ldap-bind', 'LDAP bind account, base DN(s), and group mapping confirmed'));
     if(a.auth === 'ldap') coreNode.push(item('ldaps-ca', 'If using LDAPS (636): directory CA certificate trusted by CAST Imaging\'s SSO Service'));
     if(a.mcp) coreNode.push(item('mcp', 'Imaging MCP + Gatekeeper MCP + OAuth module deployed'));
@@ -1608,6 +1645,7 @@
     }
     if(a.egress === 'airgapped') reverseProxyItems.push(item('rp-extend-local', 'Decided how the Extend Local Server is reached (host:8085 directly — nothing to add on the reverse proxy — or a dedicated proxy hostname/port if your standards require it)'));
     if(a.certSource === 'self-signed') reverseProxyItems.push(item('self-signed-trust', 'Self-signed certificate (or its CA) trusted on every workstation that accesses CAST Imaging'));
+    if(a.auth === 'oidc' && a.certSource === 'none') reverseProxyItems.push(item('oidc-needs-https', '<b>HTTPS enabled</b> — a prerequisite of CAST\'s OpenID Connect setup; change the "No HTTPS" answer (question 6)'));
     if(a.auth === 'saml' && a.certSource === 'none') reverseProxyItems.push(item('saml-needs-https', '<b>HTTPS enabled</b> — mandatory with SAML SSO; change the "No HTTPS" answer (question 6)'));
     groups.push({title:'Reverse proxy', items:reverseProxyItems});
 

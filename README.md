@@ -24,7 +24,7 @@ integrations, how source code reaches the analysis-nodes, and the deployment con
   hosting model, plus Neo4j requirements when your scenario includes the Viewer.
 - Reverse proxy (a mandatory prerequisite — Kubernetes Ingress is preselected on
   Kubernetes) and HTTPS/TLS guidance matched to your certificate source.
-- Authentication prerequisites for the exact method you picked (Local / SAML / LDAP),
+- Authentication prerequisites for the exact method you picked (Local / SAML / OpenID Connect / LDAP),
   all brokered through CAST's embedded SSO Service and Auth service.
 - CAST Extend access and licensing steps, adapted for direct/proxy/air-gapped egress.
 - MCP Server (AI) prerequisites, only shown if you enable that integration.

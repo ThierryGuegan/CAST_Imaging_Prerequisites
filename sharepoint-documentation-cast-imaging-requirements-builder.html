@@ -40,7 +40,7 @@
     <tr><td style="border:1px solid #c8c6c4;"><b>Network egress</b></td><td style="border:1px solid #c8c6c4;">How the servers reach the internet: direct, via proxy, or air-gapped.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Reverse proxy</b></td><td style="border:1px solid #c8c6c4;">The mandatory proxy in front of CAST Imaging.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>HTTPS</b></td><td style="border:1px solid #c8c6c4;">Certificate source.</td></tr>
-    <tr><td style="border:1px solid #c8c6c4;"><b>Authentication</b></td><td style="border:1px solid #c8c6c4;">Local, SAML or LDAP.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Authentication</b></td><td style="border:1px solid #c8c6c4;">Local, SAML, OpenID Connect or LDAP.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Optional integrations</b></td><td style="border:1px solid #c8c6c4;">MCP / AI and CAST Highlight.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Source code access</b></td><td style="border:1px solid #c8c6c4;">How source code reaches the analysis-nodes.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Deployment context</b></td><td style="border:1px solid #c8c6c4;">Standard deployment or audit engagement.</td></tr>
@@ -61,7 +61,7 @@
     <tr><td style="border:1px solid #c8c6c4;"><b>Network ports / FQDN allowlist</b></td><td style="border:1px solid #c8c6c4;">Filtered to the flows your configuration actually needs — no unused rows, no wildcards. Each row is labelled <i>mandatory</i>, <i>conditional</i>, <i>optional</i> or <i>recommended</i>.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Database requirements</b></td><td style="border:1px solid #c8c6c4;">CAST Imaging supports PostgreSQL only; matched to your chosen hosting model. Neo4j requirements are added when your scenario includes the Viewer.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Reverse proxy &amp; HTTPS / TLS</b></td><td style="border:1px solid #c8c6c4;">The reverse proxy is a mandatory prerequisite (Kubernetes Ingress is preselected on Kubernetes). HTTPS/TLS guidance is matched to your certificate source.</td></tr>
-    <tr><td style="border:1px solid #c8c6c4;"><b>Authentication</b></td><td style="border:1px solid #c8c6c4;">Prerequisites for the exact method you picked (Local / SAML / LDAP), all brokered through CAST's embedded SSO Service and Auth service.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Authentication</b></td><td style="border:1px solid #c8c6c4;">Prerequisites for the exact method you picked (Local / SAML / OpenID Connect / LDAP), all brokered through CAST's embedded SSO Service and Auth service.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>CAST Extend access &amp; licensing</b></td><td style="border:1px solid #c8c6c4;">Steps adapted for direct, proxy or air-gapped egress.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>MCP Server (AI)</b></td><td style="border:1px solid #c8c6c4;">Prerequisites, shown only if you enable that integration.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Pre-installation checklist</b></td><td style="border:1px solid #c8c6c4;">Built from your actual answers and grouped by the machine or role responsible for each item. Ticks are remembered in your browser.</td></tr>

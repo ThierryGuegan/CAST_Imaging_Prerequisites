@@ -179,12 +179,12 @@ be a search-and-fix pass, not a rename in isolation.
    and from Reverse proxy (Section 5) because all three are orthogonal decisions a reader might
    answer differently. The certificate-source choice includes a real "no HTTPS — serve over plain
    HTTP" option, not just CA-issued/self-signed — HTTPS itself is highly recommended but not
-   mandatory (unlike the reverse proxy). The one hard exception: **SAML SSO requires HTTPS** (the
-   browser/IdP redirect flow needs an HTTPS callback URL), so if `a.auth==='saml'` and the cert
+   mandatory (unlike the reverse proxy). The one hard exception: **SAML SSO and OpenID Connect require HTTPS** (SAML: inference from the
+   browser/IdP redirect flow; OIDC: CAST's page lists HTTPS as a prerequisite) — `authNeedsHttps(a)` — so if it is true and the cert
    source is "none", surface that as an explicit conflict in the HTTPS section's own output — don't
    let the two answers silently contradict each other.
-7. **User authentication** — how *users* sign in: Local / SAML / LDAP, radio (the legend, the chip and the
-   results heading say "User authentication" to distinguish it from service-to-service auth). All three are brokered through CAST's embedded
+7. **User authentication** — how *users* sign in: Local / SAML / OpenID Connect / LDAP, radio (the legend, the chip and the
+   results heading say "User authentication" to distinguish it from service-to-service auth). All four are brokered through CAST's embedded
    **SSO Service** (8096, `/auth`) and **Auth service** (8092, `/oauth2`) — not "Keycloak"; that was
    this tool's own earlier incorrect guess at the underlying broker's identity before a user-supplied
    architecture diagram confirmed the real component names. Don't build rows that bypass Gateway's
@@ -629,7 +629,7 @@ own.
    vHost guidance covers Docker, Podman *and* Windows, and the "disable plain HTTP" advice targets
    the proxy's own port-80 listener — **never Gateway's 8090, which is the proxy's upstream**
    (the original text told users to disable 8090, which would have broken the deployment).
-5. **Authentication prerequisites** (`authHtml`) — prerequisites for whichever of Local/SAML/LDAP
+5. **Authentication prerequisites** (`authHtml`) — prerequisites for whichever of Local/SAML/OIDC/LDAP
    was selected.
 6. **CAST Extend access & licensing** (`extendHtml`) — in air-gapped mode it ends with an
    **"Air-gapped installation — container images to download"** subsection (`airgapImagesHtml()`),
