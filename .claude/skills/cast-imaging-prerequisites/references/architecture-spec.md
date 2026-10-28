@@ -172,7 +172,7 @@ be a search-and-fix pass, not a rename in isolation.
    platform's natural choice** — Kubernetes Ingress on Kubernetes, an external reverse proxy
    elsewhere — via `syncReverseProxyDefault()`, which keeps following the platform until the user
    changes the select themselves (`reverseProxyTouched`), after which their choice is never
-   overwritten. Impossible pairs (IIS + ARR off Windows, Ingress off Kubernetes) aren't blocked;
+   overwritten. Options on Kubernetes: Ingress controller (NGINX Ingress — legacy, but the Helm chart still carries it for existing customers) and Gateway API (the non-legacy route); selecting Ingress shows an info callout. Impossible pairs (IIS + ARR off Windows, Ingress/Gateway API off Kubernetes) aren't blocked;
    the HTTPS section shows a warning callout (`proxyMismatchHtml`) and the checklist item says
    "incompatible with your platform".
 6. **HTTPS / TLS certificate** (legend renamed from the bare "HTTPS", which didn't say what was being asked) — certificate source and TLS termination point. Kept separate from egress (Section 4)

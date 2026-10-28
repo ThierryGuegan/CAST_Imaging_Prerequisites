@@ -328,13 +328,15 @@
           <label class="opt"><input type="radio" name="reverseProxy" value="nginx" checked>
             <span class="opt-text"><b>External reverse proxy</b><span>Nginx / Apache / HAProxy / F5</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="ingress">
-            <span class="opt-text"><b>Kubernetes Ingress controller</b></span></label>
+            <span class="opt-text"><b>Kubernetes Ingress controller</b><span>NGINX Ingress — no longer maintained upstream</span></span></label>
+          <label class="opt"><input type="radio" name="reverseProxy" value="gatewayapi">
+            <span class="opt-text"><b>Kubernetes Gateway API</b><span>Preferred on Kubernetes</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="iis">
             <span class="opt-text"><b>IIS with ARR</b><span>Windows</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="undecided">
             <span class="opt-text"><b>Not decided yet</b></span></label>
         </div>
-        <p class="hint" style="margin-top:6px;">A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is a <b>mandatory prerequisite</b> for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing. "Not decided yet" is a valid answer while planning, but must be resolved before install day.</p>
+        <p class="hint" style="margin-top:6px;">A reverse proxy (or equivalent load balancer/Ingress/Gateway API) in front of Gateway is a <b>mandatory prerequisite</b> for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing. "Not decided yet" is a valid answer while planning, but must be resolved before install day.</p>
       </div>
     </fieldset>
 
@@ -474,7 +476,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-10-09';
+  var TOOL_VERSION = '2026-10-28';
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
@@ -485,7 +487,7 @@
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
     egress:{direct:'Direct outbound', proxy:'Via proxy', airgapped:'Air-gapped'},
     certSource:{'ca-issued':'CA-issued', 'self-signed':'Self-signed', 'none':'No HTTPS (plain HTTP)'},
-    reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', iis:'IIS + ARR', undecided:'Not decided yet'},
+    reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', gatewayapi:'Kubernetes Gateway API', iis:'IIS + ARR', undecided:'Not decided yet'},
     auth:{local:'Local accounts', saml:'SAML 2.0 SSO', ldap:'LDAP / Active Directory'},
     llmProvider:{anthropic:'Anthropic API', openai:'OpenAI API', 'azure-openai':'Azure OpenAI', other:'Custom / internal LLM gateway'},
     auditContext:{standard:'Standard deployment', audit:'Audit / structural-analysis engagement'}
@@ -1032,6 +1034,19 @@
       }
     }
 
+    var viaProxyNote = a.egress === 'proxy' ? ' via your configured proxy' : '';
+    if(isK8s){
+      rows.push({src:'Administrator / CI host running Helm (or ArgoCD repo-server)', dst:'github.com (CAST-Extend/com.castsoftware.castimaging-v3.kubernetessetup)', port:'443', proto:'HTTPS', purpose:'Clone the CAST Imaging Helm chart repository (latest release branch, or an older one with -b x.x.x)'+viaProxyNote, tag:(a.egress === 'airgapped' ? 'conditional' : 'mandatory'), note:(a.egress === 'airgapped' ? 'Air-gapped: clone on an internet-connected host and transfer the repository instead — no outbound path needed from the cluster' : 'Needed at install and at every chart upgrade; a mirror of the repository inside your network works as well')});
+    }
+    if(hasAnalysis(a)){
+      rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : '(s)'), dst:'Your private Maven repository (e.g. Nexus / Artifactory)', port:'443 (per your repository)', proto:'HTTPS', purpose:'Dependency resolution for analyses that use a private Maven repository'+viaProxyNote, tag:'conditional', note:'Per customer — host, port and credentials are yours; CAST names no fixed endpoint. Only if your analysed applications resolve Maven dependencies from a private repository'});
+    }
+    rows.push({src:'Administrator / delivery workstation', dst:'castsoftware.zendesk.com', port:'443', proto:'HTTPS', purpose:'CAST Support portal (tickets, downloads)', tag:'optional', note:'Browser access from the workstations (e.g. the operator machine), not from the CAST Imaging servers'});
+    rows.push({src:'Administrator / delivery workstation', dst:'doc.castsoftware.com', port:'443', proto:'HTTPS', purpose:'CAST online documentation', tag:'optional', note:'Browser access from the workstations, not from the CAST Imaging servers'});
+    if(a.highlight){
+      rows.push({src:'Administrator / delivery workstation', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal (browser access)', tag:'conditional', note:'Highlight integration selected — workstation side; the imaging-services side is listed above'});
+    }
+
     if(a.mcp){
       rows.push({src:'MCP client (Claude Desktop / IDE / CI pipeline)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Through the reverse proxy to Gateway, then path-routed to Imaging MCP (/mcp, internal :8282) and Gatekeeper MCP (/mcp/gatekeeper, internal :8283) — no separate firewall port needed beyond Gateway itself, per CAST\'s architecture reference', tag:'mandatory', note:'AI/MCP selected'+podmanPortNote});
       rows.push({src:'MCP client host (user workstation / CI)', dst:LLM_FQDN[a.llmProvider], port:'443', proto:'HTTPS', purpose:'The MCP client (Claude Desktop, IDE assistant, CI agent) calls its configured LLM provider and uses CAST\'s MCP servers as tools — this egress leaves the client host, not the CAST Imaging servers', tag:'conditional', note:'AI/MCP selected — '+LABELS.llmProvider[a.llmProvider]+
@@ -1408,9 +1423,12 @@
 
     var proxyMismatchHtml = '';
     if(a.reverseProxy === 'iis' && a.platform !== 'windows'){
-      proxyMismatchHtml = '<div class="callout warn"><b>IIS with ARR is a Windows-only reverse proxy</b>, but your platform is '+esc(LABELS.platform[a.platform])+' — pick '+(isK8s ? 'Kubernetes Ingress' : 'an external reverse proxy (Nginx / Apache / HAProxy / F5)')+' instead, or run IIS on a separate Windows host in front of CAST Imaging.</div>';
-    } else if(a.reverseProxy === 'ingress' && !isK8s){
-      proxyMismatchHtml = '<div class="callout warn"><b>A Kubernetes Ingress controller only applies to a Kubernetes install</b>, but your platform is '+esc(LABELS.platform[a.platform])+' — pick an external reverse proxy'+(a.platform==='windows' ? ' (or IIS with ARR)' : '')+' instead.</div>';
+      proxyMismatchHtml = '<div class="callout warn"><b>IIS with ARR is a Windows-only reverse proxy</b>, but your platform is '+esc(LABELS.platform[a.platform])+' — pick '+(isK8s ? 'Kubernetes Gateway API (or Ingress)' : 'an external reverse proxy (Nginx / Apache / HAProxy / F5)')+' instead, or run IIS on a separate Windows host in front of CAST Imaging.</div>';
+    } else if((a.reverseProxy === 'ingress' || a.reverseProxy === 'gatewayapi') && !isK8s){
+      proxyMismatchHtml = '<div class="callout warn"><b>A Kubernetes '+(a.reverseProxy === 'gatewayapi' ? 'Gateway API' : 'Ingress controller')+' only applies to a Kubernetes install</b>, but your platform is '+esc(LABELS.platform[a.platform])+' — pick an external reverse proxy'+(a.platform==='windows' ? ' (or IIS with ARR)' : '')+' instead.</div>';
+    }
+    if(a.reverseProxy === 'ingress' && isK8s){
+      proxyMismatchHtml = '<div class="callout info"><b>NGINX Ingress is no longer maintained upstream; Kubernetes Gateway API is now the recommended route.</b> CAST\'s Helm chart (<code>com.castsoftware.castimaging-v3.kubernetessetup</code>) still carries Ingress settings because existing customers run NGINX Ingress, so it remains a working choice — but prefer Gateway API for a new deployment (as the user-supplied AIFE target-architecture document does). <span class="hint">Source: AIFE requirements document and the chart repository as read by the maintainer — not a CAST doc statement.</span></div>';
     }
     var httpsHtml = '<h3>4. Reverse Proxy &amp; HTTPS / TLS</h3>' +
       '<div class="callout warn"><b>A reverse proxy is a mandatory prerequisite.</b> A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is required for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing.</div>' +
@@ -1505,6 +1523,7 @@
         add('psql — required in ≥ 3.6.0-funcrel when using a custom/external PostgreSQL instance (DB_MODE=external)', '', 'alpine/psql');
       }
       add('CAST Extend Local Server', '', 'castimaging/extend-proxy');
+      if(isK8s) add('Init Container', 'utilities', 'castimaging/init-util');
       function c(t){ return '<code>'+esc(t)+'</code>'; }
       if(a.mcp){
         add('Imaging MCP Server', 'mcp', 'castimaging/imaging-mcp-server');
@@ -1581,7 +1600,14 @@
     if(isK8s){
       var k8sPrep = ['Cluster namespace', 'RBAC', 'StorageClass'];
       if(a.reverseProxy === 'ingress' && a.certSource !== 'none') k8sPrep.push('Ingress TLS secret');
+      if(a.reverseProxy === 'gatewayapi' && a.certSource !== 'none') k8sPrep.push('Gateway TLS secret');
       coreNode.push(item('k8s-prep', k8sPrep.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' prepared'));
+      coreNode.push(item('k8s-csi', 'CSI storage drivers installed by the cluster administrator, exposing at least one <b>block/disk</b> StorageClass and one <b>shared-file</b> StorageClass (the latter is mandatory for the <code>shared-datadir</code> volume, which several Imaging services must reach); CAST Imaging does not depend on a particular driver'));
+      coreNode.push(item('k8s-loadbalancer', 'A load-balancer implementation (e.g. MetalLB) available on the cluster — without it the services\' external IP stays <code>&lt;pending&gt;</code>; installed and operated by the cluster administrator'));
+      coreNode.push(item('k8s-provider', '<code>K8SProvider: K8S</code> set in <code>values.yaml</code> when the cluster is not a managed cloud one (EKS / AKS / GKE) — the same Helm chart serves both, and a non-managed cluster provides neither managed storage classes nor a load-balancer integration of its own'));
+      coreNode.push(item('k8s-etc-cast-imaging', 'Kubernetes has read/write rights on <code>/etc/cast-imaging</code> <span class="hint">(per the AIFE requirements document — not independently confirmed against CAST\'s docs)</span>'));
+      if((a.reverseProxy === 'ingress' || a.reverseProxy === 'gatewayapi') && a.certSource !== 'none') coreNode.push(item('k8s-tls-key-unencrypted', 'TLS private key supplied <b>unencrypted</b> (the FQDNs and TLS certificates for Imaging'+(a.mcp ? ', MCP Server' : '')+(a.egress === 'airgapped' ? ' and Extend Local Server' : '')+' are defined on the '+(a.reverseProxy === 'gatewayapi' ? 'Gateway' : 'Ingress')+') <span class="hint">(per the AIFE requirements document)</span>'));
+      coreNode.push(item('helm-chart-clone', a.egress === 'airgapped' ? 'Helm chart repository (<code>CAST-Extend/com.castsoftware.castimaging-v3.kubernetessetup</code>) cloned on an internet-connected host — release branch matching your CAST Imaging version — and transferred to where Helm/ArgoCD runs' : 'Access to <code>github.com</code> confirmed to clone the Helm chart repository (<code>CAST-Extend/com.castsoftware.castimaging-v3.kubernetessetup</code>, latest release branch — or <code>-b x.x.x</code> for an older release)'));
     }
     var coreComps = 'imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+(hasDashboards(a)?' + dashboards':'')+(a.topology === 'single' && hasAnalysis(a) ? ' + analysis-node' : '');
     var coreNodeTitle = (a.topology === 'single' || !hasDistributedNodes(a))
