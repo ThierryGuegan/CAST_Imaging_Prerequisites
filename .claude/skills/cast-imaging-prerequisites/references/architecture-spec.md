@@ -267,8 +267,8 @@ alignment, the "every server" admin rows) on `hasDistributedNodes(a)`, not on
 `a.topology === 'multi'` — a multi topology with a scenario that has nothing to move off the core
 node still yields one CAST server, and `render()` says so in a "Nothing to distribute in this
 scenario" callout. Two more small shared helpers follow the same rule of being named once:
-`needsSharedStorage(a)` (VM platforms: `hasDistributedNodes(a)`; Kubernetes: only when several
-analysis-node pods run, since CAST defaults to per-node block storage there) and
+`needsSharedStorage(a)` (VM platforms: `hasDistributedNodes(a)`; Kubernetes/OpenShift: always — the Helm chart
+always creates the RWX `pvc-shared-datadir`, maintainer-confirmed 2026-10-28) and
 `clientPort(a)`/`clientProto(a)` (443/HTTPS, or 80/HTTP when the HTTPS answer is "none" — the port
 clients use to reach the reverse proxy).
 
