@@ -23,8 +23,8 @@ integrations, how source code reaches the analysis-nodes, and the deployment con
 - Database requirements (CAST Imaging supports PostgreSQL only) matched to your chosen
   hosting model, plus Neo4j requirements when your scenario includes the Viewer.
 - Reverse proxy (a mandatory prerequisite — Kubernetes Gateway API is preselected on
-  Kubernetes; the legacy NGINX Ingress stays available) and HTTPS/TLS guidance matched to your certificate source.
-- Authentication prerequisites for the exact method you picked (Local / SAML / LDAP),
+  Kubernetes, with the legacy NGINX Ingress still available; an OpenShift Route on OpenShift) and HTTPS/TLS guidance matched to your certificate source.
+- Authentication prerequisites for the exact method you picked (Local / SAML / OpenID Connect / LDAP),
   all brokered through CAST's embedded SSO Service and Auth service.
 - CAST Extend access and licensing steps, adapted for direct/proxy/air-gapped egress.
 - MCP Server (AI) prerequisites, only shown if you enable that integration.

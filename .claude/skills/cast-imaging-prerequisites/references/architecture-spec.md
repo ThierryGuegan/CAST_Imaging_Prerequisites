@@ -121,7 +121,7 @@ These are the sections as of the current build. If requirements change, renumber
 render() references section numbers in generated text (e.g. "see Section 3"), so a renumber has to
 be a search-and-fix pass, not a rename in isolation.
 
-1. **Platform & topology** — host platform (Docker / Podman / Kubernetes / Windows Server, radio),
+1. **Platform & topology** — host platform (Docker / Podman / Kubernetes / OpenShift / Windows Server, radio; `isKube(a)` = Kubernetes or OpenShift, `isOcp(a)` = OpenShift — every former `a.platform === 'kubernetes'` test is `isKube(a)`; OpenShift adds the `route` reverse-proxy option and its own chart facts: Routes, `restricted-v2` SCC, `registry.redhat.io` PostgreSQL image, no StorageClass creation),
    deployment scenario (select: which components exist — this is what later drives every
    `has*(a)` predicate), topology (single machine / multi-machine, radio), plus conditional
    sub-blocks that only show when relevant (analysis-node count when topology is multi and the
@@ -169,7 +169,7 @@ be a search-and-fix pass, not a rename in isolation.
    with Gateway directly internet-facing, so don't fold this into the HTTPS section or make it
    conditional on HTTPS being enabled. Kept as its own section (split out from HTTPS after an
    earlier draft combined them and blurred that independence). The select **defaults to the
-   platform's natural choice** — Kubernetes Gateway API on Kubernetes, an external reverse proxy
+   platform's natural choice** — Kubernetes Gateway API on Kubernetes, an OpenShift Route on OpenShift, an external reverse proxy
    elsewhere — via `syncReverseProxyDefault()`, which keeps following the platform until the user
    changes the select themselves (`reverseProxyTouched`), after which their choice is never
    overwritten. Options on Kubernetes: Ingress controller (NGINX Ingress — legacy, but the Helm chart still carries it for existing customers) and Gateway API (the non-legacy route); selecting Ingress shows an info callout. Impossible pairs (IIS + ARR off Windows, Ingress/Gateway API off Kubernetes) aren't blocked;
@@ -179,12 +179,12 @@ be a search-and-fix pass, not a rename in isolation.
    and from Reverse proxy (Section 5) because all three are orthogonal decisions a reader might
    answer differently. The certificate-source choice includes a real "no HTTPS — serve over plain
    HTTP" option, not just CA-issued/self-signed — HTTPS itself is highly recommended but not
-   mandatory (unlike the reverse proxy). The one hard exception: **SAML SSO requires HTTPS** (the
-   browser/IdP redirect flow needs an HTTPS callback URL), so if `a.auth==='saml'` and the cert
+   mandatory (unlike the reverse proxy). The one hard exception: **SAML SSO and OpenID Connect require HTTPS** (SAML: inference from the
+   browser/IdP redirect flow; OIDC: CAST's page lists HTTPS as a prerequisite) — `authNeedsHttps(a)` — so if it is true and the cert
    source is "none", surface that as an explicit conflict in the HTTPS section's own output — don't
    let the two answers silently contradict each other.
-7. **User authentication** — how *users* sign in: Local / SAML / LDAP, radio (the legend, the chip and the
-   results heading say "User authentication" to distinguish it from service-to-service auth). All three are brokered through CAST's embedded
+7. **User authentication** — how *users* sign in: Local / SAML / OpenID Connect / LDAP, radio (the legend, the chip and the
+   results heading say "User authentication" to distinguish it from service-to-service auth). All four are brokered through CAST's embedded
    **SSO Service** (8096, `/auth`) and **Auth service** (8092, `/oauth2`) — not "Keycloak"; that was
    this tool's own earlier incorrect guess at the underlying broker's identity before a user-supplied
    architecture diagram confirmed the real component names. Don't build rows that bypass Gateway's
@@ -629,7 +629,7 @@ own.
    vHost guidance covers Docker, Podman *and* Windows, and the "disable plain HTTP" advice targets
    the proxy's own port-80 listener — **never Gateway's 8090, which is the proxy's upstream**
    (the original text told users to disable 8090, which would have broken the deployment).
-5. **Authentication prerequisites** (`authHtml`) — prerequisites for whichever of Local/SAML/LDAP
+5. **Authentication prerequisites** (`authHtml`) — prerequisites for whichever of Local/SAML/OIDC/LDAP
    was selected.
 6. **CAST Extend access & licensing** (`extendHtml`) — in air-gapped mode it ends with an
    **"Air-gapped installation — container images to download"** subsection (`airgapImagesHtml()`),
@@ -644,7 +644,7 @@ own.
    one (`DB_MODE=external`), `curlimages/curl` and `castimaging/extend-proxy` always, and the two MCP
    images (`castimaging/imaging-mcp-server`, `castimaging/gatekeeper-mcp-server`, Docker Hub pages given by
    the user) when `a.mcp`. A short note explains the tag (`<ver>` = release installed; curl has its own
-   versions); Kubernetes adds a private-registry note (no CAST procedure found); Windows has no images.
+   versions); Kubernetes/OpenShift replace the Docker table by the image list of CAST's Helm chart 3.6.8 (`values.yaml` — init-util, analysis-node `<ver>_core…`, extend-proxy, imaging-mcp-server pinned tags; no Gatekeeper image; OpenShift: `registry.redhat.io/rhel8/postgresql-15`) plus a private-registry note (override `*Image.name`, `UseImagePullSecrets`); Windows has no images.
    The Docker/Podman network table has no registry row, since CAST's procedure is `save`/`load` Update the table when the doc text is
    pasted in verbatim — outbound access to CAST's extension/update
    service (direct or via the air-gapped Local Update Server), generating an **API key from the
