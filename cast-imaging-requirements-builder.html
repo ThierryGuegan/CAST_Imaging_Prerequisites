@@ -330,7 +330,7 @@
           <label class="opt"><input type="radio" name="reverseProxy" value="ingress">
             <span class="opt-text"><b>Kubernetes Ingress controller</b><span>NGINX Ingress — no longer maintained upstream</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="gatewayapi">
-            <span class="opt-text"><b>Kubernetes Gateway API</b><span>Preferred on Kubernetes</span></span></label>
+            <span class="opt-text"><b>Kubernetes Gateway API</b><span>Preselected on Kubernetes — the recommended route</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="iis">
             <span class="opt-text"><b>IIS with ARR</b><span>Windows</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="undecided">
@@ -1859,7 +1859,7 @@
     if(savedProject) document.getElementById('clientProject').value = savedProject;
   } catch(e){}
 
-  // Reverse-proxy default follows the platform (Ingress on Kubernetes, external proxy elsewhere)
+  // Reverse-proxy default follows the platform (Gateway API on Kubernetes, external proxy elsewhere)
   // until the user picks a value themselves; after that their choice is left alone.
   var reverseProxyTouched = false;
   document.querySelectorAll('input[name=reverseProxy]').forEach(function(radio){
@@ -1868,7 +1868,7 @@
   function syncReverseProxyDefault(){
     if(reverseProxyTouched) return;
     var platform = document.querySelector('input[name=platform]:checked').value;
-    var want = platform === 'kubernetes' ? 'ingress' : 'nginx';
+    var want = platform === 'kubernetes' ? 'gatewayapi' : 'nginx';
     var radio = document.querySelector('input[name=reverseProxy][value="'+want+'"]');
     if(radio) radio.checked = true;
   }
