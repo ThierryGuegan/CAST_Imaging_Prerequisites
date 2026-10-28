@@ -591,15 +591,15 @@
   // The HTTP(S) port clients use to reach the reverse proxy, following the HTTPS answer.
   function clientPort(a){ return a.certSource === 'none' ? '80 (or your proxy\'s HTTP port)' : '443'; }
   function clientProto(a){ return a.certSource === 'none' ? 'HTTP' : 'HTTPS'; }
-  // Shared storage across servers: always with distributed VMs; on Kubernetes CAST defaults to
-  // per-node block storage and only needs shared-access (RWX) volumes for multiple analysis-node pods.
+  // Shared storage across servers: always with distributed VMs; on Kubernetes/OpenShift the Helm chart always
+  // creates the shared-access (RWX) pvc-shared-datadir (confirmed by the maintainer, 2026-10-28).
   function needsSharedStorage(a){
-    if(isKube(a)) return a.topology === 'multi' && hasAnalysis(a) && (ANALYSIS_NODE_COUNT[a.analysisNodes] || 1) > 1;
+    if(isKube(a)) return true;
     return hasDistributedNodes(a);
   }
   function sharedStorageText(a){
     if(a.platform === 'windows') return {box:'deploy / delivery / common-data shares · SMB :445', checklist:'Shared deploy/delivery/common-data SMB shares reachable from every server machine under one consistent service account'};
-    if(isKube(a)) return {box:'shared-access (RWX) PersistentVolume / StorageClass', checklist:'Shared-access (ReadWriteMany) StorageClass available for the PersistentVolumes shared by your multiple analysis-node pods (e.g. Azure Files on AKS, instead of the default per-node Azure Disks)'};
+    if(isKube(a)) return {box:'shared-access (RWX) PersistentVolume / StorageClass', checklist:'Shared-access (ReadWriteMany) StorageClass available (<code>FileClassName</code>) for <code>pvc-shared-datadir</code> — always required by CAST\'s Helm chart, even with a single analysis-node pod (e.g. Azure Files on AKS, EFS on EKS, Filestore on GKE)'};
     return {box:'default: /opt/cast/shared (configurable) · SMB :445', checklist:'Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared (default path — configurable) on every server machine before install'};
   }
   function topologyLabel(a){
@@ -1368,10 +1368,10 @@
       storageHtml = '<h4>Storage locations</h4><p>CAST does not ship a PostgreSQL installer for Windows — you install an official EnterpriseDB PostgreSQL release yourself and accept its defaults: <code>%PROGRAMFILES%\\PostgreSQL\\&lt;version&gt;</code> for the install directory, <code>%PROGRAMFILES%\\PostgreSQL\\&lt;version&gt;\\data</code> for the data directory (a Windows Service named <code>postgresql-x64-&lt;version&gt;</code> is created and set to auto-start). The older <code>%PROGRAMFILES%\\CAST\\CASTStorageService&lt;version&gt;</code> path (with a <code>DBDATADIR</code> installer variable) belongs to the legacy, end-of-life <b>CAST Storage Service</b> installer — not the current PostgreSQL-based install. Full per-folder paths are at CAST\'s reference: ' +
         '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/windows/" target="_blank" rel="noopener">storage-locations/windows</a> and <a href="https://doc.castsoftware.com/imaging/install/db/windows/" target="_blank" rel="noopener">install/db/windows</a>.</p>';
     } else if(isK8s){
-      storageHtml = '<h4>Storage locations</h4><p>On '+esc(LABELS.platform[a.platform])+', storage is provisioned as persistent volumes/StorageClasses rather than host paths — for Azure/AKS, CAST defaults to Azure Disks (block storage) per node, with an optional move to Azure Files when running multiple analysis-node pods. See CAST\'s cloud reference: ' +
+      storageHtml = '<h4>Storage locations</h4><p>On '+esc(LABELS.platform[a.platform])+', storage is provisioned as persistent volumes/StorageClasses rather than host paths — block volumes (e.g. Azure Disks on AKS) for the databases and logs, plus a shared-access (RWX) volume (e.g. Azure Files) that CAST\'s chart always requires. See CAST\'s cloud reference: ' +
         '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/cloud/" target="_blank" rel="noopener">storage-locations/cloud</a>.</p>' +
         '<p><b>What CAST\'s Helm chart 3.6.8 itself creates</b> (<code>storage.yaml</code>, <code>values.yaml</code>):</p><ul>' +
-        '<li><b>Always a shared <code>pvc-shared-datadir</code></b> (100 Gi by default), <b>ReadWriteMany</b> unless <code>SharedVolumeAccessMode</code> is overridden, on the <code>FileClassName</code> StorageClass — mounted by the console service, the control panel and the analysis-node (<code>/opt/cast/shared</code>: deploy, delivery, common-data). So an RWX-capable file StorageClass is needed even with a single analysis-node pod.</li>' +
+        '<li><b>Always a shared <code>pvc-shared-datadir</code></b> (100 Gi by default), <b>ReadWriteMany</b>, on the <code>FileClassName</code> StorageClass — mounted by the console service, the control panel and the analysis-node (<code>/opt/cast/shared</code>: deploy, delivery, common-data). An RWX-capable file StorageClass is therefore <b>always required</b>, even with a single analysis-node pod (confirmed by CAST\'s maintainer-side check, 2026-10-28).</li>' +
         '<li>Block volumes (<code>DiskClassName</code>, ReadWriteOnce): <code>db-data</code> 128 Gi (embedded PostgreSQL), <code>castdir</code> 100 Gi (<code>/usr/share/CAST</code> — extensions, logs), Neo4j data 100 Gi, ETL logs and CSV archive 10 Gi each, Extend proxy data 10 Gi, and 1–2 Gi log volumes per service. The log/audit volumes are kept on uninstall (<code>helm.sh/resource-policy: keep</code>).</li>' +
         (isOcp(a)
           ? '<li><b>OpenShift:</b> the chart does not create StorageClasses (<code>CreateStorageClass: false</code>) and its default <code>DiskClassName</code>/<code>FileClassName</code> is <code>crc-csi-hostpath-provisioner</code> — the OpenShift Local (CRC) development provisioner. Set both to your cluster\'s block and RWX file classes. <code>AnalysisNodeFS.enable</code> must not be changed once CAST Imaging is deployed.</li>'
@@ -1679,7 +1679,6 @@
       if(a.reverseProxy === 'ingress' && a.certSource !== 'none') k8sPrep.push('Ingress TLS secret (<code>tls-secret-cast</code>)');
       if(a.reverseProxy === 'gatewayapi' && a.certSource !== 'none') k8sPrep.push('Gateway TLS secret');
       if(a.reverseProxy === 'route' && a.certSource !== 'none') k8sPrep.push('Route TLS certificate and key (<code>--set-file tls.certificate / tls.key</code>)');
-      if(!needsSharedStorage(a)) k8sPrep.push('ReadWriteMany file StorageClass for <code>pvc-shared-datadir</code> (always created by the chart)');
       coreNode.push(item('k8s-prep', k8sPrep.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' prepared'));
       coreNode.push(item('k8s-csi', 'CSI storage drivers installed by the cluster administrator, exposing at least one <b>block/disk</b> StorageClass and one <b>shared-file</b> StorageClass (the latter is mandatory for the <code>shared-datadir</code> volume, which several Imaging services must reach); CAST Imaging does not depend on a particular driver'));
       coreNode.push(item('k8s-loadbalancer', 'A load-balancer implementation (e.g. MetalLB) available on the cluster — without it the services\' external IP stays <code>&lt;pending&gt;</code>; installed and operated by the cluster administrator'));
