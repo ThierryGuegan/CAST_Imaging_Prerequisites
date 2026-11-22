@@ -781,3 +781,5 @@ Same as any other change to this file: verify claims against
 `SKILL.md`'s commit/reconcile-before-PR workflow. A from-scratch build touches every section at
 once, so the regression sweep matters more here than for a single-section fix — don't skip
 combinations just because the file is new.
+
+**Kubernetes/OpenShift Disk column** — rows carry a `kind` (`single`/`core`/`neo4j`/`analysis`/`pg`); `chartPvcGb(kind)` sums the Helm chart's default PVC sizes of what the row hosts (shared datadir 100 + five service logs 10 + dashboards 2 + viewer 25 + Neo4j 100 + embedded PostgreSQL 128 + MCP 3 + Extend proxy 10 when air-gapped; analysis-node `castdir` 100) and shows CAST's own figure beside it as "guidance". PostgreSQL rows outside the cluster keep CAST's figure; the 256 GB floor is described as per-node disk, not PVC.

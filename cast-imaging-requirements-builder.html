@@ -1212,45 +1212,45 @@
       : '';
     var sizingRows;
     if(a.topology === 'single'){
-      sizingRows = [{c:allInOneLabel + ' (' + allInOneComponentList(a) + ')' + singleNote, cpu:sizeSpec.single.cpu, ram:sizeSpec.single.ram, disk:sizeSpec.single.disk}];
+      sizingRows = [{kind:'single', c:allInOneLabel + ' (' + allInOneComponentList(a) + ')' + singleNote, cpu:sizeSpec.single.cpu, ram:sizeSpec.single.ram, disk:sizeSpec.single.disk}];
     } else {
-      sizingRows = [{c:coreLabel + ' (' + coreComponentList(a) + ')', cpu:sizeSpec.core.cpu, ram:sizeSpec.core.ram, disk:sizeSpec.core.disk}];
+      sizingRows = [{kind:'core', c:coreLabel + ' (' + coreComponentList(a) + ')', cpu:sizeSpec.core.cpu, ram:sizeSpec.core.ram, disk:sizeSpec.core.disk}];
       if(hasNeo4j(a) && a.neo4jDedicated){
-        sizingRows.push({c:neo4jDedicatedLabel, cpu:sizeSpec.neo4j.cpu, ram:sizeSpec.neo4j.ram, disk:sizeSpec.neo4j.disk});
+        sizingRows.push({kind:'neo4j', c:neo4jDedicatedLabel, cpu:sizeSpec.neo4j.cpu, ram:sizeSpec.neo4j.ram, disk:sizeSpec.neo4j.disk});
       }
       if(hasAnalysis(a)){
         var nodeCount = ANALYSIS_NODE_COUNT[a.analysisNodes] || 1;
         for(var i = 1; i <= nodeCount; i++){
-          sizingRows.push({c:analysisLabel + (nodeCount > 1 ? ' #' + i : ''), cpu:sizeSpec.analysis.cpu, ram:sizeSpec.analysis.ram, disk:sizeSpec.analysis.disk});
+          sizingRows.push({kind:'analysis', c:analysisLabel + (nodeCount > 1 ? ' #' + i : ''), cpu:sizeSpec.analysis.cpu, ram:sizeSpec.analysis.ram, disk:sizeSpec.analysis.disk});
         }
       }
     }
     if(a.dbHosting === 'dedicated'){
-      sizingRows.push({c:'PostgreSQL machine (dedicated database server'+(isK8s ? ', typically outside the cluster' : '')+')', cpu:sizeSpec.postgresDedicated.cpu, ram:sizeSpec.postgresDedicated.ram, disk:sizeSpec.postgresDedicated.disk});
+      sizingRows.push({kind:'pg', c:'PostgreSQL machine (dedicated database server'+(isK8s ? ', typically outside the cluster' : '')+')', cpu:sizeSpec.postgresDedicated.cpu, ram:sizeSpec.postgresDedicated.ram, disk:sizeSpec.postgresDedicated.disk});
     }
     if(a.dbHosting === 'managed'){
-      sizingRows.push({c:'PostgreSQL instance (managed/clustered DBaaS, primary + standby for HA)', cpu:sizeSpec.postgresManaged.cpu, ram:sizeSpec.postgresManaged.ram, disk:sizeSpec.postgresManaged.disk});
+      sizingRows.push({kind:'pg', c:'PostgreSQL instance (managed/clustered DBaaS, primary + standby for HA)', cpu:sizeSpec.postgresManaged.cpu, ram:sizeSpec.postgresManaged.ram, disk:sizeSpec.postgresManaged.disk});
     }
     // Co-located PostgreSQL shares the first row's server, so that server also carries the database's
     // own resources — otherwise the all-in-one/core row would be smaller than CAST's documented
     // figure for the PostgreSQL instance alone.
     if(a.dbHosting === 'colocated'){
-      sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + sizeSpec.postgresDedicated.cpu, ram:sizingRows[0].ram + sizeSpec.postgresDedicated.ram, disk:sizingRows[0].disk + sizeSpec.postgresDedicated.disk};
+      sizingRows[0] = {kind:sizingRows[0].kind, c:sizingRows[0].c, cpu:sizingRows[0].cpu + sizeSpec.postgresDedicated.cpu, ram:sizingRows[0].ram + sizeSpec.postgresDedicated.ram, disk:sizingRows[0].disk + sizeSpec.postgresDedicated.disk};
     }
     // A multi topology that distributes nothing still has one CAST server, so the standalone 32 GB
     // RAM floor applies to it rather than the 16 GB distributed one.
     if(a.topology === 'multi' && !hasDistributedNodes(a) && sizingRows[0].ram < 32){
-      sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu, ram:32, disk:sizingRows[0].disk};
+      sizingRows[0] = {kind:sizingRows[0].kind, c:sizingRows[0].c, cpu:sizingRows[0].cpu, ram:32, disk:sizingRows[0].disk};
     }
     if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
-      sizingRows[0] = {c:sizingRows[0].c, cpu:sizingRows[0].cpu + userBonus.cpu, ram:sizingRows[0].ram + userBonus.ram, disk:sizingRows[0].disk};
+      sizingRows[0] = {kind:sizingRows[0].kind, c:sizingRows[0].c, cpu:sizingRows[0].cpu + userBonus.cpu, ram:sizingRows[0].ram + userBonus.ram, disk:sizingRows[0].disk};
     }
     // MCP servers are co-located with the core/all-in-one server by default (CAST: installable on a
     // machine already running CAST Imaging components or on a dedicated one) — folded into that row
     // rather than listed as a separate server, so the footprint and the per-node floors stay true.
     var mcpBonus = {cpu:2, ram:4, disk:20};
     if(a.mcp){
-      sizingRows[0] = {c:sizingRows[0].c.replace(/\)( \(.*\))?$/, ' + Imaging MCP + Gatekeeper MCP)$1'), cpu:sizingRows[0].cpu + mcpBonus.cpu, ram:sizingRows[0].ram + mcpBonus.ram, disk:sizingRows[0].disk + mcpBonus.disk};
+      sizingRows[0] = {kind:sizingRows[0].kind, c:sizingRows[0].c.replace(/\)( \(.*\))?$/, ' + Imaging MCP + Gatekeeper MCP)$1'), cpu:sizingRows[0].cpu + mcpBonus.cpu, ram:sizingRows[0].ram + mcpBonus.ram, disk:sizingRows[0].disk + mcpBonus.disk};
     }
 
     // ---- Machine-count summary: how many server machines/pods + workstation machine(s) this profile needs ----
@@ -1294,16 +1294,32 @@
     var usersRangeText = {tiny:'< 10 concurrent users', small:'10–50 concurrent users', medium:'50–200 concurrent users', large:'200+ concurrent users'}[a.users];
     var scaleProfileHtml = '<div class="callout info"><b>Project scale profile:</b> '+esc(LABELS.scale[a.scale])+', '+usersRangeText+' — drives the sizing baseline below.</div>';
 
+    // Kubernetes/OpenShift: Disk = the Helm chart's default PVC capacity of what the row hosts (chart 3.6.9
+    // values.yaml size_*; 3.6.8 had no mcpserver-data volume). CAST's own sizing figure is shown beside it.
+    function chartPvcGb(kind){
+      var gb = 0, neo4jInCore = hasNeo4j(a) && !(a.topology === 'multi' && a.neo4jDedicated);
+      if(kind === 'neo4j') return 100;
+      if(kind === 'analysis') return 100;
+      gb += 5 * 2 + 100;                                   // console/control-panel/gateway/auth/sso logs (2 Gi each) + shared datadir
+      if(hasDashboards(a)) gb += 2;                        // dashboards logs
+      if(hasViewer(a)) gb += 1 + 2 + 2 + 10 + 10;          // viewer-server, ai-manager, api logs, ETL logs + CSV archive
+      if(neo4jInCore) gb += 100;                           // Neo4j data
+      if(a.dbHosting === 'colocated') gb += 128;           // embedded PostgreSQL db-data
+      if(a.mcp) gb += 2 + 1;                               // mcp-server logs + data
+      if(a.egress === 'airgapped') gb += 10;               // extendproxy data
+      if(kind === 'single' && hasAnalysis(a)) gb += 100;   // analysis-node castdir
+      return gb;
+    }
     var sizingHtml = '<h3>1. Hardware sizing for your profile</h3>' +
       scaleProfileHtml +
       machineSummaryHtml +
-      (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk (the chart\'s default PVC sizes are listed under Storage locations below — raise the <code>size_*</code> values to match the Disk figures here; the chart\'s own StorageClasses allow online expansion on AKS/EKS/GKE). "Single node pool" vs. one pod per row below mirrors the topology answer (question 1), not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' +
+      (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk (the Disk column shows the chart\'s <b>default PVC sizes</b> for what each row hosts, with CAST\'s sizing guidance beside it — raise the <code>size_*</code> values, mainly <code>size_db_data</code>, <code>size_neo4jdata</code> and <code>size_castdir</code>, toward that guidance as your data grows; volumes can be increased but not reduced). "Single node pool" vs. one pod per row below mirrors the topology answer (question 1), not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' +
         '<div class="callout info"><b>Cluster requirements per CAST\'s Kubernetes hardware doc'+(isOcp(a) ? ' (applied to OpenShift — this tool found no separate OpenShift hardware page; the OpenShift chart\'s values.yaml lists no EnforceBalancedAffinity/EnforceNodeAffinity settings, although its templates read them)' : '')+':</b> <b>2 nodes minimum</b>, <b>4 vCPU per node minimum</b>, <b>32 GB RAM per node minimum</b> (64 GB recommended; 128 GB for multiple complex/large applications). Your profile above needs <b>'+k8sMinNodes+' node'+(k8sMinNodes===1?'':'s')+' minimum</b>: the base 2, '+(k8sIsolationActive ? '+1 for running the analysis-node/Neo4j workload on its own dedicated node(s) (this tool\'s Isolated nodes topology'+(hasNeo4j(a)&&a.neo4jDedicated?' and dedicated-Neo4j checkbox':'')+' — CAST\'s <code>EnforceAnalysisNodeIsolation</code>/<code>EnforceNeo4jIsolation</code> Helm settings, which require <code>EnforceBalancedAffinity: true</code>), ' : '')+(k8sAnalysisReplicaCount > 1 ? '+'+(k8sAnalysisReplicaCount-1)+' for each analysis-node replica beyond the first (<code>AnalysisNodeReplicaCount</code> in <code>values.yaml</code>)' : (hasAnalysis(a) ? 'no further additions for a single analysis-node replica' : 'no analysis-node in this scenario'))+(k8sCapacityNodes > k8sFloorNodes ? '; but the pod requests below total <b>'+k8sSumCpu+' vCPU / '+k8sSumRam+' GB</b>, which need at least <b>'+k8sCapacityNodes+' nodes</b> at the 4 vCPU / 32 GB per-node minimum — use larger nodes to need fewer' : '')+'. Each node hosting an isolated pod must be at least as large as that pod\'s request. Not modeled here: further isolating the embedded PostgreSQL pod onto its own node (<code>EnforcePostgresIsolation</code>) costs one more node again — CAST\'s own "extra large" example (3 analysis-node replicas + all three isolation flags) reaches 6 nodes minimum. All cluster nodes (and any managed PostgreSQL instance) should sit in the <b>same Availability Zone</b>.</div>' : '') +
       (a.platform === 'kubernetes' && hasAnalysis(a) ? '<div class="callout info"><b>Optional analysis-node autoscaler</b> (CAST Imaging 3.6.9 or later, <code>AnalysisNodeAutoscaling</code>, off by default): one schedulable worker node per analysis-node <b>plus one for <code>viewer-neo4j</code></b>, so at most <i>schedulable worker nodes − 1</i> analysis-nodes; <code>minNodes</code> must never be 0. It relies on the OpenKruise operator'+(a.k8sProvider === 'gke' ? ' — installing it needs cluster-admin, and a namespace-only user needs the built-in <code>admin</code> role on the CAST namespace (<code>edit</code> is not sufficient)' : '')+' — per CAST\'s GKE page; the EKS and AKS pages only list the autoscaler as optional.</div>' : '') +
       (isK8s ? '<div class="callout info"><b>Helm chart 3.6.8 defaults (<code>values.yaml</code>)</b> — '+(isOcp(a) ? 'the OpenShift chart ships its own requests/limits (lower CPU than the Kubernetes chart); read its <code>values.yaml</code> for your version. For reference, the Kubernetes chart sets: ' : '')+'analysis-node requests 0.5 CPU / 8 GB, limits 4 CPU / 32 GB (<code>MaxParallelAnalysisPerNode: 2</code>); Neo4j requests 0.5 CPU / 16 GB, limits 4 CPU / 32 GB with a 12 GB heap (<code>NEO4J_server_memory_heap_*</code>) and 10 GB transaction memory; embedded PostgreSQL requests 0.5 CPU / 8 GB, limits 2 CPU / 16 GB; viewer-server and ETL limit 8 GB each; the other services stay at or under 4 GB. These are chart defaults, not CAST\'s sizing guidance — Section 1\'s figures remain the baseline.</div>' : '') +
       '<h4>Server components</h4>' +
-      '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr></thead><tbody>' +
-      sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+esc(r.disk)+' GB</td></tr>'; }).join('') +
+      '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>'+(isK8s ? 'Disk (chart default PVCs)' : 'Disk')+'</th></tr></thead><tbody>' +
+      sizingRows.map(function(r){ return '<tr><td>'+esc(r.c)+'</td><td>'+esc(r.cpu)+'</td><td>'+esc(r.ram)+' GB</td><td>'+(isK8s && r.kind !== 'pg' ? esc(chartPvcGb(r.kind))+' GB <span class="hint">· CAST guidance '+esc(r.disk)+' GB</span>' : esc(r.disk)+' GB')+'</td></tr>'; }).join('') +
       '</tbody></table></div>';
 
     if(userBonusApplies && (userBonus.cpu || userBonus.ram)){
@@ -1332,7 +1348,7 @@
       sizingHtml += '<div class="callout warn">Sizing scales with the number of applications delivered, retained snapshot history, and concurrent analyses/users. Re-validate after a pilot batch of real deliveries.</div>';
     }
 
-    var floorParts = ['<b>Disk:</b> 256 GB min/node (SSD or equivalent high-IOPS)', isK8s ? '<b>RAM:</b> 32 GB min per cluster node (64 GB recommended — see the cluster requirements above)' : '<b>RAM:</b> 32 GB min standalone, 16 GB min/node distributed (32 GB recommended)'];
+    var floorParts = [isK8s ? '<b>Disk:</b> 256 GB min per cluster node (the node\'s own SSD or high-IOPS disk — separate from the PVC sizes above)' : '<b>Disk:</b> 256 GB min/node (SSD or equivalent high-IOPS)', isK8s ? '<b>RAM:</b> 32 GB min per cluster node (64 GB recommended — see the cluster requirements above)' : '<b>RAM:</b> 32 GB min standalone, 16 GB min/node distributed (32 GB recommended)'];
     if(hasNeo4j(a)) floorParts.push('<b>Neo4j:</b> 16 GB min, 32 GB recommended (12 GB JVM heap default'+((a.platform === 'docker' || a.platform === 'podman') ? ', tunable via <code>imaging-viewer/.env</code>' : '')+')');
     sizingHtml += '<div class="callout info">CAST\'s hard floors — already respected above: '+floorParts.join(' · ')+'.</div>';
 
