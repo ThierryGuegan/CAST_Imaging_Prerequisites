@@ -783,3 +783,5 @@ once, so the regression sweep matters more here than for a single-section fix �
 combinations just because the file is new.
 
 **Kubernetes/OpenShift Disk column** — rows carry a `kind` (`single`/`core`/`neo4j`/`analysis`/`pg`); `chartPvcGb(kind)` sums the Helm chart's default PVC sizes of what the row hosts (shared datadir 100 + five service logs 10 + dashboards 2 + viewer 25 + Neo4j 100 + embedded PostgreSQL 128 + MCP 3 + Extend proxy 10 when air-gapped; analysis-node `castdir` 100) and shows CAST's own figure beside it as "guidance". PostgreSQL rows outside the cluster keep CAST's figure; the 256 GB floor is described as per-node disk, not PVC.
+
+**Chart version in text** — Kubernetes/OpenShift statements cite "chart 3.6.9" (read from the `CAST-Extend` chart repos on 2026-11-22). On OpenShift `k8sIsolationActive` is always false (no isolation flags in that chart), so the node floor is 2 + one per extra analysis-node replica; on both platforms the MCP row is the 3.1 aggregator on 8285 (Gatekeeper flagged "not in Helm chart").
