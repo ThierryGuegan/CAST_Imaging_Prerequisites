@@ -121,7 +121,7 @@ These are the sections as of the current build. If requirements change, renumber
 render() references section numbers in generated text (e.g. "see Section 3"), so a renumber has to
 be a search-and-fix pass, not a rename in isolation.
 
-1. **Platform & topology** — host platform (Docker / Podman / Kubernetes / OpenShift / Windows Server, radio; `isKube(a)` = Kubernetes or OpenShift, `isOcp(a)` = OpenShift — every former `a.platform === 'kubernetes'` test is `isKube(a)`; OpenShift adds the `route` reverse-proxy option and its own chart facts: Routes, `restricted-v2` SCC, `registry.redhat.io` PostgreSQL image, no StorageClass creation),
+1. **Platform & topology** — host platform (Docker / Podman / Kubernetes / OpenShift / Windows Server, radio; `isKube(a)` = Kubernetes or OpenShift, `a.k8sProvider` (aks/eks/gke/other, radio `k8sProvider` in a sub-block shown only on Kubernetes) selects the provider-specific storage text (`kubeProviderStorage`), the EKS EFS / AKS-FIPS-NFS port rows and checklist items, `isOcp(a)` = OpenShift — every former `a.platform === 'kubernetes'` test is `isKube(a)`; OpenShift adds the `route` reverse-proxy option and its own chart facts: Routes, `restricted-v2` SCC, `registry.redhat.io` PostgreSQL image, no StorageClass creation),
    deployment scenario (select: which components exist — this is what later drives every
    `has*(a)` predicate), topology (single machine / multi-machine, radio), plus conditional
    sub-blocks that only show when relevant (analysis-node count when topology is multi and the
