@@ -208,6 +208,19 @@
           <label class="opt"><input type="radio" name="platform" value="windows">
             <span class="opt-text"><b>Windows Server</b><span>Native installation, no container runtime</span></span></label>
         </div>
+        <div class="sub-block" id="k8s-provider-sub">
+          <label class="qlabel">Kubernetes provider (<code>K8SProvider</code> in CAST's <code>values.yaml</code>)</label>
+          <div class="opt-row">
+            <label class="opt"><input type="radio" name="k8sProvider" value="aks">
+              <span class="opt-text"><b>Azure AKS</b></span></label>
+            <label class="opt"><input type="radio" name="k8sProvider" value="eks">
+              <span class="opt-text"><b>AWS EKS</b></span></label>
+            <label class="opt"><input type="radio" name="k8sProvider" value="gke">
+              <span class="opt-text"><b>Google GKE</b></span></label>
+            <label class="opt"><input type="radio" name="k8sProvider" value="other" checked>
+              <span class="opt-text"><b>Other / self-managed</b><span>no managed storage classes or load balancer assumed</span></span></label>
+          </div>
+        </div>
       </div>
       <div class="q">
         <label class="qlabel">Deployment scenario — which components do you need?</label>
@@ -482,12 +495,13 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-10-28';
+  var TOOL_VERSION = '2026-11-22';
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
     users:{tiny:'< 10 users', small:'10–50 users', medium:'50–200 users', large:'200+ users'},
     platform:{docker:'Docker', podman:'Podman', kubernetes:'Kubernetes', openshift:'OpenShift', windows:'Windows Server'},
+    k8sProvider:{aks:'Azure AKS', eks:'AWS EKS', gke:'Google GKE', other:'Other / self-managed'},
     scenario:{full:'Full (analysis + Viewer + Dashboards)', 'analysis-dashboards':'Analysis + Dashboards (no Viewer)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
     topology:{single:'Single machine', multi:'Multi-machine'},
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
@@ -578,6 +592,14 @@
   function hasNeo4j(a){ return hasViewer(a); }
   // Federated sign-in needs HTTPS on CAST Imaging: CAST's OIDC page lists it as a prerequisite; for SAML it is
   // this tool's inference (browser/IdP redirect flow).
+  // Provider-specific storage/exposure facts from CAST's EKS / GKE / AKS install pages (read 2026-11-22) and the
+  // Helm chart's storage.yaml; 'other' keeps the generic list.
+  function kubeProviderStorage(a){
+    if(a.k8sProvider === 'eks') return '<li><b>AWS EKS</b> (<code>K8SProvider: EKS</code>): block volumes on EBS (<code>ebs.csi.aws.com</code>, gp3); <code>pvc-shared-datadir</code> on <b>Amazon EFS</b> (<code>efs.csi.aws.com</code>) — create the file system in the <b>same VPC</b> as the cluster, set <code>EFSsystemID</code> (and optionally <code>EFSaccessPointID</code>: access point <code>castimaging-shared-datadir</code>, root <code>/castimaging-shared-datadir</code>, owner UID/GID 10001, permissions 0755 — otherwise one is created at deployment), and create a <b>mount target in every Availability Zone</b> where worker nodes can run (a pod scheduled elsewhere times out mounting the volume). The mount targets must accept <b>NFS, TCP 2049</b>, from the cluster security group (<code>eks-cluster-sg-&lt;cluster&gt;-&lt;id&gt;</code>). Volumes can be increased but not reduced.</li>';
+    if(a.k8sProvider === 'aks') return '<li><b>Azure AKS</b> (<code>K8SProvider: AKS</code>): block volumes on Azure Disks (<code>disk.csi.azure.com</code>, Premium_LRS); <code>pvc-shared-datadir</code> on Azure Files (<code>file.csi.azure.com</code>) over <b>SMB</b> by default (<code>AnalysisNodeFS.AKSprotocol: smb</code>). On <b>FIPS-enabled nodes</b> it must be <code>nfs</code>, which needs a <b>Premium FileStorage</b> account reachable on TCP 2049 (<code>AKSnfsEncryptInTransit</code> defaults to true). Optional <code>AKSresourceGroup</code>/<code>AKSstorageAccount</code>; <code>AKSsharedDatadirPV.create</code> (SMB only; secret <code>cast-fs-secret</code>, share <code>cast-fileshare</code>) when auto-provisioning can\'t be used. Azure Application Gateway is set up from CAST\'s own PDF in the chart repository.</li>';
+    if(a.k8sProvider === 'gke') return '<li><b>Google GKE</b> (<code>K8SProvider: GKE</code>): block volumes on Persistent Disk (<code>pd.csi.storage.gke.io</code>, <code>pd-standard</code> by default in the chart); <code>pvc-shared-datadir</code> on the file driver <code>filestore.csi.storage.gke.io</code> (the chart\'s <code>GKE_FSdriver</code> — CAST\'s GKE page names no Filestore tier or requirement). CAST suggests a regional Persistent Disk for <code>castdir</code> if you want zone redundancy.</li>';
+    return '<li><b>Providers</b> (<code>K8SProvider</code>: <code>AKS</code> / <code>EKS</code> / <code>GKE</code>; <code>CreateStorageClass: true</code> creates <code>castimaging-ds</code> and <code>castimaging-fs</code>): AKS — <code>disk.csi.azure.com</code> (Premium_LRS) and <code>file.csi.azure.com</code> (SMB, Premium); EKS — <code>ebs.csi.aws.com</code> (gp3) and <code>efs.csi.aws.com</code> (an EFS file system id, <code>AnalysisNodeFS.EFSsystemID</code>, is required); GKE — <code>pd.csi.storage.gke.io</code> and <code>filestore.csi.storage.gke.io</code>. Sizes are the <code>size_*</code> values. Pick your provider in question 1 for the provider-specific steps.</li>';
+  }
   function isKube(a){ return a.platform === 'kubernetes' || a.platform === 'openshift'; }
   function isOcp(a){ return a.platform === 'openshift'; }
   function authNeedsHttps(a){ return a.auth === 'saml' || a.auth === 'oidc'; }
@@ -599,7 +621,7 @@
   }
   function sharedStorageText(a){
     if(a.platform === 'windows') return {box:'deploy / delivery / common-data shares · SMB :445', checklist:'Shared deploy/delivery/common-data SMB shares reachable from every server machine under one consistent service account'};
-    if(isKube(a)) return {box:'shared-access (RWX) PersistentVolume / StorageClass', checklist:'Shared-access (ReadWriteMany) StorageClass available (<code>FileClassName</code>) for <code>pvc-shared-datadir</code> — always required by CAST\'s Helm chart, even with a single analysis-node pod '+(isOcp(a) ? '(your cluster\'s RWX-capable CSI class)' : '(e.g. Azure Files on AKS, EFS on EKS, Filestore on GKE)')+''};
+    if(isKube(a)) return {box:'shared-access (RWX) PersistentVolume / StorageClass', checklist:'Shared-access (ReadWriteMany) StorageClass available (<code>FileClassName</code>) for <code>pvc-shared-datadir</code> — always required by CAST\'s Helm chart, even with a single analysis-node pod '+(isOcp(a) ? '(your cluster\'s RWX-capable CSI class)' : a.k8sProvider === 'eks' ? '(Amazon EFS)' : a.k8sProvider === 'aks' ? '(Azure Files)' : a.k8sProvider === 'gke' ? '(Filestore CSI driver)' : '(e.g. Azure Files on AKS, EFS on EKS, Filestore on GKE)')+''};
     return {box:'default: /opt/cast/shared (configurable) · SMB :445', checklist:'Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared (default path — configurable) on every server machine before install'};
   }
   function topologyLabel(a){
@@ -621,6 +643,7 @@
       users: document.querySelector('input[name=users]:checked').value,
       auditContext: document.querySelector('input[name=auditContext]:checked').value,
       platform: document.querySelector('input[name=platform]:checked').value,
+      k8sProvider: document.querySelector('input[name=k8sProvider]:checked').value,
       scenario: document.querySelector('input[name=scenario]:checked').value,
       topology: document.querySelector('input[name=topology]:checked').value,
       analysisNodes: document.querySelector('input[name=analysisNodes]:checked').value,
@@ -1005,6 +1028,12 @@
       rows.push({src:'Backup/admin host', dst:neo4jDst, port:'7474', proto:'HTTP', purpose:'Neo4j\'s own browser-based admin/query interface — for direct database administration, not used by imaging-viewer itself', tag:'optional', note:'Only if you need to browse/query Neo4j directly outside the Viewer application'});
     }
 
+    if(a.platform === 'kubernetes' && a.k8sProvider === 'eks'){
+      rows.push({src:'Every cluster worker node', dst:'Amazon EFS mount targets (one per Availability Zone with worker nodes)', port:'2049', proto:'NFS/TCP', purpose:'The shared pvc-shared-datadir volume (analysis-node, console-service) lives on EFS; the mount targets must allow NFS from the EKS cluster security group', tag:'mandatory', note:'Per CAST\'s EKS page; a missing mount target in a node\'s zone makes the volume mount time out'});
+    }
+    if(a.platform === 'kubernetes' && a.k8sProvider === 'aks'){
+      rows.push({src:'Every cluster worker node (FIPS-enabled only)', dst:'Azure Premium FileStorage account (NFS)', port:'2049', proto:'NFS/TCP', purpose:'On FIPS-enabled nodes the shared volume must use NFS (AnalysisNodeFS.AKSprotocol: nfs) instead of the default SMB', tag:'conditional', note:'Per CAST\'s AKS page; with the default SMB protocol Azure Files needs no row beyond your cluster\'s own networking'});
+    }
     if(isK8s){
       rows.push({src:'Worker nodes / kubelets', dst:'Control plane (API server, etcd, scheduler)', port:'Per your cluster\'s own network policy', proto:'TCP', purpose:'Standard Kubernetes control-plane/data-plane communication — provisioning and securing the cluster network is your Kubernetes administrator\'s responsibility, not a CAST-specific requirement', tag:'conditional', note:'Not a CAST-documented port — generic Kubernetes cluster networking, out of scope for this tool'});
     }
@@ -1124,6 +1153,7 @@
 
     document.getElementById('mcp-sub').className = 'sub-block' + (a.mcp ? ' show' : '');
     document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' && hasAnalysis(a) ? ' show' : '');
+    document.getElementById('k8s-provider-sub').className = 'sub-block' + (a.platform === 'kubernetes' ? ' show' : '');
     document.getElementById('neo4j-dedicated-sub').className = 'sub-block' + (a.topology === 'multi' && hasNeo4j(a) ? ' show' : '');
     document.getElementById('topology-hint').textContent =
       (a.scale === 'enterprise' && a.topology === 'single') ? (isK8s ? 'A single node pool' : 'Single machine')+' is not recommended at Enterprise scale — consider '+(isK8s ? 'isolated nodes' : 'Multi-machine or Kubernetes')+'.' :
@@ -1155,6 +1185,7 @@
     var chips = (a.clientProject ? chip('client / project', a.clientProject) : '') + chip('scale', LABELS.scale[a.scale]) + chip('users', LABELS.users[a.users]) +
       chip('platform', LABELS.platform[a.platform]) + chip('scenario', LABELS.scenario[a.scenario]) +
       chip('topology', topologyLabel(a));
+    if(a.platform === 'kubernetes') chips += chip('Kubernetes provider', LABELS.k8sProvider[a.k8sProvider]);
     if(a.topology === 'multi' && hasAnalysis(a)) chips += chip('analysis nodes', a.analysisNodes.replace('-', '–'));
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) chips += chip('Neo4j', 'dedicated');
     chips += chip('database', LABELS.dbHosting[a.dbHosting]) + chip('egress', LABELS.egress[a.egress]) +
@@ -1268,6 +1299,7 @@
       machineSummaryHtml +
       (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk (the chart\'s default PVC sizes are listed under Storage locations below — raise the <code>size_*</code> values to match the Disk figures here; the chart\'s own StorageClasses allow online expansion on AKS/EKS/GKE). "Single node pool" vs. one pod per row below mirrors the topology answer (question 1), not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' +
         '<div class="callout info"><b>Cluster requirements per CAST\'s Kubernetes hardware doc'+(isOcp(a) ? ' (applied to OpenShift — this tool found no separate OpenShift hardware page; the OpenShift chart\'s values.yaml lists no EnforceBalancedAffinity/EnforceNodeAffinity settings, although its templates read them)' : '')+':</b> <b>2 nodes minimum</b>, <b>4 vCPU per node minimum</b>, <b>32 GB RAM per node minimum</b> (64 GB recommended; 128 GB for multiple complex/large applications). Your profile above needs <b>'+k8sMinNodes+' node'+(k8sMinNodes===1?'':'s')+' minimum</b>: the base 2, '+(k8sIsolationActive ? '+1 for running the analysis-node/Neo4j workload on its own dedicated node(s) (this tool\'s Isolated nodes topology'+(hasNeo4j(a)&&a.neo4jDedicated?' and dedicated-Neo4j checkbox':'')+' — CAST\'s <code>EnforceAnalysisNodeIsolation</code>/<code>EnforceNeo4jIsolation</code> Helm settings, which require <code>EnforceBalancedAffinity: true</code>), ' : '')+(k8sAnalysisReplicaCount > 1 ? '+'+(k8sAnalysisReplicaCount-1)+' for each analysis-node replica beyond the first (<code>AnalysisNodeReplicaCount</code> in <code>values.yaml</code>)' : (hasAnalysis(a) ? 'no further additions for a single analysis-node replica' : 'no analysis-node in this scenario'))+(k8sCapacityNodes > k8sFloorNodes ? '; but the pod requests below total <b>'+k8sSumCpu+' vCPU / '+k8sSumRam+' GB</b>, which need at least <b>'+k8sCapacityNodes+' nodes</b> at the 4 vCPU / 32 GB per-node minimum — use larger nodes to need fewer' : '')+'. Each node hosting an isolated pod must be at least as large as that pod\'s request. Not modeled here: further isolating the embedded PostgreSQL pod onto its own node (<code>EnforcePostgresIsolation</code>) costs one more node again — CAST\'s own "extra large" example (3 analysis-node replicas + all three isolation flags) reaches 6 nodes minimum. All cluster nodes (and any managed PostgreSQL instance) should sit in the <b>same Availability Zone</b>.</div>' : '') +
+      (a.platform === 'kubernetes' && hasAnalysis(a) ? '<div class="callout info"><b>Optional analysis-node autoscaler</b> (CAST Imaging 3.6.9 or later, <code>AnalysisNodeAutoscaling</code>, off by default): one schedulable worker node per analysis-node <b>plus one for <code>viewer-neo4j</code></b>, so at most <i>schedulable worker nodes − 1</i> analysis-nodes; <code>minNodes</code> must never be 0. It relies on the OpenKruise operator'+(a.k8sProvider === 'gke' ? ' — installing it needs cluster-admin, and a namespace-only user needs the built-in <code>admin</code> role on the CAST namespace (<code>edit</code> is not sufficient)' : '')+' — per CAST\'s GKE page; the EKS and AKS pages only list the autoscaler as optional.</div>' : '') +
       (isK8s ? '<div class="callout info"><b>Helm chart 3.6.8 defaults (<code>values.yaml</code>)</b> — '+(isOcp(a) ? 'the OpenShift chart ships its own requests/limits (lower CPU than the Kubernetes chart); read its <code>values.yaml</code> for your version. For reference, the Kubernetes chart sets: ' : '')+'analysis-node requests 0.5 CPU / 8 GB, limits 4 CPU / 32 GB (<code>MaxParallelAnalysisPerNode: 2</code>); Neo4j requests 0.5 CPU / 16 GB, limits 4 CPU / 32 GB with a 12 GB heap (<code>NEO4J_server_memory_heap_*</code>) and 10 GB transaction memory; embedded PostgreSQL requests 0.5 CPU / 8 GB, limits 2 CPU / 16 GB; viewer-server and ETL limit 8 GB each; the other services stay at or under 4 GB. These are chart defaults, not CAST\'s sizing guidance — Section 1\'s figures remain the baseline.</div>' : '') +
       '<h4>Server components</h4>' +
       '<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr></thead><tbody>' +
@@ -1376,7 +1408,7 @@
         '<li>Block volumes (<code>DiskClassName</code>, ReadWriteOnce): <code>db-data</code> 128 Gi (embedded PostgreSQL), <code>castdir</code> 100 Gi (<code>/usr/share/CAST</code> — extensions, logs), Neo4j data 100 Gi, ETL logs and CSV archive 10 Gi each, Extend proxy data 10 Gi, and 1–2 Gi log volumes per service. The log/audit volumes are kept on uninstall (<code>helm.sh/resource-policy: keep</code>).</li>' +
         (isOcp(a)
           ? '<li><b>OpenShift:</b> the chart does not create StorageClasses (<code>CreateStorageClass: false</code>) and its default <code>DiskClassName</code>/<code>FileClassName</code> is <code>crc-csi-hostpath-provisioner</code> — the OpenShift Local (CRC) development provisioner. Set both to your cluster\'s block and RWX file classes. <code>AnalysisNodeFS.enable</code> must not be changed once CAST Imaging is deployed.</li>'
-          : '<li><b>Providers</b> (<code>K8SProvider</code>: <code>AKS</code> / <code>EKS</code> / <code>GKE</code>; <code>CreateStorageClass: true</code> creates <code>castimaging-ds</code> and <code>castimaging-fs</code>): AKS — <code>disk.csi.azure.com</code> (Premium_LRS) and <code>file.csi.azure.com</code> (SMB, Premium); EKS — <code>ebs.csi.aws.com</code> (gp3) and <code>efs.csi.aws.com</code> (an EFS file system id, <code>AnalysisNodeFS.EFSsystemID</code>, is required); GKE — <code>pd.csi.storage.gke.io</code> and <code>filestore.csi.storage.gke.io</code>. Sizes are the <code>size_*</code> values.</li>') +
+          : kubeProviderStorage(a)) +
         '</ul>';
     }
 
@@ -1466,7 +1498,7 @@
     }
     var kubeNetHtml = !isK8s ? '' : (isOcp(a)
       ? '<div class="callout info"><b>OpenShift networking (CAST\'s chart 3.6.8):</b> <code>Routes.enable: true</code> creates <code>castimaging-route</code> (host from <code>FrontEndHost</code>, target <code>console-gateway-service</code>:8090) and, with the Extend proxy enabled, <code>extendproxy-route</code> (:8085). With <code>Routes.tls: true</code> the routes use <b>edge termination</b> with the certificate and key you pass at install (<code>--set-file tls.certificate=… --set-file tls.key=…</code>), plain HTTP is not redirected. Request timeouts are set with <code>haproxy.router.openshift.io/timeout</code> from <code>NetworkTimeoutSeconds</code> (300 s) and <code>ExtendProxy.timeoutSeconds</code> (3600 s; the router default is 30 s when unset) — any reverse proxy or DMZ in front of the router must allow at least as long. <code>CreateLoadBalancer</code> is the alternative entry point.</div>'
-      : '<div class="callout info"><b>Kubernetes networking (CAST\'s chart 3.6.8):</b> exactly one of <code>CreateLoadBalancer</code> (default; exposes <code>console-gateway-service</code> as a cloud LoadBalancer), <code>CreateIngress</code>, <code>UseIstioGateway</code>, <code>UseGatewayAPI</code> (a GatewayClass controller such as NGINX Gateway Fabric) or <code>UseApplicationGateway</code> (Azure Application Gateway, created separately). The Ingress template is <b>nginx-specific</b> (<code>ingressClassName: nginx</code>, <code>nginx.ingress.kubernetes.io/*</code> annotations) — install an ingress-nginx controller first; TLS comes from the Kubernetes secret <code>tls-secret-cast</code> (and <code>tls-secret-cast-extend</code> for the Extend proxy host) that you create in the CAST namespace. The chart sets <code>X-Forwarded-Host/-Proto/-Port</code> from <code>FrontEndHost</code>, which matters when a reverse proxy or DMZ sits in front of the Ingress. Timeouts: <code>NetworkTimeoutSeconds</code> 300 s (Extend proxy 3600 s) — keep any outer proxy at least that high.</div>');
+      : '<div class="callout info"><b>Kubernetes networking (CAST\'s chart 3.6.8):</b> exactly one of <code>CreateLoadBalancer</code> (default; exposes <code>console-gateway-service</code> as a cloud LoadBalancer), <code>CreateIngress</code>, <code>UseIstioGateway</code>, <code>UseGatewayAPI</code> (a GatewayClass controller such as NGINX Gateway Fabric) or <code>UseApplicationGateway</code> (Azure Application Gateway, created separately). The Ingress template is <b>nginx-specific</b> (<code>ingressClassName: nginx</code>, <code>nginx.ingress.kubernetes.io/*</code> annotations) — install an ingress-nginx controller first; TLS comes from the Kubernetes secret <code>tls-secret-cast</code> (and <code>tls-secret-cast-extend</code> for the Extend proxy host) that you create in the CAST namespace (<code>istio-system</code> with Istio). The chart sets <code>X-Forwarded-Host/-Proto/-Port</code> from <code>FrontEndHost</code>, which matters when a reverse proxy or DMZ sits in front of the Ingress. Timeouts: <code>NetworkTimeoutSeconds</code> 300 s (Extend proxy 3600 s) — keep any outer proxy at least that high.</div>');
     var httpsHtml = '<h3>4. Reverse Proxy &amp; HTTPS / TLS</h3>' +
       '<div class="callout warn"><b>A reverse proxy is a mandatory prerequisite.</b> A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is required for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing.</div>' +
       '<div class="callout info"><b>HTTPS/SSL itself is not mandatory, but highly recommended'+(authNeedsHttps(a) ? ' — except with '+authShortName(a)+' (Section 5), where it is mandatory' : '')+'.</b> CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment — which in practice means almost every deployment beyond a fully offline POC.' + (a.auth==='saml' ? ' SAML SSO is an exception: browsers and IdPs require an HTTPS redirect/callback URL, so HTTPS is a hard requirement whenever SAML is selected (Reasonable inference from standard SAML browser-redirect behavior, not a CAST-specific rule).' : '') + (a.auth==='oidc' ? ' OpenID Connect is the other exception: CAST\'s OpenID Connect page lists access to CAST Imaging via HTTPS, already set up and configured, as a requirement before you register the client application.' : '') + '</div>' +
@@ -1647,6 +1679,7 @@
 
     var coreNode = separateEveryMachineGroup ? [] : everyMachine.slice();
     coreNode.push(item('server-sizing', (isK8s ? 'Node pool capacity' : 'Server(s)') + ' provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(topologyLabel(a))+')'));
+    if(isK8s && a.dbHosting !== 'colocated') coreNode.push(item('k8s-extdb', 'External PostgreSQL 15 with 8 GB RAM minimum recommended, in the same VPC/VNet and the same zone as the cluster nodes, and <code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>) set in <code>values.yaml</code> <span class="hint">(per CAST\'s EKS / GKE install pages)</span>'));
     coreNode.push(item('pg-hosting:'+a.dbHosting, 'PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting])));
     var pgEmbedded = a.dbHosting === 'colocated' && (a.platform === 'docker' || a.platform === 'podman' || isK8s);
     if(!pgEmbedded) coreNode.push(item('pg-version', 'PostgreSQL 14.x–18.x (64-bit, 18.x recommended) with UTF-8 and the collation CAST specifies (see Section 2)'));
@@ -1683,7 +1716,15 @@
       coreNode.push(item('k8s-prep', k8sPrep.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' prepared'));
       coreNode.push(item('k8s-csi', 'CSI storage drivers installed by the cluster administrator, exposing at least one <b>block/disk</b> StorageClass and one <b>shared-file</b> StorageClass (the latter is mandatory for the <code>shared-datadir</code> volume, which several Imaging services must reach); CAST Imaging does not depend on a particular driver'));
       if(!isOcp(a)) coreNode.push(item('k8s-loadbalancer', 'A load-balancer implementation (e.g. MetalLB) available on the cluster — without it the services\' external IP stays <code>&lt;pending&gt;</code>; installed and operated by the cluster administrator'));
-      if(!isOcp(a)) coreNode.push(item('k8s-provider', '<code>K8SProvider: K8S</code> set in <code>values.yaml</code> when the cluster is not a managed cloud one (EKS / AKS / GKE — the providers the chart documents) — a non-managed cluster provides neither managed storage classes nor a load-balancer integration of its own <span class="hint">(per the AIFE requirements document)</span>'));
+      if(a.platform === 'kubernetes' && a.k8sProvider !== 'other') coreNode.push(item('k8s-provider:'+a.k8sProvider, '<code>K8SProvider: '+a.k8sProvider.toUpperCase()+'</code> set in <code>values.yaml</code> before the first deployment — CAST marks it install-time only'));
+      if(isK8s && a.egress === 'airgapped') coreNode.push(item('k8s-telemetry', '<code>TELEMETRY_PUSH_ENABLED: false</code> set for the CAST services — CAST\'s EKS page recommends it when the cluster has no outbound internet access'));
+      if(a.platform === 'kubernetes' && a.k8sProvider === 'other') coreNode.push(item('k8s-provider:other', '<code>K8SProvider: K8S</code> set in <code>values.yaml</code> when the cluster is not a managed cloud one (EKS / AKS / GKE — the providers the chart documents) — a non-managed cluster provides neither managed storage classes nor a load-balancer integration of its own <span class="hint">(per the AIFE requirements document)</span>'));
+      if(a.platform === 'kubernetes' && a.k8sProvider === 'eks'){
+        coreNode.push(item('eks-efs', 'Amazon EFS file system created in the cluster\'s VPC, <code>EFSsystemID</code> (and optionally <code>EFSaccessPointID</code>) set in <code>values.yaml</code>, one mount target in <b>every</b> Availability Zone where worker nodes can run, and the cluster security group allowed to reach them on NFS TCP 2049'));
+        coreNode.push(item('eks-csi', 'EBS and EFS CSI driver add-ons installed on the cluster with their IAM roles (CAST\'s EKS cluster-setup page installs both with eksctl)'));
+      }
+      if(a.platform === 'kubernetes' && a.k8sProvider === 'aks') coreNode.push(item('aks-files-protocol', 'Azure Files protocol decided for the shared volume: SMB (default) or — on FIPS-enabled nodes — NFS with a Premium FileStorage account reachable on TCP 2049 (<code>AnalysisNodeFS.AKSprotocol</code>)'));
+      if(a.platform === 'kubernetes' && a.k8sProvider === 'gke') coreNode.push(item('gke-storage', 'GKE Persistent Disk and Filestore CSI drivers available for the chart\'s StorageClasses (<code>GKE_DSdriver</code>, <code>GKE_FSdriver</code>) — consider a regional Persistent Disk for <code>castdir</code> if you need zone redundancy'));
       if(!isOcp(a)) coreNode.push(item('k8s-etc-cast-imaging', 'Kubernetes has read/write rights on <code>/etc/cast-imaging</code> <span class="hint">(per the AIFE requirements document — not independently confirmed against CAST\'s docs)</span>'));
       if((a.reverseProxy === 'ingress' || a.reverseProxy === 'gatewayapi') && a.certSource !== 'none') coreNode.push(item('k8s-tls-key-unencrypted', 'TLS private key supplied <b>unencrypted</b> (the FQDNs and TLS certificates for Imaging'+(a.mcp ? ', MCP Server' : '')+(a.egress === 'airgapped' ? ' and Extend Local Server' : '')+' are defined on the '+(a.reverseProxy === 'gatewayapi' ? 'Gateway' : 'Ingress')+') <span class="hint">(per the AIFE requirements document)</span>'));
       coreNode.push(item('helm-chart-clone', a.egress === 'airgapped' ? 'Helm chart repository (<code>CAST-Extend/'+(isOcp(a) ? 'com.castsoftware.castimaging-v3.openshiftsetup' : 'com.castsoftware.castimaging-v3.kubernetessetup')+'</code>) cloned on an internet-connected host — release branch matching your CAST Imaging version — and transferred to where Helm/ArgoCD runs' : 'Access to <code>github.com</code> confirmed to clone the Helm chart repository (<code>CAST-Extend/'+(isOcp(a) ? 'com.castsoftware.castimaging-v3.openshiftsetup' : 'com.castsoftware.castimaging-v3.kubernetessetup')+'</code>, latest release branch — or <code>-b x.x.x</code> for an older release)'));
