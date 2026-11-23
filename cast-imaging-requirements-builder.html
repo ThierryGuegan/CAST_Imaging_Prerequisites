@@ -1108,7 +1108,8 @@
         (a.egress === 'airgapped' ? ' — this is an external SaaS with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or Highlight must be dropped' :
          a.egress === 'proxy' ? ' — reaches this external SaaS via your configured proxy' : '');
       rows.push({src:'imaging-services (com.castsoftware.highlight2mri extension)', dst:'rpa.casthighlight.com', port:'443', proto:'HTTPS', purpose:'The "Highlight URL" setting of CAST Imaging (e.g. SCA vulnerabilities for the Highlight integration)', tag:'conditional', note:highlightNote+' — host confirmed by the maintainer and by CAST\'s Highlight system-settings page; the port isn\'t stated, 443 follows from HTTPS'});
-      rows.push({src:'imaging-services', dst:'cloud.pa.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS (portal / API integration)', tag:'conditional', note:highlightNote+' — host confirmed by the maintainer; the port isn\'t stated, 443 follows from HTTPS'});
+      rows.push({src:'imaging-services', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS (portal / API integration)', tag:'conditional', note:highlightNote+' — host confirmed by the maintainer; the port isn\'t stated, 443 follows from HTTPS'});
+      rows.push({src:'imaging-services', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote+' — host confirmed by the maintainer; the port isn\'t stated, 443 follows from HTTPS'});
     }
 
     var viaProxyNote = a.egress === 'proxy' ? ' via your configured proxy' : '';
@@ -1121,7 +1122,7 @@
     rows.push({src:'Administrator / delivery workstation', dst:'castsoftware.zendesk.com', port:'443', proto:'HTTPS', purpose:'CAST Support portal (tickets, downloads)', tag:'optional', note:'Browser access from the workstations (e.g. the operator machine), not from the CAST Imaging servers'});
     rows.push({src:'Administrator / delivery workstation', dst:'doc.castsoftware.com', port:'443', proto:'HTTPS', purpose:'CAST online documentation', tag:'optional', note:'Browser access from the workstations, not from the CAST Imaging servers'});
     if(a.highlight){
-      rows.push({src:'Administrator / delivery workstation', dst:'cloud.pa.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal (browser access)', tag:'conditional', note:'Highlight integration selected — workstation side; the imaging-services side is listed above'});
+      rows.push({src:'Administrator / delivery workstation', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal (browser access)', tag:'conditional', note:'Highlight integration selected — workstation side; the imaging-services side is listed above'});
     }
 
     if(a.mcp){
@@ -1790,7 +1791,7 @@
     if(a.auth === 'ldap') coreNode.push(item('ldap-bind', 'LDAP bind account, base DN(s), and group mapping confirmed'));
     if(a.auth === 'ldap') coreNode.push(item('ldaps-ca', 'If using LDAPS (636): directory CA certificate trusted by CAST Imaging\'s SSO Service'));
     if(a.mcp) coreNode.push(item('mcp'+(isK8s ? ':k8s' : ''), (isK8s ? 'MCP Server 3.1 deployed (CAST\'s Helm chart ships no Gatekeeper MCP)' : 'MCP Server 3.1 + Gatekeeper MCP deployed')+', and the client authentication method chosen: API key, or OAuth with one Keycloak client profile and policy per AI client (profile linked to the policy)'));
-    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (rpa.casthighlight.com and cloud.pa.casthighlight.com)'));
+    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (rpa.casthighlight.com, cloud.casthighlight.com and auth.casthighlight.com)'));
     if(a.email) coreNode.push(item('smtp', 'SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)'));
     if(isK8s){
       var k8sPrep = [isOcp(a) ? 'OpenShift project' : 'Cluster namespace', 'RBAC'];
