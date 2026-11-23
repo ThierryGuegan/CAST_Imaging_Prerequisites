@@ -675,7 +675,7 @@
     counts = counts || {};
     var isK8sDiagram = isKube(a);
     var machineWord = isK8sDiagram ? 'pod' : 'machine';
-    var coreWordDiagram = isK8sDiagram ? 'core pods' : 'core node';
+    var coreWordDiagram = isK8sDiagram ? 'core pods' : (a.topology === 'single' ? 'single machine' : 'core node');
     var W = 1260, boxH = 60, gapY = 34, headerH = 30;
 
     function layoutRow(items, w){
@@ -983,14 +983,14 @@
   // ---- Port / FQDN matrix rows, each with a show(a) predicate ----
   function buildPortRows(a){
     var isK8s = isKube(a);
-    var coreWord = isK8s ? 'core pods' : 'core node';
+    var coreWord = isK8s ? 'core pods' : (a.topology === 'single' ? 'single machine' : 'core node');
     var unitWord = isK8s ? 'pod' : 'machine';
     var dbPort = '2285 (default, configurable)';
     var dbLabel = 'PostgreSQL';
     var dbDest = 'PostgreSQL (' +
       (a.dbHosting === 'dedicated' ? 'dedicated database server' :
        a.dbHosting === 'managed' ? 'managed/clustered DBaaS' :
-       a.topology === 'multi' ? 'co-located with the ' + coreWord : (isK8s ? 'co-located with all pods' : 'co-located on the single host')) + ')';
+       a.topology === 'multi' ? 'co-located with the ' + coreWord : (isK8s ? 'co-located with all pods' : 'co-located on the single machine')) + ')';
     var adminRows;
     if(isK8s){
       adminRows = [{src:(isOcp(a) ? 'oc / helm / CI pipelines' : 'kubectl / CI pipelines'), dst:(isOcp(a) ? 'OpenShift API server' : 'Kubernetes API server'), port:'6443', proto:'TCP', purpose:'Cluster administration and CAST deployment/upgrade via Helm', tag:'mandatory', note:'6443 is the default for self-managed clusters and OpenShift; managed services (EKS, AKS, GKE) usually expose the API server on 443 — reasonable inference, not CAST-documented'}];
@@ -1002,7 +1002,7 @@
 
     // Rootless Podman can't bind <1024 — only relevant to the client-facing 80/443 listener, and only
     // when the reverse proxy itself runs as a rootless container on the Podman host (Gateway's 8090 is fine).
-    var podmanPortNote = a.platform === 'podman' ? ' — if the reverse proxy runs as a rootless Podman container, it can\'t bind ports below 1024 by default; lower net.ipv4.ip_unprivileged_port_start, grant CAP_NET_BIND_SERVICE, or publish to a high port and front it with something that can bind 80/443' : '';
+    var podmanPortNote = a.platform === 'podman' ? ' — general Linux behaviour, not stated on CAST\'s Podman pages: if the reverse proxy runs as a rootless Podman container, it can\'t bind ports below 1024 by default; lower net.ipv4.ip_unprivileged_port_start, grant CAP_NET_BIND_SERVICE, or publish to a high port and front it with something that can bind 80/443' : '';
     var hasUi = hasUiScenario(a);
     var proxyDst = 'Reverse proxy ('+LABELS.reverseProxy[a.reverseProxy]+')';
     var cPort = clientPort(a), cProto = clientProto(a);
@@ -1011,7 +1011,9 @@
     ] : [
       {src:'API client / CI pipeline', dst:proxyDst, port:cPort, proto:cProto, purpose:'This scenario has no Viewer/Dashboards UI — imaging-services is consumed programmatically via CAST\'s REST APIs (delivery, analysis triggering, results retrieval) through the same reverse proxy → Gateway entry point rather than through a browser', tag:'mandatory', note:'Headless scenario — no separate browser-facing UI ports are needed'+podmanPortNote},
       {src:'API client / CI pipeline', dst:proxyDst, port:cPort, proto:cProto, purpose:'OAuth2 token issuance via Gateway\'s /oauth2 path — internally routed to Auth service (:8092), not a separately exposed port, per Gateway\'s single-entry-point model — for API authentication, since CAST\'s REST APIs may still require a token even without a human browser session', tag:'conditional', note:'Reasonable inference from CAST\'s architecture reference, not independently confirmed for headless API-only use — check your API authentication docs before excluding this'+podmanPortNote}
-    ]).concat([
+    ]).concat(!hasUi ? [
+      {src:'End-user browser (Console, Control Panel)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Console (/console — delivery and administration) and Control Panel (/admin) are browser UIs even in a scenario without Viewer or Dashboards', tag:'conditional', note:'Reasonable inference — both are UI services behind Gateway; only needed if staff use them from a browser rather than the APIs'}
+    ] : []).concat([
       {src:proxyDst, dst:'Gateway', port:'8090', proto:'HTTP', purpose:'The reverse proxy\'s upstream — Gateway listens on 8090 (not 80) and is CAST Imaging\'s single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below)', tag:'mandatory', note:(a.reverseProxy === 'ingress' ? 'In-cluster Service traffic from the Ingress controller' : undefined)}
     ]).concat(adminRows).concat([
       {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? (isK8s && a.dbHosting !== 'managed' ? 'Outside the cluster — egress from the core pods to the database host must be allowed' : 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened') : undefined)}
@@ -1037,7 +1039,7 @@
     }
     var interNodeNote = isK8s ? 'in-cluster pod-to-pod traffic — allow it in your NetworkPolicy if you enforce one' : 'a real firewall path must be opened';
     if(a.topology === 'multi' && hasAnalysis(a)){
-      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services / Gateway (' + coreWord + ')', port:'8090 (Gateway) — plus the other core ports CAST lists on its hardware page', proto:'HTTP/HTTPS', purpose:'Return path: each analysis-node registers against imaging-services and reports job status and results back to it, so connectivity must work in both directions between every analysis-node '+unitWord+' and the '+coreWord, tag:'mandatory', note:'Reasonable inference — CAST\'s multi-machine install pages say to open the hardware-page ports on each machine; the exact analysis-node → core ports aren\'t itemised by this tool'});
+      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services / Gateway (' + coreWord + ')', port:'8090 (Gateway) and 8098 (Control Panel) — plus the other core ports CAST lists on its hardware page', proto:'HTTP/HTTPS', purpose:'Return path: each analysis-node registers against imaging-services and reports job status and results back to it, so connectivity must work in both directions between every analysis-node '+unitWord+' and the '+coreWord, tag:'mandatory', note:'CAST\'s network-access page (a summary) says 8098 is opened only to the other CAST Imaging machines so analysis nodes, dashboards, viewer and MCP can register, and its hardware page says not all ports are needed on all machines; the exact set isn\'t itemised — reasonable inference'});
       rows.push({src:'imaging-services (' + coreWord + ')', dst:'analysis-node ' + unitWord + '(s)', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — the return path is the row above'});
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Each analysis-node writes analysis results directly to the '+dbLabel+' database — per CAST\'s architecture reference, this port is used by every component that reads/writes the database, not just imaging-services', tag:'mandatory', note:'Multi-'+unitWord+' topology — '+(a.dbHosting === 'colocated' ? interNodeNote : 'a real firewall path between every analysis-node '+unitWord+' and the database host/service must be opened')+', in addition to imaging-services\' own path above'});
     }
@@ -1053,6 +1055,12 @@
       rows.push({src:'Backup/admin host', dst:neo4jDst, port:'7474', proto:'HTTP', purpose:'Neo4j\'s own browser-based admin/query interface — for direct database administration, not used by imaging-viewer itself', tag:'optional', note:'Only if you need to browse/query Neo4j directly outside the Viewer application'});
     }
 
+    if(a.platform === 'kubernetes' && a.k8sProvider === 'gke'){
+      rows.push({src:'Every cluster worker node', dst:'Filestore instance (NFS)', port:'2049', proto:'NFS/TCP', purpose:'The shared pvc-shared-datadir volume uses the Filestore CSI driver (the chart\'s GKE_FSdriver)', tag:'conditional', note:'Reasonable inference — Filestore is NFS-based (Google documentation); CAST\'s GKE page states no port'});
+    }
+    if(isOcp(a) || (a.platform === 'kubernetes' && a.k8sProvider === 'other')){
+      rows.push({src:'Every cluster worker node', dst:'RWX file storage backend of your FileClassName (NFS, CephFS…)', port:'Per your storage (NFS: 2049)', proto:'TCP', purpose:'The shared pvc-shared-datadir volume needs a ReadWriteMany StorageClass; whatever backs it must be reachable from every worker node', tag:'conditional', note:'Per customer — CAST names no storage backend for OpenShift or self-managed clusters'});
+    }
     if(a.platform === 'kubernetes' && a.k8sProvider === 'eks'){
       rows.push({src:'Every cluster worker node', dst:'Amazon EFS mount targets (one per Availability Zone with worker nodes)', port:'2049', proto:'NFS/TCP', purpose:'The shared pvc-shared-datadir volume (analysis-node, console-service) lives on EFS; the mount targets must allow NFS from the EKS cluster security group', tag:'mandatory', note:'Per CAST\'s EKS page; a missing mount target in a node\'s zone makes the volume mount time out'});
     }
@@ -1099,10 +1107,12 @@
       var highlightNote = 'Highlight integration selected' +
         (a.egress === 'airgapped' ? ' — this is an external SaaS with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or Highlight must be dropped' :
          a.egress === 'proxy' ? ' — reaches this external SaaS via your configured proxy' : '');
-      rows.push({src:'imaging-services', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote});
-      rows.push({src:'imaging-services', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote});
+      var hlUnconfirmed = ' — hostname not found in CAST\'s pages (the documented one is rpa.casthighlight.com)';
+      rows.push({src:'imaging-services (com.castsoftware.highlight2mri extension)', dst:'rpa.casthighlight.com', port:'443', proto:'HTTPS', purpose:'The "Highlight URL" setting of CAST Imaging (documented example https://rpa.casthighlight.com): the extension needs a live connection to it, e.g. to download SCA vulnerabilities', tag:'conditional', note:highlightNote+' — per CAST\'s Highlight system-settings page (a summary); the port isn\'t stated, 443 follows from HTTPS'});
+      rows.push({src:'imaging-services', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote+hlUnconfirmed});
+      rows.push({src:'imaging-services', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote+hlUnconfirmed});
       if(hasAnalysis(a)){
-        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : '(s)'), dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote});
+        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : '(s)'), dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote+hlUnconfirmed});
       }
     }
 
@@ -1231,7 +1241,7 @@
     var sizeSpec = SIZING[a.scale];
     var userBonus = USER_BONUS[a.users] || {cpu:0, ram:0};
     var userBonusApplies = hasViewer(a) || hasDashboards(a);
-    var allInOneLabel = isK8s ? 'All pods' : 'All-in-one host';
+    var allInOneLabel = isK8s ? 'All pods' : 'Single machine';
     var coreLabel = isK8s ? 'Core pods' : 'Core node';
     var neo4jDedicatedLabel = isK8s ? ('Neo4j pod ('+(isOcp(a) ? 'on a node apart from the analysis-nodes' : 'isolated on its own node')+', serves imaging-viewer)') : 'Neo4j machine (dedicated, serves imaging-viewer)';
     var analysisLabel = isK8s ? 'Analysis-node pod' : 'Analysis-node machine';
@@ -1414,17 +1424,18 @@
     ];
     componentRows.push(['Console', '8091', 'Delivery/administration console (path /console)']);
     componentRows.push(['Auth service', '8092', 'OAuth2 token endpoint (path /oauth2)']);
-    componentRows.push(['SSO Service', '8096', 'Sign-in / SSO broker (Keycloak, realm aip-realm) for Local, SAML, OpenID Connect and LDAP identity sources (path /auth)']);
+    componentRows.push(['SSO Service', '8096'+(a.platform === 'windows' ? ' / 9002' : ''), 'Sign-in / SSO broker (Keycloak, realm aip-realm) for Local, SAML, OpenID Connect and LDAP identity sources (path /auth)']);
     componentRows.push(['Control Panel (admin-center)', '8098–2381', 'Administration UI (path /admin)']);
     if(hasAnalysis(a)) componentRows.push(['Analysis-node' + (isK8s?' pod(s)':'(s)'), '8089', 'Runs analyses; registers against the core services'+(a.topology === 'multi' ? ' (see Section 3 for the '+unitWord+'-to-'+unitWord+' port)' : '')]);
     if(hasViewer(a)) componentRows.push(['Viewer', '8083', 'Architecture/dependency graph UI (path /imaging)']);
+    if(hasViewer(a) && !isK8s) componentRows.push(['Viewer — other services', a.platform === 'windows' ? '9010 / 8286' : '8084 / 8286 / 9000 / 9980', a.platform === 'windows' ? 'Viewer back-end (9010) and GraphRAG server (8286) of imaging-viewer, per CAST\'s hardware page' : 'Login (8084), GraphRAG (8286), Viewer (9000) and Source code (9980) services of imaging-viewer, per CAST\'s hardware page']);
     if(hasViewer(a)) componentRows.push(['Viewer-APIs (imaging-apis)', '8070', 'REST API layer backing the Viewer']);
     if(hasNeo4j(a)) componentRows.push(['ETL service', '9001', 'Loads analysis results from PostgreSQL into Neo4j for the Viewer']);
     if(hasViewer(a)) componentRows.push(['AI-service (ai-manager)', '8082', 'Part of imaging-viewer, serving the Viewer/Viewer-APIs — per CAST\'s architecture diagram it is a distinct component unrelated to the MCP/AI integration (question 8) despite the similar naming']);
     if(a.mcp) componentRows.push(['MCP Server (Aggregator Gateway)', '8285', 'CAST Imaging MCP Server 3.1 — the only MCP port clients reach, routed from Gateway (any <code>/mcp</code> route; admin routes <code>/mcp/healthcheck</code>, <code>/mcp/status</code>, <code>/mcp/servers</code>, <code>/mcp/tools</code>); '+(isK8s ? 'the <code>mcp-server</code> pod\'s only exposed port; ' : 'published on the host by the installer; ')+'the bundled Structural (8282, CAST Imaging REST API), Semantic search (8287, Neo4j) and Text2Cypher (8289, Neo4j) MCP servers listen on the '+(a.platform === 'windows' ? 'machine' : 'container')+' loopback']);
     if(a.mcp) componentRows.push(['Gatekeeper MCP', '8283', 'Standalone '+(a.platform === 'windows' ? 'service (<code>Gatekeeper-MCP-Server</code>, TCP 8283)' : 'container (<code>castimaging/gatekeeper-mcp-server</code>, TCP 8283)')+' connecting AI clients to CAST Imaging\'s Dashboard REST API (<code>/dashboards/rest</code> on imaging-services), routed from Gateway (path /mcp/gatekeeper); installed alongside the MCP Server, not part of its 3.1 container'+(isK8s ? ' — <b>not deployed by CAST\'s Helm chart 3.6.9</b> (it ships only <code>mcp-server</code>, the 3.1 aggregator on port 8285); confirm in CAST\'s docs how Gatekeeper is deployed on '+esc(LABELS.platform[a.platform]) : '')]);
     if(hasDashboards(a)) componentRows.push(['Dashboards', '8097', 'KPI dashboards UI (path /dashboards)']);
-    if(hasNeo4j(a)) componentRows.push(['Neo4j', '7687 / 7474 / 6362', 'Graph database for the Viewer (Bolt / HTTP browser interface / backup)'+(isK8s ? ' — CAST\'s Helm chart exposes 7474, 7687, 7473 and 8888 on the Neo4j Service, not 6362' : '')]);
+    if(hasNeo4j(a)) componentRows.push(['Neo4j', '7687 / 7474 / '+(isK8s ? '' : '7473 / ')+'6362', 'Graph database for the Viewer (Bolt / HTTP browser interface / backup)'+(isK8s ? ' — CAST\'s Helm chart exposes 7474, 7687, 7473 and 8888 on the Neo4j Service, not 6362' : '')]);
     componentRows.push(['PostgreSQL', '2285 (default, configurable)', 'Relational database used directly by Control Panel, SSO Service, Auth Service, Console, Dashboards, analysis-node and imaging-viewer (per CAST) — not by Gateway, the Extend Local Server or the MCP servers']);
     if(a.egress === 'airgapped') componentRows.push(['Extend Local Server (' + (a.platform === 'windows' ? 'CAST_ExtendProxy service' : isK8s ? 'extendproxy pod' : 'extend-proxy') + ')', '8085', 'On-premises mirror of extend.castsoftware.com for air-gapped installs']);
 
@@ -1462,6 +1473,7 @@
     var osRows = [];
     if(a.platform === 'docker' || a.platform === 'podman'){
       osRows.push(['Host OS', 'Linux, 64-bit (x64) only, glibc ≥ 2.28 — Server Core / non-glibc distros not supported']);
+      osRows.push(['curl', 'Required by CAST\'s installer (its prechecks use it) — install it before running the installer <span class="hint">(CAST\'s software requirements page)</span>']);
       osRows.push(['Supported distributions', (a.platform === 'podman'
         ? 'RHEL-family: RHEL 8, RHEL 9, Rocky Linux 8, Rocky Linux 9 · Debian-family: Debian 12, Debian 13, Ubuntu 24.04 LTS, Ubuntu 26.04 LTS — Podman 4.x or 5.x'
         : 'RHEL-family: RHEL 8, RHEL 9, RHEL 10, Rocky Linux 8, Rocky Linux 9 · Debian-family: Debian 11, Debian 12, Debian 13, Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Ubuntu 26.04 LTS — Docker Engine ≥ 20.10')+'. ARM64/AArch64 is not supported <span class="hint">(CAST\'s software requirements page)</span>']);
@@ -1480,6 +1492,7 @@
         osRows.push(['UID/GID alignment', 'Not explicitly confirmed for Linux from what this tool could reach, but SMB-mounted shares typically fix ownership via mount-time <code>uid=</code>/<code>gid=</code> options — plan for a consistent service account/UID across every machine mounting <code>/opt/cast/shared</code>, the same way CAST documents for the Windows service account case']);
       }
     } else if(a.platform === 'windows'){
+      osRows.push(['curl', 'Required by CAST\'s installer — install it before running the installer <span class="hint">(CAST\'s software requirements page)</span>']);
       osRows.push(['Host OS', 'Windows Server 2016, 2019, 2022 or 2025, 64-bit (<b>Server Core is not supported</b>, Desktop Experience required); Windows 10/11 64-bit is also listed as supported']);
       osRows.push(['Installing user', 'Requires <b>Full Control</b> permissions (directly or via group membership) on the root folder where CAST Imaging components are installed']);
       osRows.push(['Java (JDK)', '64-bit JDK ≥ 17 LTS and ≤ 25 (CAST Imaging 3.6.7 or later; ≤ 21 before) with <code>%JAVA_HOME%</code> set — <b>mandatory on Windows</b> (CAST Imaging uses it to encrypt/decrypt passwords; checked by the installer\'s precheck)']);
@@ -1508,11 +1521,11 @@
           : a.dbHosting==='colocated' && isK8s
           ? 'CAST\'s Helm chart deploys PostgreSQL as an in-cluster pod: image <code>'+(isOcp(a) ? 'registry.redhat.io/rhel8/postgresql-15:latest' : 'postgres:15')+'</code> in chart 3.6.9 (<code>ConsolePostgresImage</code>), service port 2285. <code>CastStorageService.ssl: true</code> enforces SSL (TLS ≥ 1.2, self-signed certificate generated by the chart).'
           : a.dbHosting==='managed'
-          ? 'Pick a managed PostgreSQL offering (e.g. Amazon RDS, Azure Database for PostgreSQL, Google Cloud SQL) — CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b>.'+(isK8s ? ' On Kubernetes set <code>CastStorageService.enable: false</code> and <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>); CAST\'s EKS and GKE install pages mention PostgreSQL 15 with 8 GB RAM minimum for it.' : '')
+          ? 'Pick a managed PostgreSQL offering (e.g. Amazon RDS, Azure Database for PostgreSQL, Google Cloud SQL) — CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b>.'+(isK8s ? ' On Kubernetes set <code>CastStorageService.enable: false</code> and <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>); CAST\'s EKS and GKE install pages recommend at least 8 GB RAM for it.' : '')
           : a.dbHosting==='colocated'
           ? 'You provision PostgreSQL yourself on the CAST Imaging host: install an official EnterpriseDB release (CAST ships no PostgreSQL for Windows). CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b>.'
           : isK8s
-          ? 'External PostgreSQL outside the cluster (<code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> — host, port 2285 by default, admin login, <code>PostgresDbPassword</code>). CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b>; CAST\'s EKS and GKE install pages mention PostgreSQL 15 with 8 GB RAM minimum for it.'
+          ? 'External PostgreSQL outside the cluster (<code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> — host, port 2285 by default, admin login, <code>PostgresDbPassword</code>). CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b>; CAST\'s EKS and GKE install pages recommend at least 8 GB RAM for it.'
           : 'You provision PostgreSQL yourself: on Windows, install from EnterpriseDB (CAST ships no PostgreSQL for Windows); on Linux, from the distribution\'s official PostgreSQL repository (or run it in Docker). CAST supports <b>PostgreSQL 14.x–18.x (64-bit)</b> and currently recommends <b>18.x</b> for a self-provisioned instance.') +
         ' Confirm the full supported/minimum version range against <a href="https://doc.castsoftware.com/imaging/install/requirements/db/" target="_blank" rel="noopener">doc.castsoftware.com/imaging/install/requirements/db</a> before provisioning'+(a.dbHosting!=='colocated' ? ' your '+esc(LABELS.dbHosting[a.dbHosting]).toLowerCase()+' instance' : '')+'.</td></tr>' +
       '<tr><td>Hosting</td><td>'+esc(LABELS.dbHosting[a.dbHosting])+
@@ -1531,7 +1544,7 @@
     var portRows = buildPortRows(a);
 
     var netHtml = '<h3>3. Network ports &amp; FQDN allowlist — tailored to your answers</h3>' +
-      '<p>Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.</p>' +
+      '<p>Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.</p><!--WINPORTS-->' +
       '<div class="tbl-wrap"><table><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Protocol</th><th>Reason</th><th></th></tr></thead><tbody>' +
       portRows.map(function(r){
         return '<tr><td>'+esc(r.src)+'</td><td>'+esc(r.dst)+'</td><td>'+esc(r.port)+'</td><td>'+esc(r.proto)+'</td><td>'+esc(r.purpose)+(r.note?' <span class="hint">— '+esc(r.note)+'</span>':'')+'</td><td>'+tagHtml(r.tag)+'</td></tr>';
@@ -1566,6 +1579,8 @@
         '<li>The customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
         '<li>Once HTTPS is confirmed working, disable the reverse proxy\'s own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway\'s 8090 stays the proxy\'s internal upstream — keep it reachable only from the reverse proxy, not from users.</li>'
         : '') +
+      ((a.platform === 'docker' || a.platform === 'podman') && a.reverseProxy === 'nginx' && a.certSource !== 'none' ?
+        '<li>On Docker/Podman CAST\'s HTTPS page has NGINX terminate TLS on 443 (<code>listen 443 ssl</code>, <code>ssl_protocols TLSv1.2</code> in its example) with a <b>PEM</b> key pair whose private key is <b>unencrypted</b> (<code>openssl req -nodes</code>), proxying to imaging-services on 8090; it states that CAST <b>highly recommends not using self-signed certificates</b> and gives no trust-store guidance <span class="hint">(per a summary of the page)</span>.</li>' : '') +
       ((a.platform === 'docker' || a.platform === 'podman' || a.platform === 'windows') && a.reverseProxy === 'nginx' ?
         '<li>NGINX settings in CAST\'s reverse-proxy examples (per a summary of its Docker and Windows reverse-proxy pages): a single <code>location</code> block with <code>proxy_pass http://&lt;imaging-services-host&gt;:8090/;</code>, the headers Host, X-Forwarded-Proto, X-Real-IP, X-Forwarded-For, X-Forwarded-Host and X-Forwarded-Port, <code>proxy_buffering off</code>, <code>proxy_cache off</code>, <code>proxy_http_version 1.1</code> with an empty <code>Connection</code> header, <code>client_max_body_size 100M</code> (it limits ZIP uploads at onboarding — raise it if needed) and, for CAST Imaging ≥ 3.4.0 only, <code>proxy_cookie_flags ~.* secure samesite=None;</code>. CAST runs Keycloak behind it with <code>KC_PROXY: edge</code> / <code>KC_PROXY_HEADERS: xforwarded</code> (Docker) or <code>proxy=edge</code> / <code>proxy-headers=xforwarded</code> (Windows). The pages state no proxy timeouts and no <code>/.well-known</code> route (the MCP security page says CAST Imaging handles <code>/.well-known/oauth-protected-resource/mcp</code> itself).</li>' : '') +
       (a.certSource === 'self-signed' ?
@@ -1703,6 +1718,7 @@
         '<li><b>Gatekeeper MCP</b> ('+(a.platform === 'windows' ? '<code>Gatekeeper-MCP-Server</code>' : '<code>castimaging/gatekeeper-mcp-server</code>')+', TCP 8283, path <code>/mcp/gatekeeper</code>) is a standalone '+(a.platform === 'windows' ? 'service' : 'container')+' installed alongside the MCP Server: it connects AI clients to the CAST Dashboard REST API (<code>/dashboards/rest</code> on imaging-services; API-key sign-in needs CAST Imaging 3.6.6 or later, the component itself 3.6.4 or later). '+(isK8s ? '' : a.platform === 'windows' ? '<b>Windows:</b> package <code>com.castsoftware.gatekeeper.mcpserver</code>, <code>mcp-server-installer.bat --install configuration.conf</code> from an elevated CMD, service <b>Gatekeeper-MCP-Server</b>; <code>configuration.conf</code> needs <code>HOST_CONTROL_PANEL</code> and <code>SERVICE_HOST</code> (neither <code>localhost</code>) and <code>MCP_SERVER_PORT=8283</code>; no Java, at least 2 GB disk; open inbound TCP 8283, then check <code>/mcp/healthcheck</code> on :8283 (CAST\'s Gatekeeper Windows guide).' : 'Install it from the <code>com.castsoftware.gatekeeper.mcpserver.docker</code> package (<code>./run.sh</code>) with <code>HOST_CONTROL_PANEL</code>/<code>SERVICE_HOST</code> set, then check <code>/mcp/healthcheck</code> on :8283. Per CAST\'s Gatekeeper install pages; the tag and volumes aren\'t stated there.')+' Its telemetry push to CAST is on by default (<code>TELEMETRY_PUSH_ENABLED</code>, every 120 minutes; the host isn\'t stated) — set it to <code>false</code> on networks without outbound access.'+(isK8s ? ' <b>On '+esc(LABELS.platform[a.platform])+':</b> CAST\'s Helm chart 3.6.9 deploys only <code>mcp-server</code> (<code>McpServer.enable: true</code>, requires <code>Viewer.enable: true</code>; health check <code>/mcp/healthcheck</code>) — it has no Gatekeeper template or image, so confirm with CAST how Gatekeeper is deployed there.' : '')+'</li>' +
         '<li><b>Client authentication</b> (CAST\'s MCP security page): an API key sent in the <code>x-api-key</code> header (still supported), or an <b>OAuth browser sign-in</b> for Claude Code and VS Code — one or the other per client. The identity provider is CAST Imaging\'s own <b>Keycloak</b> (realm <code>aip-realm</code>, <code>kcadmin</code>), not an external one: the page mentions no external OAuth2/OIDC provider. OAuth needs CAST Imaging 3.6.6 or later, MCP Server 3.0.4 or later and Gatekeeper 3.0.1 or later. In Keycloak (Realm settings → Client policies) create, per AI client, a profile with the <code>client-id-metadata-document</code> executor and a policy, and <b>link the profile to the policy</b> (CAST calls a missing link the most common mistake): Claude Code — <code>cimd-profile-claude</code> / <code>cimd-policy-claude</code>, trusted domains <code>claude.ai</code>, <code>localhost</code>, <code>127.0.0.1</code>; VS Code — <code>cimd-profile-vscode</code> / <code>cimd-policy-vscode</code>, trusted domains <code>vscode.dev</code>, <code>code.visualstudio.com</code>, <code>127.0.0.1</code>. Clients reach only the Gateway (<code>/mcp</code>, <code>/mcp/gatekeeper</code>, and <code>/.well-known/oauth-protected-resource/mcp</code>, which CAST Imaging redirects to Keycloak\'s discovery endpoint) — never expose the MCP Server or Keycloak directly. '+(a.platform === 'windows' && a.certSource === 'none' ? 'Windows over plain HTTP: set the system environment variable <code>PUBLIC_URL=http://&lt;imaging-services-fqdn&gt;:8090</code> and restart imaging-services. ' : '')+'HTTPS is highly recommended; plain HTTP is acceptable only on a trusted local or CI host not reachable from the internet. Check: an unauthenticated POST to <code>/mcp</code> must answer with a <code>WWW-Authenticate: Bearer resource_metadata=…</code> header.</li>' +
         '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> on the MCP client hosts, not the CAST Imaging servers (no wildcards).</li>' +
+        (isK8s ? '' : '<li>Update and logs (per a summary of CAST\'s MCP update page): '+(a.platform === 'windows' ? 'run <code>mcp-server-installer.bat --update</code> from an elevated prompt after setting <code>SERVICE_HOST</code> and <code>NEO4J_URL</code> in <code>configuration.conf</code>; logs in <code>%CONFIG_DIR%\\logs\\mcp_server.log</code>' : 'run <code>./run.sh --update &lt;old installer path&gt;</code> from the new installer folder (it archives the old compose, <code>.env</code> and <code>app.config</code> under <code>backups/</code> and drops some settings you may have to set again); logs with <code>./run.sh --logs</code>')+'. The tool-surface profiles reset to <code>intents</code> on update.</li>') +
         '<li>Sizing: CAST\'s MCP pages give only <b>at least 2 GB of free disk</b> (CPU and RAM: the general hardware requirements) and don\'t say whether the MCP servers can share a machine with other CAST Imaging components; the MCP servers have their own installers. The ~2 vCPU / 4 GB RAM / 20 GB disk added to the '+(a.topology==='single' ? 'all-in-one' : 'core')+' row in Section 1 (Imaging MCP + Gatekeeper MCP combined) is <b>this tool\'s estimate, not a CAST figure</b> — split it out yourself if you need per-container limits.</li>' +
         '</ul>';
     }
@@ -1722,7 +1738,7 @@
     if(a.platform === 'windows') everyMachine.push(item('win-full-control', 'Installing user confirmed to have <b>Full Control</b> permissions (directly or via group membership) on the root install folder'));
     if(a.platform === 'windows') everyMachine.push(item('win-jdk', '64-bit JDK ≥ 17 LTS and ≤ 25 (CAST Imaging 3.6.7 or later; ≤ 21 before) installed with <code>%JAVA_HOME%</code> set (mandatory on Windows)'));
     if(isK8s) everyMachine.push(item('k8s-cluster-rights', 'Installing user/service account confirmed to have sufficient cluster rights ('+(isOcp(a) ? 'project creation' : 'namespace creation')+', Helm release management) — separate from the CAST-service RBAC below'));
-    if(needsSharedStorage(a)) everyMachine.push(item('shared-storage:'+(isK8s ? (isOcp(a) ? 'openshift' : a.k8sProvider) : a.platform === 'windows' ? 'windows' : 'vm'), sharedStorageText(a).checklist));
+    if(needsSharedStorage(a) && !isK8s) everyMachine.push(item('shared-storage:'+(isK8s ? (isOcp(a) ? 'openshift' : a.k8sProvider) : a.platform === 'windows' ? 'windows' : 'vm'), sharedStorageText(a).checklist));
     var checklistUnitWord = isK8s ? 'pod' : 'machine';
     // Kubernetes prerequisites are cluster-wide, not per pod, and a single-server profile has only one
     // server group — in both cases the "every server" items fold into the core group.
@@ -1736,7 +1752,7 @@
 
     var coreNode = separateEveryMachineGroup ? [] : everyMachine.slice();
     coreNode.push(item('server-sizing', (isK8s ? 'Node pool capacity' : 'Server(s)') + ' provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(topologyLabel(a))+')'));
-    if(isK8s && a.dbHosting !== 'colocated') coreNode.push(item('k8s-extdb', 'External PostgreSQL (PostgreSQL 15 with 8 GB RAM minimum recommended on CAST\'s EKS/GKE pages; the supported range is 14.x–18.x) in the same VPC/VNet and the same zone as the cluster nodes, and <code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>) set in <code>values.yaml</code> <span class="hint">(per CAST\'s EKS / GKE install pages)</span>'));
+    if(isK8s && a.dbHosting !== 'colocated') coreNode.push(item('k8s-extdb', 'External PostgreSQL (CAST\'s supported 14.x–18.x; 8 GB RAM minimum recommended on its EKS/GKE pages) in the same VPC/VNet and the same zone as the cluster nodes, and <code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>) set in <code>values.yaml</code> <span class="hint">(per CAST\'s EKS / GKE install pages)</span>'));
     coreNode.push(item('pg-hosting:'+a.dbHosting, 'PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting])));
     var pgEmbedded = a.dbHosting === 'colocated' && (a.platform === 'docker' || a.platform === 'podman' || isK8s);
     if(!pgEmbedded) coreNode.push(item('pg-version', 'PostgreSQL 14.x–18.x (64-bit, 18.x recommended) with UTF-8 and the collation CAST specifies (see Section 2)'));
@@ -1763,32 +1779,31 @@
     if(a.auth === 'ldap') coreNode.push(item('ldap-bind', 'LDAP bind account, base DN(s), and group mapping confirmed'));
     if(a.auth === 'ldap') coreNode.push(item('ldaps-ca', 'If using LDAPS (636): directory CA certificate trusted by CAST Imaging\'s SSO Service'));
     if(a.mcp) coreNode.push(item('mcp'+(isK8s ? ':k8s' : ''), (isK8s ? 'MCP Server 3.1 deployed (CAST\'s Helm chart ships no Gatekeeper MCP)' : 'MCP Server 3.1 + Gatekeeper MCP deployed')+', and the client authentication method chosen: API key, or OAuth with one Keycloak client profile and policy per AI client (profile linked to the policy)'));
-    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (cloud/auth'+(hasAnalysis(a) ? '/binaries' : '')+')'));
+    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (rpa — documented by CAST — and cloud/auth'+(hasAnalysis(a) ? '/binaries' : '')+', which are unconfirmed)'));
     if(a.email) coreNode.push(item('smtp', 'SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)'));
     if(isK8s){
-      var k8sPrep = [isOcp(a) ? 'OpenShift project' : 'Cluster namespace', 'RBAC', 'StorageClass'];
+      var k8sPrep = [isOcp(a) ? 'OpenShift project' : 'Cluster namespace', 'RBAC'];
       if(a.reverseProxy === 'ingress' && a.certSource !== 'none') k8sPrep.push('Ingress TLS secret (<code>tls-secret-cast</code>)');
       if(a.reverseProxy === 'gatewayapi' && a.certSource !== 'none') k8sPrep.push('Gateway TLS secret');
       if(a.reverseProxy === 'route' && a.certSource !== 'none') k8sPrep.push('Route TLS certificate and key (<code>--set-file tls.certificate / tls.key</code>)');
+      var stoParts = ['a block StorageClass (<code>DiskClassName</code>, ReadWriteOnce) <b>and</b> a shared-file StorageClass (<code>FileClassName</code>, <b>ReadWriteMany</b> — mandatory for <code>pvc-shared-datadir</code>, even with a single analysis-node pod), CSI drivers installed by the cluster administrator (CAST does not depend on a particular driver)'];
+      if(isOcp(a)) stoParts.push('both class names set to your cluster\'s own classes (the chart\'s default is the OpenShift Local provisioner)');
+      if(a.platform === 'kubernetes' && a.k8sProvider === 'eks') stoParts.push('EBS and EFS CSI add-ons installed with their IAM roles; the Amazon EFS file system in the cluster\'s VPC (<code>EFSsystemID</code>, optionally <code>EFSaccessPointID</code>) with a mount target in <b>every</b> Availability Zone where worker nodes can run, and the cluster security group allowed on NFS TCP 2049');
+      if(a.platform === 'kubernetes' && a.k8sProvider === 'aks') stoParts.push('Azure Files protocol decided: SMB (default) or — on FIPS-enabled nodes — NFS with a Premium FileStorage account reachable on TCP 2049 (<code>AnalysisNodeFS.AKSprotocol</code>)');
+      if(a.platform === 'kubernetes' && a.k8sProvider === 'gke') stoParts.push('Persistent Disk and Filestore CSI drivers available (<code>GKE_DSdriver</code>, <code>GKE_FSdriver</code>); consider a regional Persistent Disk for <code>castdir</code> if you need zone redundancy');
+      coreNode.push(item('k8s-storage:'+(isOcp(a) ? 'openshift' : a.k8sProvider), 'Storage ready: '+stoParts.join('; ')));
       coreNode.push(item('k8s-prep:'+a.reverseProxy+':'+(a.certSource !== 'none' ? 'tls' : 'plain')+(isOcp(a) ? ':ocp' : ''), k8sPrep.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' prepared'));
-      coreNode.push(item('k8s-csi', 'CSI storage drivers installed by the cluster administrator, exposing at least one <b>block/disk</b> StorageClass and one <b>shared-file</b> StorageClass (the latter is mandatory for the <code>shared-datadir</code> volume, which several Imaging services must reach); CAST Imaging does not depend on a particular driver'));
       if(!isOcp(a)) coreNode.push(item('k8s-loadbalancer', 'A load-balancer implementation (e.g. MetalLB) available on the cluster — without it the services\' external IP stays <code>&lt;pending&gt;</code>; installed and operated by the cluster administrator'));
       if(a.platform === 'kubernetes' && a.k8sProvider !== 'other') coreNode.push(item('k8s-provider:'+a.k8sProvider, '<code>K8SProvider: '+a.k8sProvider.toUpperCase()+'</code> set in <code>values.yaml</code> before the first deployment — CAST marks it install-time only'));
       if(isK8s && a.egress === 'airgapped') coreNode.push(item('k8s-telemetry', '<code>TELEMETRY_PUSH_ENABLED: false</code> set for the CAST services — CAST\'s EKS page recommends it when the cluster has no outbound internet access'));
       if(a.platform === 'kubernetes' && a.k8sProvider === 'other') coreNode.push(item('k8s-provider:other', '<code>K8SProvider: K8S</code> set in <code>values.yaml</code> when the cluster is not a managed cloud one (EKS / AKS / GKE — the providers the chart documents) — a non-managed cluster provides neither managed storage classes nor a load-balancer integration of its own <span class="hint">(per the AIFE requirements document)</span>'));
-      if(a.platform === 'kubernetes' && a.k8sProvider === 'eks'){
-        coreNode.push(item('eks-efs', 'Amazon EFS file system created in the cluster\'s VPC, <code>EFSsystemID</code> (and optionally <code>EFSaccessPointID</code>) set in <code>values.yaml</code>, one mount target in <b>every</b> Availability Zone where worker nodes can run, and the cluster security group allowed to reach them on NFS TCP 2049'));
-        coreNode.push(item('eks-csi', 'EBS and EFS CSI driver add-ons installed on the cluster with their IAM roles (CAST\'s EKS cluster-setup page installs both with eksctl)'));
-      }
-      if(a.platform === 'kubernetes' && a.k8sProvider === 'aks') coreNode.push(item('aks-files-protocol', 'Azure Files protocol decided for the shared volume: SMB (default) or — on FIPS-enabled nodes — NFS with a Premium FileStorage account reachable on TCP 2049 (<code>AnalysisNodeFS.AKSprotocol</code>)'));
-      if(a.platform === 'kubernetes' && a.k8sProvider === 'gke') coreNode.push(item('gke-storage', 'GKE Persistent Disk and Filestore CSI drivers available for the chart\'s StorageClasses (<code>GKE_DSdriver</code>, <code>GKE_FSdriver</code>) — consider a regional Persistent Disk for <code>castdir</code> if you need zone redundancy'));
       if(!isOcp(a)) coreNode.push(item('k8s-etc-cast-imaging', 'Kubernetes has read/write rights on <code>/etc/cast-imaging</code> <span class="hint">(per the AIFE requirements document — not independently confirmed against CAST\'s docs)</span>'));
       if((a.reverseProxy === 'ingress' || a.reverseProxy === 'gatewayapi') && a.certSource !== 'none') coreNode.push(item('k8s-tls-key-unencrypted:'+a.reverseProxy+(a.mcp ? ':mcp' : '')+(a.egress === 'airgapped' ? ':extend' : ''), 'TLS private key supplied <b>unencrypted</b> (the FQDNs and TLS certificates for Imaging'+(a.mcp ? ', MCP Server' : '')+(a.egress === 'airgapped' ? ' and Extend Local Server' : '')+' are defined on the '+(a.reverseProxy === 'gatewayapi' ? 'Gateway' : 'Ingress')+') <span class="hint">(per the AIFE requirements document)</span>'));
       coreNode.push(item('helm-chart-clone:'+(isOcp(a) ? 'ocp' : 'k8s')+(a.egress === 'airgapped' ? ':airgapped' : ''), a.egress === 'airgapped' ? 'Helm chart repository (<code>CAST-Extend/'+(isOcp(a) ? 'com.castsoftware.castimaging-v3.openshiftsetup' : 'com.castsoftware.castimaging-v3.kubernetessetup')+'</code>) cloned on an internet-connected host — release branch matching your CAST Imaging version — and transferred to where Helm/ArgoCD runs' : 'Access to <code>github.com</code> confirmed to clone the Helm chart repository (<code>CAST-Extend/'+(isOcp(a) ? 'com.castsoftware.castimaging-v3.openshiftsetup' : 'com.castsoftware.castimaging-v3.kubernetessetup')+'</code>, latest release branch — or <code>-b x.x.x</code> for an older release)'));
     }
     var coreComps = 'imaging-services'+(hasViewer(a)?' + imaging-viewer':'')+(hasDashboards(a)?' + dashboards':'')+(a.topology === 'single' && hasAnalysis(a) ? ' + analysis-node' : '');
     var coreNodeTitle = (a.topology === 'single' || !hasDistributedNodes(a))
-      ? (isK8s ? 'Single node pool' : 'Single host') + ' ('+coreComps+')'
+      ? (isK8s ? 'Single node pool' : 'Single machine') + ' ('+coreComps+')'
       : (isK8s ? 'Cluster / core pods' : 'Core node')+' ('+coreComps+')';
     groups.push({title:coreNodeTitle, items:coreNode});
 
@@ -1848,12 +1863,21 @@
       '<p>Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers. <span class="checklist-persist-note">Checked boxes are remembered in your browser as you tweak answers or reload the page.</span></p>' +
       checklistGroupsHtml + '</section>';
 
-    document.getElementById('results-content').innerHTML =
-      sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + optionalHtml + checklistHtml;
+    var allHtml = sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + optionalHtml + checklistHtml;
+    // Windows services listen on other ports than the Docker/Podman ones on CAST's hardware page: the text above is
+    // written with the Docker/Podman values, so translate them for Windows (PostgreSQL deliberately stays 2285 — see the
+    // documentation map), then add the note that lists the differences.
+    if(a.platform === 'windows') allHtml = windowsPorts(allHtml);
+    allHtml = allHtml.replace('<!--WINPORTS-->', a.platform === 'windows' ? '<div class="callout info"><b>Windows ports.</b> CAST\'s hardware page lists other service ports for Windows than for Docker/Podman, and this document uses the Windows values: analysis-node <b>8099</b> (Docker: 8089); imaging-viewer front-end <b>8093</b> (8083), AI Manager <b>8094</b> (8082), back-end <b>9010</b> (9000), ETL <b>9011</b> (9001); Neo4j <b>7697</b> / <b>7484</b> / <b>7483</b> / <b>6372</b> (7687 / 7474 / 7473 / 6362); the SSO Service also uses <b>9002</b>. <b>PostgreSQL:</b> this tool keeps the default <b>2285</b> recorded by the maintainer, but CAST\'s hardware page lists <b>2284</b> for Windows (its network-access page: 2284 for an external and 2285 for an embedded database) — check which one your installation uses.</div>' : '');
+    document.getElementById('results-content').innerHTML = allHtml;
 
     restoreChecklistState();
   }
 
+  function windowsPorts(html){
+    var map = {'8089':'8099','8083':'8093','8082':'8094','9001':'9011','7687':'7697','7474':'7484','7473':'7483','6362':'6372'};
+    return html.replace(/(^|[^\d.])(8089|8083|8082|9001|7687|7474|7473|6362)(?!\d)/g, function(m, pre, port){ return pre + map[port]; });
+  }
   function checklistStorageKey(key){ return 'castImagingChecklist:v2:' + key; }
   function restoreChecklistState(){
     var boxes = document.querySelectorAll('#results-content input[type=checkbox][data-check-key]');
