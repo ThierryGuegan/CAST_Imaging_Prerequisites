@@ -498,7 +498,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-11-22';
+  var TOOL_VERSION = '2026-11-23';
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
@@ -625,7 +625,10 @@
   }
   function sharedStorageText(a){
     if(a.platform === 'windows') return {box:'deploy / delivery / common-data shares · SMB :445', checklist:'Shared deploy/delivery/common-data SMB shares reachable from every server machine under one consistent service account'};
-    if(isKube(a)) return {box:'shared-access (RWX) PersistentVolume / StorageClass', checklist:'Shared-access (ReadWriteMany) StorageClass available (<code>FileClassName</code>) for <code>pvc-shared-datadir</code> — always required by CAST\'s Helm chart, even with a single analysis-node pod '+(isOcp(a) ? '(your cluster\'s RWX-capable CSI class)' : a.k8sProvider === 'eks' ? '(Amazon EFS)' : a.k8sProvider === 'aks' ? '(Azure Files)' : a.k8sProvider === 'gke' ? '(Filestore CSI driver)' : '(e.g. Azure Files on AKS, EFS on EKS, Filestore on GKE)')+''};
+    if(isKube(a)) return {box:(a.platform === 'kubernetes' && a.k8sProvider === 'eks' ? 'Amazon EFS (RWX) · mount target in every AZ · NFS :2049'
+        : a.platform === 'kubernetes' && a.k8sProvider === 'aks' ? 'Azure Files (RWX) · SMB :445 · NFS :2049 on FIPS nodes'
+        : a.platform === 'kubernetes' && a.k8sProvider === 'gke' ? 'Filestore CSI driver (RWX PersistentVolume)'
+        : 'shared-access (RWX) PersistentVolume / StorageClass'), checklist:'Shared-access (ReadWriteMany) StorageClass available (<code>FileClassName</code>) for <code>pvc-shared-datadir</code> — always required by CAST\'s Helm chart, even with a single analysis-node pod '+(isOcp(a) ? '(your cluster\'s RWX-capable CSI class)' : a.k8sProvider === 'eks' ? '(Amazon EFS)' : a.k8sProvider === 'aks' ? '(Azure Files)' : a.k8sProvider === 'gke' ? '(Filestore CSI driver)' : '(e.g. Azure Files on AKS, EFS on EKS, Filestore on GKE)')+''};
     return {box:'default: /opt/cast/shared (configurable) · SMB :445', checklist:'Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared (default path — configurable) on every server machine before install'};
   }
   function topologyLabel(a){
@@ -696,7 +699,7 @@
     var reportGenBox = {x: browserRow[0].x-60-220, w: 220};
     reportGenBox.cx = reportGenBox.x + reportGenBox.w/2;
     reportGenBox.label = 'CAST Report Generator'; reportGenBox.sub = 'reporting workstation';
-    var proxyRow = layoutRow([{key:'proxy', label:'Reverse proxy', sub:esc(LABELS.reverseProxy[a.reverseProxy])}]); var yProxy = y; y += boxH+gapY;
+    var proxyRow = layoutRow([{key:'proxy', label:'Reverse proxy', sub:esc(LABELS.reverseProxy[a.reverseProxy]) + (a.platform === 'kubernetes' && a.k8sProvider !== 'other' ? ' · ' + a.k8sProvider.toUpperCase() : '')}]); var yProxy = y; y += boxH+gapY;
     var gatewayRow = layoutRow([{key:'gw', label:'Gateway', sub:':8090 — sole entry point'}]); var yGateway = y; y += boxH+gapY;
 
     var routedItems = [
@@ -720,7 +723,8 @@
     if(hasViewer(a)) supportItems.push({key:'viewerapi', label:'Viewer-APIs', sub:'imaging-apis · :8070'});
     var supportRow = layoutRow(supportItems); var ySupport = y; if(supportItems.length) y += boxH+gapY;
 
-    var dataItems = [{key:'pg', label:'PostgreSQL', sub:'default :2285' + (a.dbHosting !== 'colocated' ? ' · '+(a.dbHosting==='managed' ? 'managed DBaaS' : (isK8sDiagram ? 'outside the cluster' : 'own '+machineWord)) : '')}];
+    var providerDb = a.platform === 'kubernetes' && a.k8sProvider !== 'other' && a.dbHosting !== 'colocated';
+    var dataItems = [{key:'pg', label:'PostgreSQL', sub:providerDb ? 'external · same '+(a.k8sProvider === 'aks' ? 'VNet' : 'VPC')+'/zone' : 'default :2285' + (a.dbHosting !== 'colocated' ? ' · '+(a.dbHosting==='managed' ? 'managed DBaaS' : (isK8sDiagram ? 'outside the cluster' : 'own '+machineWord)) : '')}];
     if(hasNeo4j(a)){
       dataItems.push({key:'etl', label:'ETL service', sub:':9001'});
       dataItems.push({key:'neo4j', label:'Neo4j', sub:(a.topology === 'multi' && a.neo4jDedicated) ? 'Bolt :7687 · own '+machineWord : 'Bolt :7687 · :7474' + (isK8sDiagram ? '' : ' · :6362')});
@@ -927,7 +931,8 @@
       svg += box(sharedRow[0], ySharedRow, {stroke:'var(--accent-2)', dash:true, labelColor:'var(--accent-2)'});
       var marginX = 20;
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L'+marginX+','+(yGateway+boxH/2)+' L'+marginX+','+(ySharedRow+boxH/2)+' L'+sharedRow[0].x+','+(ySharedRow+boxH/2)+'" fill="none" stroke="'+SHARED+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-shared)"/>';
-      svg += label(marginX+52, ySharedRow+boxH/2-8, coreWordDiagram, SHARED);
+      var sharedProto = a.platform === 'kubernetes' ? (a.k8sProvider === 'eks' ? ' · NFS :2049' : a.k8sProvider === 'aks' ? ' · SMB :445' : '') : '';
+      svg += label(marginX+52+(coreWordDiagram+sharedProto).length*0.9, ySharedRow+boxH/2-8, coreWordDiagram+sharedProto, SHARED);   // labels are centred on x
       if(analysisBox) svg += bottomLane(analysisBox.cx-20, ySupport+boxH, ySupport+boxH+22, laneR-28, ySharedRow+boxH/2, sharedRow[0].x+sharedRow[0].w, SHARED, 'ah-shared', true);
       if(neo4jBox && a.topology === 'multi' && a.neo4jDedicated) svg += '<path d="M'+(neo4jBox.x+neo4jBox.w)+','+(yData+boxH/2+14)+' L'+(laneR-42)+','+(yData+boxH/2+14)+' L'+(laneR-42)+','+(ySharedRow+boxH/2+12)+' L'+(sharedRow[0].x+sharedRow[0].w)+','+(ySharedRow+boxH/2+12)+'" fill="none" stroke="'+SHARED+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-shared)"/>';
       sharedNote = isK8sDiagram ? ' In CAST\'s Helm chart this shared RWX volume is mounted by the console service, the control panel and the analysis-node pods — only representative lines are drawn.' : ' Every CAST Imaging '+machineWord+' uses this shared storage read/write (including the core node) — only representative lines are drawn.';
