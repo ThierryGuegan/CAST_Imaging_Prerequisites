@@ -1107,13 +1107,8 @@
       var highlightNote = 'Highlight integration selected' +
         (a.egress === 'airgapped' ? ' — this is an external SaaS with no confirmed offline/local-mirror mode; it needs an explicit exception to your air-gapped egress policy or Highlight must be dropped' :
          a.egress === 'proxy' ? ' — reaches this external SaaS via your configured proxy' : '');
-      var hlUnconfirmed = ' — hostname not found in CAST\'s pages (the documented one is rpa.casthighlight.com)';
-      rows.push({src:'imaging-services (com.castsoftware.highlight2mri extension)', dst:'rpa.casthighlight.com', port:'443', proto:'HTTPS', purpose:'The "Highlight URL" setting of CAST Imaging (documented example https://rpa.casthighlight.com): the extension needs a live connection to it, e.g. to download SCA vulnerabilities', tag:'conditional', note:highlightNote+' — per CAST\'s Highlight system-settings page (a summary); the port isn\'t stated, 443 follows from HTTPS'});
-      rows.push({src:'imaging-services', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal / MRI API integration', tag:'conditional', note:highlightNote+hlUnconfirmed});
-      rows.push({src:'imaging-services', dst:'auth.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight OAuth2 authentication', tag:'conditional', note:highlightNote+hlUnconfirmed});
-      if(hasAnalysis(a)){
-        rows.push({src:'analysis-node' + (isK8s ? ' pod(s)' : '(s)'), dst:'casthighlight-binaries.s3.amazonaws.com', port:'443', proto:'HTTPS', purpose:'Download of CAST Highlight analysis engines/binaries', tag:'conditional', note:highlightNote+hlUnconfirmed});
-      }
+      rows.push({src:'imaging-services (com.castsoftware.highlight2mri extension)', dst:'rpa.casthighlight.com', port:'443', proto:'HTTPS', purpose:'The "Highlight URL" setting of CAST Imaging (e.g. SCA vulnerabilities for the Highlight integration)', tag:'conditional', note:highlightNote+' — host confirmed by the maintainer and by CAST\'s Highlight system-settings page; the port isn\'t stated, 443 follows from HTTPS'});
+      rows.push({src:'imaging-services', dst:'cloud.pa.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS (portal / API integration)', tag:'conditional', note:highlightNote+' — host confirmed by the maintainer; the port isn\'t stated, 443 follows from HTTPS'});
     }
 
     var viaProxyNote = a.egress === 'proxy' ? ' via your configured proxy' : '';
@@ -1126,7 +1121,7 @@
     rows.push({src:'Administrator / delivery workstation', dst:'castsoftware.zendesk.com', port:'443', proto:'HTTPS', purpose:'CAST Support portal (tickets, downloads)', tag:'optional', note:'Browser access from the workstations (e.g. the operator machine), not from the CAST Imaging servers'});
     rows.push({src:'Administrator / delivery workstation', dst:'doc.castsoftware.com', port:'443', proto:'HTTPS', purpose:'CAST online documentation', tag:'optional', note:'Browser access from the workstations, not from the CAST Imaging servers'});
     if(a.highlight){
-      rows.push({src:'Administrator / delivery workstation', dst:'cloud.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal (browser access)', tag:'conditional', note:'Highlight integration selected — workstation side; the imaging-services side is listed above'});
+      rows.push({src:'Administrator / delivery workstation', dst:'cloud.pa.casthighlight.com', port:'443', proto:'HTTPS', purpose:'CAST Highlight SaaS portal (browser access)', tag:'conditional', note:'Highlight integration selected — workstation side; the imaging-services side is listed above'});
     }
 
     if(a.mcp){
@@ -1577,7 +1572,22 @@
       '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : (a.certSource==='none' ? (authNeedsHttps(a) ? ' — <b>not valid with '+authShortName(a)+' selected</b>; see the conflict above.' : ' — traffic between browser/client and the reverse proxy is unencrypted; reconsider once the deployment is reachable beyond a fully trusted, isolated network segment.') : '.')) + '</li>' +
       (a.certSource !== 'none' ?
         '<li>The customer/you must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
-        '<li>Once HTTPS is confirmed working, disable the reverse proxy\'s own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway\'s 8090 stays the proxy\'s internal upstream — keep it reachable only from the reverse proxy, not from users.</li>'
+        (a.platform === 'windows'
+          ? '<li>CAST\'s Windows HTTPS procedure (below) terminates TLS <b>at the Gateway itself</b> (<code>server.port: 443</code>), not at a reverse proxy. CAST\'s Windows reverse-proxy example is HTTP-facing (<code>listen 80</code>, <code>proxy_pass …:8090/</code>) and says nothing about keeping Gateway TLS behind it — if you keep a reverse proxy in front, confirm with CAST which port and protocol it must use towards the Gateway; the 8090 rows of this document are the default HTTP port.</li>'
+          : '<li>Once HTTPS is confirmed working, disable the reverse proxy\'s own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway\'s 8090 stays the proxy\'s internal upstream — keep it reachable only from the reverse proxy, not from users.</li>')
+        : '') +
+      (a.platform === 'windows' && a.certSource !== 'none' ?
+        '<li><b>HTTPS on Windows — CAST\'s procedure</b> (CAST Imaging 3.6.2 or later; local administrator; read verbatim from CAST\'s Windows HTTPS page): ' +
+        '<ol>' +
+        '<li><b>Key pair</b> (OpenSSL isn\'t shipped — use <code>%PROGRAMFILES%\\Git\\usr\\bin</code> if Git is installed): <code>openssl req -new -newkey rsa:2048 -nodes -keyout private_key.key -out csr.csr</code>; send <code>csr.csr</code> to your CA for <code>public_key.crt</code>. Common Name <b>and</b> a SAN entry must be the public FQDN. CAST highly recommends CA-signed certificates.</li>' +
+        '<li><b>SSO Service</b>: from 3.6.9 it needs <b>no certificate</b> — in <code>%PROGRAMFILES%\\CAST\\Imaging\\CAST-Imaging-SSO\\conf\\keycloak.conf</code> set <code>hostname=https://&lt;FQDN&gt;/auth</code> and add <code>proxy-headers=xforwarded</code>; in 3.6.8 and earlier copy the PEM pair into that <code>conf</code> folder, change <code>http-port=8096</code> to <code>https-port=8096</code> and set <code>https-certificate-file</code> / <code>https-certificate-key-file</code>.</li>' +
+        '<li><b>Gateway keystore</b>: <code>openssl pkcs12 -export -in public_key.crt -inkey private_key.key -name gateway -out gateway.p12</code>, then <code>keytool -importkeystore -srckeystore gateway.p12 -destkeystore gateway.jks -srcstoretype PKCS12</code>; check the keystore type with <code>keytool -list -v -keystore gateway.jks -storepass &lt;password&gt;</code>; copy <code>gateway.jks</code> to <code>%PROGRAMFILES%\\CAST\\Imaging\\CAST-Imaging-gateway\\</code>. <b>Self-signed only</b>: <code>keytool -export -alias gateway -file gateway.crt -keystore gateway.jks</code>, then <code>keytool -importcert -trustcacerts -file gateway.crt -alias gateway -keystore "%JAVA_HOME%\\lib\\security\\cacerts"</code> (default password <code>changeit</code>) — otherwise services fail with "PKIX path building failed".</li>' +
+        '<li><b>Gateway configuration</b> (<code>CAST-Imaging-gateway\\application-default.yml</code>, <code>application.yml</code> before 3.6.2): <code>server.port: 443</code>, <code>server.ssl.enabled: true</code>, an SSL bundle on <code>gateway.jks</code> (location, type, password), <code>server-name-bundles</code> mapping the FQDN (3.6.4+; otherwise ERR_CONNECTION_CLOSED through the FQDN), <code>forward-headers-strategy: framework</code> and <code>tomcat.remoteip.remote-ip-header: x-forwarded-host</code>.</li>' +
+        '<li><b>Authentication service</b> (<code>CAST-Imaging-auth-service\\application-default.yml</code>): from 3.6.9 <code>server.port: 8092</code> and <code>service.gatewayPort: 443</code> with no gatewayUrl/nginx entries, then set the machine variable <code>PUBLIC_URL</code> to <code>https://&lt;FQDN&gt;</code> (no trailing slash; elevated PowerShell <code>[Environment]::SetEnvironmentVariable(\'PUBLIC_URL\', \'https://&lt;FQDN&gt;\', \'Machine\')</code>) and restart the machine; in 3.6.8 and earlier <code>service.auth: https://localhost:8096</code>, <code>gatewayPort: 443</code>, and <code>gatewayUrl</code> and <code>nginx</code> set to <code>https://&lt;FQDN&gt;</code>.</li>' +
+        '<li><b>Database</b>: in the <code>control_panel</code> schema (<code>admin_center</code> in 3.2 and earlier), table <code>properties</code>, change <code>keycloak.uri</code> to HTTPS and remove the port.</li>' +
+        '<li><b>Restart order</b>: SSO, Control Panel, Gateway, then the Authentication service (only once the Gateway has started), Console, Analysis Node, Dashboards, and the Viewer services (Neo4j first). Test <code>https://&lt;FQDN&gt;</code> in a browser.</li>' +
+        '<li><b>Analysis nodes added later</b>: set <code>SECURED_CONNECTION</code> to <code>true</code> in <code>config-analysis-node.conf</code>.</li>' +
+        '</ol>Typical failures per CAST: "PKIX path building failed" (certificate missing from the Java trust store), "Keystore was tampered with, or password was incorrect", "Invalid keystore format", a SAN that doesn\'t match the FQDN, and a <code>/login?error</code> loop in 3.6.9+ (<code>PUBLIC_URL</code> unset or <code>gatewayUrl</code> still set).</li>'
         : '') +
       ((a.platform === 'docker' || a.platform === 'podman') && a.reverseProxy === 'nginx' && a.certSource !== 'none' ?
         '<li>On Docker/Podman CAST\'s HTTPS page has NGINX terminate TLS on 443 (<code>listen 443 ssl</code>, <code>ssl_protocols TLSv1.2</code> in its example) with a <b>PEM</b> key pair whose private key is <b>unencrypted</b> (<code>openssl req -nodes</code>), proxying to imaging-services on 8090; it states that CAST <b>highly recommends not using self-signed certificates</b> and gives no trust-store guidance <span class="hint">(per a summary of the page)</span>.</li>' : '') +
@@ -1736,6 +1746,7 @@
     if(a.platform === 'podman') everyMachine.push(item('podman-linger', 'Rootless install plan confirmed, including <code>loginctl enable-linger</code> for the installing user so containers survive logout'));
     if(a.platform === 'docker' || a.platform === 'podman') everyMachine.push(item('tmp-exec', '/tmp confirmed mounted with exec permission (remount or redirect if your hardening baseline sets noexec)'));
     if(a.platform === 'windows') everyMachine.push(item('win-full-control', 'Installing user confirmed to have <b>Full Control</b> permissions (directly or via group membership) on the root install folder'));
+    if(a.platform === 'windows' && a.certSource !== 'none') everyMachine.push(item('win-https:'+a.certSource, 'HTTPS configured on the Gateway following CAST\'s Windows procedure (key pair with the FQDN as CN and SAN, <code>gateway.jks</code>, <code>application-default.yml</code> with <code>server.port: 443</code>, Authentication service and <code>PUBLIC_URL</code>, <code>keycloak.uri</code> in the database)'+(a.certSource === 'self-signed' ? '; the self-signed certificate imported into the Java <code>cacerts</code>' : '')));
     if(a.platform === 'windows') everyMachine.push(item('win-jdk', '64-bit JDK ≥ 17 LTS and ≤ 25 (CAST Imaging 3.6.7 or later; ≤ 21 before) installed with <code>%JAVA_HOME%</code> set (mandatory on Windows)'));
     if(isK8s) everyMachine.push(item('k8s-cluster-rights', 'Installing user/service account confirmed to have sufficient cluster rights ('+(isOcp(a) ? 'project creation' : 'namespace creation')+', Helm release management) — separate from the CAST-service RBAC below'));
     if(needsSharedStorage(a) && !isK8s) everyMachine.push(item('shared-storage:'+(isK8s ? (isOcp(a) ? 'openshift' : a.k8sProvider) : a.platform === 'windows' ? 'windows' : 'vm'), sharedStorageText(a).checklist));
@@ -1779,7 +1790,7 @@
     if(a.auth === 'ldap') coreNode.push(item('ldap-bind', 'LDAP bind account, base DN(s), and group mapping confirmed'));
     if(a.auth === 'ldap') coreNode.push(item('ldaps-ca', 'If using LDAPS (636): directory CA certificate trusted by CAST Imaging\'s SSO Service'));
     if(a.mcp) coreNode.push(item('mcp'+(isK8s ? ':k8s' : ''), (isK8s ? 'MCP Server 3.1 deployed (CAST\'s Helm chart ships no Gatekeeper MCP)' : 'MCP Server 3.1 + Gatekeeper MCP deployed')+', and the client authentication method chosen: API key, or OAuth with one Keycloak client profile and policy per AI client (profile linked to the policy)'));
-    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (rpa — documented by CAST — and cloud/auth'+(hasAnalysis(a) ? '/binaries' : '')+', which are unconfirmed)'));
+    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (rpa.casthighlight.com and cloud.pa.casthighlight.com)'));
     if(a.email) coreNode.push(item('smtp', 'SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)'));
     if(isK8s){
       var k8sPrep = [isOcp(a) ? 'OpenShift project' : 'Cluster namespace', 'RBAC'];
@@ -1868,15 +1879,15 @@
     // written with the Docker/Podman values, so translate them for Windows (PostgreSQL deliberately stays 2285 — see the
     // documentation map), then add the note that lists the differences.
     if(a.platform === 'windows') allHtml = windowsPorts(allHtml);
-    allHtml = allHtml.replace('<!--WINPORTS-->', a.platform === 'windows' ? '<div class="callout info"><b>Windows ports.</b> CAST\'s hardware page lists other service ports for Windows than for Docker/Podman, and this document uses the Windows values: analysis-node <b>8099</b> (Docker: 8089); imaging-viewer front-end <b>8093</b> (8083), AI Manager <b>8094</b> (8082), back-end <b>9010</b> (9000), ETL <b>9011</b> (9001); Neo4j <b>7697</b> / <b>7484</b> / <b>7483</b> / <b>6372</b> (7687 / 7474 / 7473 / 6362); the SSO Service also uses <b>9002</b>. <b>PostgreSQL:</b> this tool keeps the default <b>2285</b> recorded by the maintainer, but CAST\'s hardware page lists <b>2284</b> for Windows (its network-access page: 2284 for an external and 2285 for an embedded database) — check which one your installation uses.</div>' : '');
+    allHtml = allHtml.replace('<!--WINPORTS-->', a.platform === 'windows' ? '<div class="callout info"><b>Windows ports.</b> CAST\'s hardware page lists other service ports for Windows than for Docker/Podman, and this document uses the Windows values: analysis-node <b>8099</b> (Docker: 8089); imaging-viewer front-end <b>8093</b> (8083), AI Manager <b>8094</b> (8082), back-end <b>9010</b> (9000), ETL <b>9011</b> (9001); Neo4j <b>7697</b> / <b>7484</b> / <b>7483</b> / <b>6372</b> (7687 / 7474 / 7473 / 6362); the SSO Service also uses <b>9002</b>. <b>PostgreSQL</b> <b>2284</b> (Docker/Podman embedded database: 2285), confirmed by the maintainer and by CAST\'s hardware page.</div>' : '');
     document.getElementById('results-content').innerHTML = allHtml;
 
     restoreChecklistState();
   }
 
   function windowsPorts(html){
-    var map = {'8089':'8099','8083':'8093','8082':'8094','9001':'9011','7687':'7697','7474':'7484','7473':'7483','6362':'6372'};
-    return html.replace(/(^|[^\d.])(8089|8083|8082|9001|7687|7474|7473|6362)(?!\d)/g, function(m, pre, port){ return pre + map[port]; });
+    var map = {'2285':'2284','8089':'8099','8083':'8093','8082':'8094','9001':'9011','7687':'7697','7474':'7484','7473':'7483','6362':'6372'};
+    return html.replace(/(^|[^\d.])(2285|8089|8083|8082|9001|7687|7474|7473|6362)(?!\d)/g, function(m, pre, port){ return pre + map[port]; });
   }
   function checklistStorageKey(key){ return 'castImagingChecklist:v2:' + key; }
   function restoreChecklistState(){
