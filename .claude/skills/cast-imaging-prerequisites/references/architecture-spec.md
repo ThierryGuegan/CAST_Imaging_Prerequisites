@@ -127,7 +127,7 @@ be a search-and-fix pass, not a rename in isolation.
    sub-blocks that only show when relevant (analysis-node count when topology is multi and the
    scenario includes analysis; a Neo4j-dedicated-machine checkbox when topology is multi and the
    scenario includes the Viewer). On Kubernetes the two topology options are relabelled by
-   `render()` — **Single node pool** (no dedicated-node isolation, still 2 cluster nodes minimum)
+   `render()` — **Shared nodes** (no dedicated-node isolation, still 2 cluster nodes minimum)
    and **Isolated nodes** (analysis-node, and optionally Neo4j, pods isolated on their own cluster
    nodes) — because "single/multi pod" was never what the choice meant there; `topologyLabel(a)`
    returns the same words for the chips and callouts.
@@ -717,7 +717,7 @@ analyst workstation group and the Report Generator item exist only with analysis
 every requirement a results section states as mandatory (PostgreSQL version/HA, self-signed trust,
 HTTPS-for-SAML, LDAPS CA trust) needs an item — check this whenever you add a requirement to a
 section. Group titles follow the same wording rules as the rest of the file ("Cluster / core pods",
-"Single node pool", and a multi topology with nothing to distribute is titled like single).
+"Shared nodes", and a multi topology with nothing to distribute is titled like single).
 
 ### Save / import answers (JSON)
 
