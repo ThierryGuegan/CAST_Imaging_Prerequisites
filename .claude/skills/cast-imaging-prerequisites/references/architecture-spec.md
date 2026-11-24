@@ -190,7 +190,7 @@ be a search-and-fix pass, not a rename in isolation.
    architecture diagram confirmed the real component names. Don't build rows that bypass Gateway's
    `/auth`/`/oauth2` routing to reach these directly (a past bug: a headless API-client row sent
    traffic straight to "Auth service" on its own port instead of through Gateway).
-8. **Optional integrations** — (on Kubernetes/OpenShift the MCP checkbox is hidden and ignored when the scenario has no Viewer — `mcpBlocked()`, `#mcp-blocked-note`; every radio group carries `role=radiogroup` + `aria-labelledby` wired at load) MCP/AI (with LLM provider sub-select), CAST Highlight, email
+8. **Optional integrations** — (the MCP checkbox is hidden and ignored on every platform when the scenario has no Viewer — `mcpBlocked()`, `#mcp-blocked-note`; every radio group carries `role=radiogroup` + `aria-labelledby` wired at load) MCP/AI (with LLM provider sub-select), CAST Highlight, email
    notifications. Each is a checkbox that adds rows/sections conditionally rather than replacing
    anything.
 9. **Source code access** — how source reaches the analysis-nodes. CAST Imaging v3 takes source as
