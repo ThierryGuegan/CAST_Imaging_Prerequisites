@@ -69,6 +69,17 @@ const L = require('./lib');
   ok((await L.checkKeys(page)).some(k => /^k8s-backup:k8s/.test(k)), 'Kubernetes backup item missing');
   await L.set(page, { platform: 'docker', scenario: 'full', topology: 'single' });
 
+  // Windows items from the remaining install pages
+  await L.set(page, { platform: 'windows', scenario: 'full', topology: 'multi', dbHosting: 'dedicated' });
+  keys = await L.checkKeys(page);
+  ok(keys.includes('win-imaging-core') && keys.includes('win-prechecks') && keys.includes('win-config-variables') && keys.includes('win-multi-install') && keys.includes('pg-config:self'), 'Windows multi-machine items missing');
+  const cfg = await page.evaluate(() => document.querySelector('[data-check-key="win-config-variables"]').closest('li,label,div').innerText);
+  ok(/2284/.test(cfg) && !/2285/.test(cfg), 'Windows CSS_INFOS port not translated');
+  await L.set(page, { scenario: 'dashboards-only', topology: 'single', dbHosting: 'colocated' });
+  keys = await L.checkKeys(page);
+  ok(!keys.includes('win-imaging-core') && keys.includes('win-readonly-source:dashboards-only'), 'Core item shown without analysis, or read-only item missing');
+  await L.set(page, { platform: 'docker', scenario: 'full', topology: 'single', dbHosting: 'colocated' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
