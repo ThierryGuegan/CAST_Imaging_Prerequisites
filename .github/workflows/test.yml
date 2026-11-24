@@ -13,6 +13,9 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - run: node tests/syntax.js
+      - run: node tests/lint.js
       - run: node tests/sweep.js --quick
       - run: node tests/facts.js
       - run: node tests/features.js
+      - run: node tests/diagram.js --quick
+      - run: node tests/a11y.js

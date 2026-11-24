@@ -2,6 +2,6 @@
   "name": "cast-imaging-requirements-builder-tests",
   "private": true,
   "description": "Regression tests for the single-file CAST Imaging requirements builder (the tool itself has no dependencies and no build step).",
-  "scripts": { "test": "node tests/syntax.js && node tests/sweep.js --quick && node tests/facts.js && node tests/features.js", "test:full": "node tests/sweep.js" },
-  "devDependencies": { "playwright": "^1.48.0" }
+  "scripts": { "test": "node tests/syntax.js && node tests/lint.js && node tests/sweep.js --quick && node tests/facts.js && node tests/features.js", "test:full": "node tests/sweep.js && node tests/diagram.js && node tests/a11y.js" },
+  "devDependencies": { "playwright": "^1.48.0", "axe-core": "^4.10.0", "eslint": "^9.0.0", "globals": "^15.0.0" }
 }
