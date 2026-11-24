@@ -45,6 +45,10 @@ Find every place in cast-imaging-requirements-builder.html that touches the topi
 
 ## 2. Verify against the primary source, but don't let a dead end stop you
 
+**How pages are read now.** `doc.castsoftware.com` is reachable through the `web-fetch` agent (a direct `WebFetch` from the main session may still be refused). Ask for `offset=80000` (the first 40–100 kB of every page is navigation), then 100000 / 120000 until the footer; the tool's own summary replaces raw text after about 40 kB, so insist on raw text and have the agent report which character ranges were only summarised. Tell the agent to put the **complete report in its final message** (a report that says "see above" is lost) and to list keys, ports and commands one by one instead of quoting blocks (quotes are capped at ~125 characters). Parallelise: one agent per area. Then record every page in `references/sources.md` (status V / S / P and the page's "Updated" date) and the findings in `documentation-map.md`. Anything you can't re-find on the current page must be written as "an earlier version of CAST's documentation said…", never attributed to a page you can't cite.
+
+The older note below still applies when a page cannot be fetched at all:
+
 The user's info comes from `doc.castsoftware.com`. In this environment that domain is blocked at the network egress level for direct fetch — expect `WebFetch` to fail with `EGRESS_BLOCKED` on every attempt, not just some. Don't waste more than one try confirming that before falling back to `WebSearch`, which reaches the same content via cached snippets and usually surfaces enough to work with.
 
 Don't guess which doc page might be relevant — `references/documentation-map.md` maps every
@@ -54,7 +58,7 @@ searching so you're verifying against the right page on the first try, not a pla
 wrong one.
 
 Hold every claim to a clear bar:
-- **Confirmed** — a search snippet states it directly. Fine to assert as fact.
+- **Confirmed** — a page read verbatim (or a search snippet) states it directly, and `sources.md` says which page. Fine to assert as fact.
 - **Reasonable inference** — implied by confirmed facts plus general technical knowledge (e.g., rootless Podman can't bind privileged ports — that's general Linux behavior, not something you need CAST to confirm). Fine to include, but say why you believe it.
 - **Unverifiable** — you can't find it and it's not inferable. Don't guess a number or invent a port. Either leave it out, or state clearly in the tool's own text that it's unconfirmed and link the doc page to check (the tool already has precedent for this — search for "not independently verified" or "not confirmed").
 
@@ -75,6 +79,12 @@ These are the categories that have repeatedly turned out to hide real bugs in th
 - **Regressions from your own fix.** A second audit of a large fix PR found: an advice sentence about port 8090 that was wrong in the first place, a gate moved too far (the tester → Gateway line disappeared in headless scenarios), a removed-on-request callout reintroduced, labels that overflowed the viewBox, and lines crossing boxes. After a big fix, audit the diff itself (`git diff <before> <after> -- cast-imaging-requirements-builder.html`) before calling it done.
 - **Diagram/text mismatch.** The architecture diagram (`buildArchitectureDiagram(a)`) omits a connection, port, or component that a table, callout, or note elsewhere in the same file confirms exists — or draws a connection with more confidence (solid, same color as confirmed routes) than the text next to it claims. This was the single most common bug shape found auditing the diagram box-by-box: the Extend Local Server appeared with no inbound connection at all, the shared-storage box's own caption said "including the core node" while no line to the core node existed, Control Panel's confirmed port range (`8098–2381`) was silently truncated to `8098` in three of four places it appeared, and — the largest instance — Gateway/imaging-services had no connection to PostgreSQL at all despite `buildPortRows()` having had an unconditional row for exactly that connection the whole time. When auditing the diagram, don't just check that a box exists and its own label is right — trace every row in `componentRows`/`buildPortRows()` that mentions the component and confirm each one has a corresponding line in the diagram, not just the ones that were obviously due for an update.
 
+- **Provider leakage.** Text naming another cloud provider's page or product on EKS / AKS / GKE (Azure text on GKE, "EKS and GKE pages" on every flavour, a hard-coded provider list). `tests/sweep.js` carries a leak check; extend it when you add provider text.
+- **Text naming a component the scenario excludes.** analysis-node without analysis, `viewer-neo4j` / Neo4j without a Viewer, an embedded PostgreSQL pod with an external database, Gatekeeper in the Kubernetes sizing. `tests/facts.js` has an "excluded component" check; gate the text on `hasAnalysis` / `hasViewer` / `hasNeo4j` / `a.dbHosting` or drop it.
+- **Index-based mapping.** Anything that pairs two lists of controls by position (the checklist export once did) breaks the day an interactive control is added; key by `data-check-key` / id.
+- **Unverifiable attribution.** A statement credited to a CAST page that no longer says it (e.g. "the hardware page says only SMB") — re-find it or reword it.
+- **Hidden state.** A control hidden by a rule (`data-rp` cards, the MCP checkbox, `dbTls`) must leave no effect: gate it in `state()` or the text, and reset or ignore it on import.
+
 ## 4. Fix it
 
 Edit cast-imaging-requirements-builder.html directly. Keep changes scoped to what the audit actually found — don't refactor unrelated code or invent new features while you're in there. When a fix affects wording used in multiple places (e.g., a shared label), check whether other rows reference the same concept and keep them consistent.
@@ -90,6 +100,8 @@ Playwright + Chromium are pre-installed for this: `NODE_PATH=/opt/node22/lib/nod
 Print the rendered table/section text for a couple of representative combinations so you can eyeball the actual wording, not just the error count — a fix can run error-free and still read wrong.
 
 ## 6. Ship it: commit, catch the branch up, then PR
+
+Before committing, run the whole suite from the repo root: `node tests/syntax.js`, `node tests/lint.js`, `node tests/sweep.js` (`--quick` is the CI version), `node tests/facts.js`, `node tests/features.js`, `node tests/consistency.js`, `node tests/profiles.js`, `node tests/a11y.js`, `node tests/diagram.js` (`npm test` runs the quick set; `npm run test:full` the long sweeps). Set `CHROMIUM_PATH=/opt/pw-browsers/chromium` and `NODE_PATH` to a folder holding `playwright`, `eslint`, `globals` and `axe-core` (`npm install` in the repo, or a scratch folder). **`tests/profiles.js` snapshots eight realistic profiles: when your change legitimately alters the generated text, read the diff of `tests/snapshots/` and refresh it with `node tests/profiles.js --update` in the same commit.** New checklist ids go into `CHECKLIST_PHASES` (an unlisted id lands in "prepare"). Add a line to the in-page `CHANGELOG` together with the `TOOL_VERSION` bump, and record the decision in `references/decisions.md`.
 
 If your fix changed any fact the tool asserts (a port, a label, a version, a gating condition —
 anything a reader would act on), bump `TOOL_VERSION` near the top of the `<script>` block to

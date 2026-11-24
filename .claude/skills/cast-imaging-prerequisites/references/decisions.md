@@ -19,6 +19,8 @@ One line per decision the maintainer made, newest first. **Never re-flag these.*
 - Single-machine topology on VMs is called "single machine".
 - Windows with HTTPS follows CAST's Windows procedure (TLS at the Gateway on 443).
 
+- The shared-folder "only SMB" statement is attributed to *an earlier version* of CAST's documentation (not found on the current hardware page) until CAST answers; Windows stays SMB only.
+
 ## Still open
 - Windows + HTTPS: does "Gateway :8090" become 443? (the tool states both CAST sources and asks to confirm)
-- Shared folder on Linux: SMB only (hardware page) or NAS/SAN / NFS (Docker pages)? (the tool shows both)
+- Shared folder on Linux: SMB only (an earlier version of the documentation) or NAS/SAN / NFS (current Docker pages)? (the tool shows both)
