@@ -62,6 +62,13 @@ const L = require('./lib');
   ok(keys.includes('win-dashboards-standalone') && keys.includes('win-install-media'), 'Windows dashboards-only items missing');
   await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
 
+  // Windows service count per scenario, Kubernetes backup item
+  await L.set(page, { platform: 'windows', scenario: 'full', topology: 'single' });
+  ok((await L.checkKeys(page)).includes('win-services:full') && /14<\/b> services|14 services/.test(await page.evaluate(() => document.querySelector('[data-check-key="win-services:full"]').closest('li,label,div').innerText)) , 'Windows services count item');
+  await L.set(page, { platform: 'kubernetes', k8sProvider: 'gke', scenario: 'full' });
+  ok((await L.checkKeys(page)).some(k => /^k8s-backup:k8s/.test(k)), 'Kubernetes backup item missing');
+  await L.set(page, { platform: 'docker', scenario: 'full', topology: 'single' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
