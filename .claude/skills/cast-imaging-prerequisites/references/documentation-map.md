@@ -142,6 +142,9 @@ Sources: `install/global/kubernetes/onprem/` ("Installation on On-premises / van
 - **Checks against the tool**: `K8SProvider: K8S` for non-managed clusters — confirmed; pvc-shared-datadir always RWX — confirmed; MetalLB-type load balancer — confirmed; ingress-nginx — confirmed (no class setting); **`/etc/cast-imaging` read/write and "TLS private key unencrypted" appear on neither page** (they come from the AIFE requirements document and stay labelled as such).
 - **Possible tool changes (not made)**: Kubernetes ≥ 1.31 in the cluster-tooling row; on "Other": `CreateStorageClass: false` + class names, the NFS-client packages and `fsGroup` prerequisites, the UID/GID ownership table in Storage locations, and an "install-time-only settings" item (decide before the first `helm install`).
 
+## Kubernetes flavours as asked by the maintainer, 2026-11-24 (applied)
+The maintainer listed the Kubernetes choices as: Amazon Web Services — EKS, Microsoft Azure — AKS, Google Cloud Platform — GKE, On-premises / vanilla Kubernetes — K8S, On-premises / vanilla Kubernetes — OpenShift / "OKB". Applied as one Kubernetes platform with that five-way flavour radio (OpenShift is no longer a separate platform card; the last label reads "On-premises / OpenShift" — "OKB" isn't a CAST or Red Hat term the tool could confirm; OKD, Red Hat's community distribution, may be meant). CAST's own Kubernetes page offers the same four entries (EKS, AKS, GKE, On-premises / vanilla Kubernetes) and the OpenShift chart lives in its own repository.
+
 ## Open questions (searched, unconfirmed — left unchanged in `cast-imaging-requirements-builder.html` on purpose)
 
 Don't "fix" these from a search snippet alone; raise them with the user or find a primary source.
