@@ -102,12 +102,29 @@ const L = require('./lib');
   ok(await page.evaluate(() => document.getElementById('export-conf').hidden === true), 'worksheet button shown on Kubernetes');
   // share link: build in the page, reload with the fragment, answers come back
   await L.set(page, { platform: 'podman', scenario: 'viewer-readonly', clientProject: 'ACME – test' });
+  await page.check('#share-with-name');
   const link = await page.evaluate(() => { let u = ''; const orig = window.prompt; window.prompt = (m, v) => { u = v; return null; }; Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }); document.getElementById('share-link').click(); window.prompt = orig; return u; });
   ok(/#a=/.test(link), 'share link not produced');
   await page.goto(link); await page.reload();
   const back = await page.evaluate(() => ({ p: document.querySelector('input[name=platform]:checked').value, s: document.querySelector('input[name=scenario]:checked').value, n: document.getElementById('clientProject').value }));
   ok(back.p === 'podman' && back.s === 'viewer-readonly' && back.n === 'ACME – test', 'share link did not restore the answers: ' + JSON.stringify(back));
   await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
+
+  // Advanced options: URL path and certificate-based database connections
+  await L.set(page, { platform: 'docker', scenario: 'full', dbHosting: 'dedicated', ctxUrl: true, dbTls: true });
+  keys = await L.checkKeys(page);
+  ok(keys.includes('ctx-url:vm') && keys.includes('db-tls'), 'advanced option items missing on Docker with an external database');
+  await L.set(page, { dbHosting: 'colocated' });
+  ok(!(await L.checkKeys(page)).includes('db-tls'), 'database TLS item shown with the bundled database');
+  await L.set(page, { platform: 'windows', dbHosting: 'colocated' });
+  ok((await L.checkKeys(page)).includes('db-tls') && (await L.checkKeys(page)).includes('ctx-url:win'), 'database TLS / URL path missing on Windows');
+  await L.set(page, { platform: 'docker', ctxUrl: false, dbTls: false, dbHosting: 'colocated' });
+  // authentication sources
+  await L.set(page, { auth: 'ldap' });
+  ok(/5,000/.test(await L.resultsText(page)), 'LDAP size limit missing');
+  await L.set(page, { auth: 'saml', certSource: 'ca-issued' });
+  ok(/Advanced Attribute to Group/.test(await L.resultsText(page)) && (await L.checkKeys(page)).includes('kc-accounts'), 'SAML group mapper or Keycloak accounts item missing');
+  await L.set(page, { auth: 'local' });
 
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));

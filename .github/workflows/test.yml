@@ -14,4 +14,5 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node tests/syntax.js
       - run: node tests/sweep.js --quick
+      - run: node tests/facts.js
       - run: node tests/features.js
