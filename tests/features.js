@@ -88,6 +88,27 @@ const L = require('./lib');
   ok(/CAST-Imaging-sync-all-services-on-startup\.bat/.test(await L.resultsText(page)), 'startup checker path');
   await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
 
+  // Docker items, installer variables worksheet, share link
+  await L.set(page, { platform: 'docker', scenario: 'dashboards-only', topology: 'single', dbHosting: 'colocated' });
+  keys = await L.checkKeys(page);
+  ok(keys.some(k => /^dk-install-plan/.test(k)) && keys.includes('dk-config') && keys.includes('dk-prechecks') && keys.includes('dk-dashboards-standalone'), 'Docker items missing');
+  const dk = await download(() => page.click('#export-conf'));
+  ok(/DB_MODE=embedded/.test(dk.text) && /DASHBOARD_STANDALONE_ENABLED=true/.test(dk.text) && !/undefined/.test(dk.text), 'Docker worksheet');
+  await L.set(page, { platform: 'windows', scenario: 'full', topology: 'multi', dbHosting: 'dedicated' });
+  const wn = await download(() => page.click('#export-conf'));
+  ok(/CSS_INFOS=<database host>:2284/.test(wn.text) && /SHARED_FOLDER=/.test(wn.text) && /config-imaging-viewer\.conf/.test(wn.text), 'Windows worksheet');
+  ok(await page.evaluate(() => document.getElementById('export-conf').hidden === false), 'worksheet button hidden on Windows');
+  await L.set(page, { platform: 'kubernetes' });
+  ok(await page.evaluate(() => document.getElementById('export-conf').hidden === true), 'worksheet button shown on Kubernetes');
+  // share link: build in the page, reload with the fragment, answers come back
+  await L.set(page, { platform: 'podman', scenario: 'viewer-readonly', clientProject: 'ACME – test' });
+  const link = await page.evaluate(() => { let u = ''; const orig = window.prompt; window.prompt = (m, v) => { u = v; return null; }; Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }); document.getElementById('share-link').click(); window.prompt = orig; return u; });
+  ok(/#a=/.test(link), 'share link not produced');
+  await page.goto(link); await page.reload();
+  const back = await page.evaluate(() => ({ p: document.querySelector('input[name=platform]:checked').value, s: document.querySelector('input[name=scenario]:checked').value, n: document.getElementById('clientProject').value }));
+  ok(back.p === 'podman' && back.s === 'viewer-readonly' && back.n === 'ACME – test', 'share link did not restore the answers: ' + JSON.stringify(back));
+  await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');

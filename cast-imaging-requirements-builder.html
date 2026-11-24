@@ -482,12 +482,14 @@
       <button class="btn btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
       <button class="btn btn-print" id="save-html" type="button">💾 Save as HTML</button>
       <button class="btn btn-print" id="export-html" type="button">⬇ Export checklist as HTML</button>
+      <button class="btn secondary" id="share-link" type="button" title="Copy a link that reproduces your answers (they are stored in the link itself — nothing is sent anywhere)">🔗 Copy share link</button>
       <button class="btn secondary" id="save-json" type="button" title="Download your answers (and checklist ticks) as a JSON file to reuse later">📥 Save answers (JSON)</button>
       <button class="btn secondary" id="import-json" type="button" title="Load answers saved earlier from a JSON file">📤 Import answers (JSON)</button>
       <button class="btn secondary" id="compare-json" type="button" title="Compare your current answers with a saved answers file (e.g. POC vs production)">🔍 Compare with a saved file</button>
       <input type="file" id="compare-json-file" accept="application/json,.json" hidden>
       <button class="btn secondary" id="export-ports-csv" type="button" title="Download the network ports / FQDN matrix as CSV for your network team">📋 Export ports (CSV)</button>
       <button class="btn secondary" id="export-values" type="button" title="Download a commented values.yaml starting point from your answers (Kubernetes / OpenShift)" hidden>📄 Export values.yaml (starting point)</button>
+      <button class="btn secondary" id="export-conf" type="button" title="Download the installer variables (names and defaults from CAST's pages) filled from your answers (Windows / Docker / Podman)" hidden>📄 Export installer variables</button>
       <input type="file" id="import-json-file" accept="application/json,.json" hidden>
       <span id="io-status" class="hint" role="status" aria-live="polite" style="align-self:center;margin:0;"></span>
     </div>
@@ -521,6 +523,7 @@
   var TOOL_VERSION = '2026-11-24';
   var CHANGELOG = [
     ['2026-11-24', 'Entry options for Kubernetes: Istio, Amazon CloudFront (EKS) and Azure Application Gateway (AKS, from CAST\'s chart PDF)'],
+    ['2026-11-24', 'Docker/Podman: install plan per scenario, configuration.conf variables, prechecks, Dashboards-only read-only mode, NFS notes; share link and installer-variables worksheet'],
     ['2026-11-24', 'Firewall: CAST\'s sample scripts and the Docker/Podman NAT caveat; startup-checker path; encrypted database connections noted'],
     ['2026-11-24', 'Windows: CAST Imaging Core on every analysis machine, installer prechecks and variables, multi-machine install plan, read-only scenarios; PostgreSQL role, encoding and configuration item'],
     ['2026-11-24', 'Supported PostgreSQL range is 15.x–18.x (was 14.x–18.x), per CAST\'s database and Windows scenario pages'],
@@ -683,7 +686,7 @@
         : a.platform === 'kubernetes' && a.k8sProvider === 'aks' ? 'Azure Files (RWX) · SMB :445 · NFS :2049 on FIPS nodes'
         : a.platform === 'kubernetes' && a.k8sProvider === 'gke' ? 'Filestore CSI driver (RWX PersistentVolume)'
         : 'shared-access (RWX) PersistentVolume / StorageClass'), checklist:'Shared-access (ReadWriteMany) StorageClass available (<code>FileClassName</code>) for <code>pvc-shared-datadir</code> — always required by CAST\'s Helm chart'+(hasAnalysis(a) ? ', even with a single analysis-node pod' : '')+' '+(isOcp(a) ? '(your cluster\'s RWX-capable CSI class)' : a.k8sProvider === 'eks' ? '(Amazon EFS)' : a.k8sProvider === 'aks' ? '(Azure Files)' : a.k8sProvider === 'gke' ? '(Filestore CSI driver)' : '(e.g. Azure Files on AKS, EFS on EKS, Filestore on GKE)')+''};
-    return {box:'default: /opt/cast/shared (configurable) · SMB :445', checklist:'Shared network folder (NAS/SAN, SMB only) mounted as /opt/cast/shared (default path — configurable) on every server machine before install'};
+    return {box:'default: /opt/cast/shared (configurable) · NAS/SAN or NFS', checklist:'Shared network folder (a NAS/SAN mount, or an NFS export from one machine — CAST\'s hardware page says SMB only, its Docker pages describe NFS) mounted as /opt/cast/shared (default path — configurable) on every analysis-node machine and on imaging-services, before install'};
   }
   function topologyLabel(a){
     return isKube(a)
@@ -1107,7 +1110,7 @@
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Each analysis-node writes analysis results directly to the '+dbLabel+' database — per CAST\'s architecture reference, this port is used by every component that reads/writes the database, not just imaging-services', tag:'mandatory', note:'Multi-'+unitWord+' topology — '+(a.dbHosting === 'colocated' ? interNodeNote : 'a real firewall path between every analysis-node '+unitWord+' and the database host/service must be opened')+', in addition to imaging-services\' own path above'});
     }
     if(hasDistributedNodes(a) && (a.platform === 'docker' || a.platform === 'podman')){
-      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:'445', proto:'SMB', purpose:'The shared parent folder ("/opt/cast/shared" by default — the path is configurable at install time) must be mounted from the same network share on every machine — only the SMB protocol is supported (not NFS)', tag:'mandatory', note:'Distributed/multi-machine requirement, independent of the source-code access answer (question 9)'});
+      rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (NAS/SAN)', port:(a.platform === 'windows' ? '445' : '445 (SMB) / 2049 (NFS)'), proto:(a.platform === 'windows' ? 'SMB' : 'SMB / NFS'), purpose:'The shared parent folder ('+(a.platform === 'windows' ? 'shares set by SHARED_FOLDER, DELIVERY_FOLDER and DEPLOY_FOLDER' : '"/opt/cast/shared" by default — the path is configurable at install time')+') must be mounted from the same network share on every machine — '+(a.platform === 'windows' ? 'only the SMB protocol is supported (not NFS)' : 'CAST\'s hardware page says only SMB is supported, while its Docker multi-machine pages offer a NAS/SAN mount or an NFS export (NFS guide linked)'), tag:'mandatory', note:'Distributed/multi-machine requirement, independent of the source-code access answer (question 9)'});
     } else if(hasDistributedNodes(a) && a.platform === 'windows'){
       rows.push({src:'Every CAST Imaging machine', dst:'Shared network storage (deploy/delivery/common-data)', port:'445', proto:'SMB', purpose:'Windows file shares for the deploy/delivery/common-data folders, accessed under a service account whose credentials are consistent across every machine (see Section 1\'s operating system table)', tag:'mandatory', note:'Exact folder layout not verified against CAST\'s Windows documentation — confirmed concept, not confirmed paths'});
     }
@@ -1881,6 +1884,21 @@
     if(a.platform === 'docker' || a.platform === 'podman') everyMachine.push(item('fw-docker-nat', 'Published container ports are <b>not</b> protected by <code>ufw</code> or <code>firewalld</code> (Docker and Podman publish them through NAT rules): restrict every CAST port except <b>8090</b> with an <code>nftables</code> table hooked to <code>prerouting</code> at a priority below -100 (CAST\'s sample uses -150) or with CAST\'s <code>cast-imaging-firewall.sh</code> (<code>dryrun</code>, apply, <code>status</code>, <code>remove</code>; rules in <code>/etc/cast-imaging/firewall.nft</code>, reloaded at boot by <code>cast-imaging-firewall.service</code>); the embedded PostgreSQL (2285) is restricted too; then check from a non-CAST machine that only 8090 answers <span class="hint">(per CAST\'s network-access page)</span>'));
     if(a.platform === 'windows' && a.scenario === 'dashboards-only') everyMachine.push(item('win-dashboards-standalone', 'Dashboards standalone mode enabled — <code>dashboard-standalone-enabled: true</code> under <code>application:</code> in <code>%PROGRAMFILES%\\CAST\\Imaging\\CAST-Imaging-Control-Panel\\application-default.yml</code>, then the CAST Imaging Control Panel service restarted (create the file if it does not exist) <span class="hint">(per CAST\'s Windows Dashboards-only page; the other platforms\' pages were not read for this)</span>'));
     if(a.platform === 'windows' && needsSharedStorage(a)) everyMachine.push(item('win-shared-folders', '<code>SHARED_FOLDER</code>, <code>DELIVERY_FOLDER</code> and <code>DEPLOY_FOLDER</code> (each a distinct folder) set to a mapped drive or UNC path reachable by every machine, and <code>DATA_DIR</code> kept off network drives; <code>CONTROL_PANEL_START_AS_USER</code> (3.6.8 or later) set to an account with the "Log on as a service" right if the Control Panel must reach a mapped drive <span class="hint">(per CAST\'s Windows installation variables page)</span>'));
+    if(a.platform === 'docker' || a.platform === 'podman'){
+      var dkScript = a.platform === 'podman' ? 'cast-imaging-install-podman.sh' : 'cast-imaging-install.sh';
+      var dkMulti = a.topology === 'multi' && hasDistributedNodes(a);
+      var dkOrder = a.scenario === 'full' ? (dkMulti ? ['imaging-services', 'imaging-viewer', 'analysis-node', 'dashboards'] : ['all'])
+        : a.scenario === 'viewer-readonly' ? ['imaging-services', 'imaging-viewer']
+        : a.scenario === 'dashboards-only' ? ['imaging-services', 'dashboards']
+        : a.scenario === 'analysis-dashboards' ? (dkMulti ? ['imaging-services', 'analysis-node', 'dashboards'] : ['imaging-services', 'dashboards', 'analysis-node'])
+        : ['imaging-services', 'analysis-node'];
+      var dkCount = a.scenario === 'full' && !dkMulti ? '13 containers (12 with an external PostgreSQL)' : a.scenario === 'viewer-readonly' ? '11 containers (10 with an external PostgreSQL)' : a.scenario === 'dashboards-only' ? '7 containers (6 with an external PostgreSQL)' : a.scenario === 'analysis-dashboards' && !dkMulti ? '8 containers (7 with an external PostgreSQL)' : dkMulti ? 'per machine: imaging-services 6 containers, imaging-viewer 5, analysis-node 1, dashboards 1' : '';
+      everyMachine.push(item('dk-install-plan:'+a.platform+':'+a.scenario+':'+(dkMulti ? 'multi' : 'single'), 'Install plan: package <code>com.castsoftware.imaging.all.docker</code> downloaded from CAST Extend and unzipped, then <code>chmod +x '+dkScript+'</code> and, in this order — '+dkOrder.map(function(c){ return '<code>./'+dkScript+' '+c+'</code>'; }).join(' → ')+(dkMulti ? ' (imaging-services first and fully running; each command on its own machine, one analysis-node per analysis machine)' : '')+(dkCount ? ' — expect '+dkCount : '')+'; the <code>*_HOSTNAME</code> variables in <code>configuration.conf</code> are an FQDN or static IP, never <code>localhost</code> or a short hostname'+(a.egress === 'airgapped' ? '; <code>OFFLINE_MODE=true</code> with the images loaded first' : '')+'; Docker on WSL 2 is for testing only <span class="hint">(per CAST\'s Docker scenario pages; the order differs between multi-machine scenarios)</span>'));
+      everyMachine.push(item('dk-config', '<code>configuration.conf</code> decided — <code>DB_MODE</code> '+(a.dbHosting === 'colocated' ? '<code>embedded</code> (default; data in the Docker volume <code>cast-imaging-db-data</code>, path <code>CAST_IMAGING_DB_DATA_VOLUME_PATH</code> from 3.6.4)' : '<code>external</code> with <code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_USER</code> / <code>DB_PASSWORD</code> (the installer proposes <code>operator</code> / <code>CastAIP</code>; other credentials in <code>DB_ENCRYPTED_PASSWORD</code>, from <code>tools/cast-imaging-encryption-tool.sh</code>), <code>DB_DATABASE</code> — the <code>control_panel</code> and <code>keycloak</code> schemas must not exist yet')+(hasNeo4j(a) ? '; <code>NEO4J_INSTALLATION_MODE</code> (3.6.6 or later) <code>embedded</code> or <code>external</code> — identical on every machine, with <code>IMAGING_NEO4J_HOSTNAME</code> when external; Neo4j heap and transaction memory default to 12 GB each (<code>cast-imaging-viewer/.env</code>, 3.5.4 or later)' : '')+'; <code>IMAGING_DOMAIN_SYNCHRO_ENABLED</code> set <b>before</b> onboarding applications (enabling it later loses customizations); the Keycloak service account password (<code>KEYCLOAK_SERVICE_ACCOUNT_PASSWORD</code>) is random from 3.6.6 on a fresh install, <code>admin</code> before — change it at first login <span class="hint">(per CAST\'s Docker variables page)</span>'));
+      everyMachine.push(item('dk-prechecks', 'Installer prechecks (3.6.6 or later) expected to pass — <b>blocking</b>: x86_64 (no ARM64), a running container engine usable by your user with the <b>Compose v2</b> plugin (<code>docker-compose</code> 1.x is not supported; Podman needs a compose provider), <code>curl</code>, <code>INSTALL_DIR</code> writable and not <code>noexec</code>, an empty installation folder, free ports, memory and disk minimums, shared folders that exist with enough free space'+(a.dbHosting !== 'colocated' ? ', PostgreSQL 15 or later with a suitable role and no existing <code>control_panel</code> / <code>keycloak</code> schema' : '')+', reachable CAST Extend'+(hasDistributedNodes(a) ? ' and Control Panel' : '')+'; <b>warnings</b>: <code>fs.file-max</code> below 65536, <code>tar</code> / <code>unzip</code> / <code>ss</code> missing, Docker Hub and public Maven reachability'+(a.dbHosting !== 'colocated' ? ', non-UTF8 encoding' : '')+'; <code>--skip-precheck</code> exists from 3.6.9 but only hides problems <span class="hint">(per CAST\'s prechecks page)</span>'));
+      if(a.scenario === 'dashboards-only') everyMachine.push(item('dk-dashboards-standalone', 'Dashboards read-only mode enabled <b>before</b> installing: <code>DASHBOARD_STANDALONE_ENABLED=true</code> in <code>cast-imaging-services/.env</code> <span class="hint">(per CAST\'s Docker Dashboards-only page; the analysis results come from a separate installation and no component can be added afterwards)</span>'));
+      if(needsSharedStorage(a)) everyMachine.push(item('dk-nfs', 'If the shared folder is an NFS export (CAST\'s NFS guide): <code>/etc/exports</code> line such as <code>/opt/cast/shared 192.168.1.0/24(rw,sync,no_subtree_check)</code> (<code>no_root_squash</code> and <code>all_squash</code> need care), the NFS service allowed through the firewall, <code>setsebool -P nfs_export_all_rw 1</code> on an enforcing RHEL server, the same numeric UID/GID on the server and every client (<code>/opt/cast/shared</code> read/write on every analysis-node machine and on imaging-services from 3.6.0 — never share <code>/opt/cast</code> itself), and <code>chown -R 0:0 /opt/cast/shared</code> on each analysis node <span class="hint">(per CAST\'s Docker NFS and scenario pages; the NFS page does not mention the analysis-node container UID 10001)</span>'));
+    }
     if(a.platform === 'windows' && hasAnalysis(a)) everyMachine.push(item('win-imaging-core', '<b>CAST Imaging Core 8.4</b> (<code>com.castsoftware.imaging.core</code>) installed <b>manually on every analysis-node machine</b> — also on a single machine — <b>before</b> the analysis-node package (setup.bat as administrator, or a silent <code>setup.exe /r</code> then <code>/s</code> install); it installs the Visual C++ 2015–2022 redistributables, Microsoft Build Tools 2015 and .NET Framework 4.7.2 if missing, and its embedded JRE is separate from your JDK; <code>AIP_INSTALLDIR</code> points to it <span class="hint">(per CAST\'s Windows Imaging Core and scenario pages)</span>'));
     if(a.platform === 'windows') everyMachine.push(item('win-prechecks', 'Installer prechecks (3.6.6 or later) expected to pass — <b>blocking</b>: a 64-bit JDK with <code>JAVA_HOME</code> (Windows Server Core is not supported), <code>curl</code>, resolvable hostnames and mandatory variables, free service ports, memory and disk minimums, an empty installation folder, reachable Extend and Control Panel, database role privileges; <b>warnings</b>: non-UTF8 encoding, tablespace privilege, Docker Hub / Maven reachability; <code>--skip-precheck</code> exists from 3.6.9 but only hides problems until mid-install <span class="hint">(verbatim for the first groups, a summary for the others — CAST\'s prechecks page)</span>'));
     if(a.platform === 'windows') everyMachine.push(item('win-config-variables', 'Installer variables decided — <code>IMAGING_SERVICES_HOSTNAME</code> (public FQDN), every <code>HOSTNAME_*</code> either all <code>localhost</code> or all FQDN; <code>CSS_INFOS</code> as <code>host:2285</code> and <code>CSS_USER</code> / password (the installer proposes <code>operator</code> / <code>CastAIP</code>; other credentials go in <code>CSS_ENCRYPTED_PASSWORD</code>, encrypted with <code>imaging-encryption-tool.bat</code>); <code>DATA_DIR</code> not on a network drive (even mapped); <code>INSTALL_DIR</code> without spaces outside <code>C:\\Program Files</code>; <code>SECURED_CONNECTION</code> <code>false</code> for the first install and <code>true</code> when updating after HTTPS or adding a node; the Keycloak <code>kcadmin</code> password stays <code>admin</code> after a fresh install — change it right away <span class="hint">(per CAST\'s Windows installation variables page)</span>'));
@@ -2034,6 +2052,7 @@
     allHtml = pointsToConfirm(allHtml) + allHtml;
     document.getElementById('results-content').innerHTML = allHtml;
     document.getElementById('export-values').hidden = !isKube(a);
+    document.getElementById('export-conf').hidden = isKube(a);
 
     restoreChecklistState();
   }
@@ -2316,6 +2335,49 @@
     ioStatus('values.yaml starting point exported — review it against the chart before use.', false);
   });
 
+  // Installer variables worksheet for the VM platforms (names and defaults from CAST's variables pages; the file syntax is not reproduced).
+  function buildConfWorksheet(a){
+    var o = [], win = a.platform === 'windows', ext = a.dbHosting !== 'colocated';
+    function c(t){ o.push('# ' + t); }
+    c('Installer variables worksheet generated by the CAST Imaging requirements builder (' + TOOL_VERSION + ').');
+    c('Variable names and defaults come from CAST\'s ' + (win ? 'Windows' : 'Docker / Podman') + ' installation variables page; the syntax of the configuration files is not reproduced here — copy the values into the files shipped in the installation package.');
+    c('Values in <angle brackets> are yours to fill in. Hostnames are an FQDN or a static IP, never localhost or a short hostname, when anything is distributed.');
+    o.push('');
+    if(win){
+      c('config-imaging-services.conf (config-all.conf on a single machine)');
+      o.push('IMAGING_SERVICES_HOSTNAME=<public FQDN>', 'SECURED_CONNECTION=false   # true when updating after HTTPS is enabled, or when adding a node',
+        'CSS_INFOS=<database host>:2284', 'CSS_USER=operator   # proposed by the installer', 'CSS_PASSWORD=   # blank: the installer asks (CSS_ENCRYPTED_PASSWORD for other credentials, from imaging-encryption-tool.bat)',
+        'V3_DB_NAME=postgres', 'KEYCLOAK_DB=keycloak', 'KEYCLOAK_LOGIN_ADMIN_USER=kcadmin', '# LICENSE_KEY=<optional>', '# EXTEND_API_KEY=<optional, encrypted>');
+      if(hasDistributedNodes(a)){
+        o.push('', 'SHARED_FOLDER=<UNC or mapped path, e.g. \\\\server\\imaging\\shared>', 'DELIVERY_FOLDER=<distinct UNC or mapped path>', 'DEPLOY_FOLDER=<distinct UNC or mapped path>', '# DATA_DIR stays on a local drive');
+      }
+      if(hasAnalysis(a)) o.push('', '# config-analysis-node.conf', 'ANALYSIS_NODE_HOSTNAME=<this machine FQDN>' + (hasDistributedNodes(a) ? '' : ' (localhost on a single machine)'), 'HOST_HOSTNAME=<same as ANALYSIS_NODE_HOSTNAME>', 'AIP_INSTALLDIR=<CAST Imaging Core folder, e.g. C:\\Program Files\\CAST\\8.4>', hasDistributedNodes(a) ? 'USE_IPADDRESS=true' : 'USE_IPADDRESS=false');
+      if(hasViewer(a)) o.push('', '# config-imaging-viewer.conf', 'IMAGING_VIEWER_HOSTNAME=<this machine FQDN>' + (hasDistributedNodes(a) ? '' : '   # localhost on a single machine'));
+      if(hasDashboards(a)) o.push('', '# config-dashboards.conf', 'IMAGING_DASHBOARDS_HOSTNAME=<this machine FQDN>' + (hasDistributedNodes(a) ? '' : '   # localhost on a single machine'));
+      o.push('', '# Windows system variables, set before installing when needed: CAST_INSTALLATION_CONF (install-properties folder), IMAGING_DOMAIN_SYNCHRO_ENABLED=true (3.5.0 or later, before onboarding applications)');
+    } else {
+      c('configuration.conf');
+      o.push('IMAGING_SERVICES_HOSTNAME=<FQDN or static IP>');
+      if(hasViewer(a)) o.push('IMAGING_VIEWER_HOSTNAME=' + (hasDistributedNodes(a) ? '<viewer machine FQDN or IP>' : a.scenario === 'full' ? '   # left blank on a single machine for the all-components scenario' : '<this machine FQDN or IP>'));
+      if(hasAnalysis(a)) o.push('IMAGING_NODE_HOSTNAME=' + (hasDistributedNodes(a) ? '<each analysis machine>' : a.scenario === 'full' ? '   # left blank on a single machine for the all-components scenario' : '<this machine FQDN or IP>'));
+      if(hasDashboards(a)) o.push('IMAGING_DASHBOARDS_HOSTNAME=' + (hasDistributedNodes(a) ? '<dashboards machine FQDN or IP>' : a.scenario === 'full' ? '   # left blank on a single machine for the all-components scenario' : '<this machine FQDN or IP>'));
+      o.push('DB_MODE=' + (ext ? 'external' : 'embedded'));
+      if(ext) o.push('DB_HOST=<database host>', 'DB_PORT=<5432 or your port>', 'DB_USER=operator', 'DB_PASSWORD=   # or DB_ENCRYPTED_PASSWORD from tools/cast-imaging-encryption-tool.sh', 'DB_DATABASE=postgres');
+      else o.push('# CAST_IMAGING_DB_DATA_VOLUME_PATH=/opt/cast/cast-imaging-db-data/data   # 3.6.4 or later, embedded, fresh install only');
+      if(hasNeo4j(a)) o.push('NEO4J_INSTALLATION_MODE=embedded   # 3.6.6 or later; "external" also needs IMAGING_NEO4J_HOSTNAME; identical on every machine');
+      o.push('INSTALL_DIR=/opt/cast   # default; /opt/cast/shared must be read/write on every analysis-node machine and on imaging-services when distributed');
+      if(a.egress === 'airgapped') o.push('OFFLINE_MODE=true');
+      o.push('IMAGING_DOMAIN_SYNCHRO_ENABLED=false   # true BEFORE onboarding applications if you need domain mapping (3.5.0 or later)', '# KEYCLOAK_LOGIN_ADMIN_USER=kcadmin   # fresh install only');
+      if(a.scenario === 'dashboards-only') o.push('', '# cast-imaging-services/.env, before installing (Dashboards-only):', 'DASHBOARD_STANDALONE_ENABLED=true');
+    }
+    return o.join('\n') + '\n';
+  }
+  document.getElementById('export-conf').addEventListener('click', function(){
+    if(!lastState || isKube(lastState)) return;
+    downloadText('installer-variables-' + exportBaseName() + '.txt', buildConfWorksheet(lastState), 'text/plain;charset=utf-8');
+    ioStatus('Installer variables worksheet exported — review it against CAST\'s variables page before use.', false);
+  });
+
   // Compare the current answers with a saved answers file (e.g. POC vs production).
   document.getElementById('compare-json').addEventListener('click', function(){ document.getElementById('compare-json-file').click(); });
   document.getElementById('compare-json-file').addEventListener('change', function(ev){
@@ -2342,6 +2404,30 @@
     };
     reader.readAsText(file);
   });
+
+  // Share link: the answers travel in the URL fragment (never sent to a server).
+  function toBase64Url(text){ return btoa(unescape(encodeURIComponent(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function fromBase64Url(b64){ b64 = b64.replace(/-/g, '+').replace(/_/g, '/'); while(b64.length % 4) b64 += '='; return decodeURIComponent(escape(atob(b64))); }
+  function buildShareUrl(){
+    var payload = {format: ANSWERS_FORMAT, schema: ANSWERS_SCHEMA, answers: collectAnswers(), reverseProxyChosenByUser: reverseProxyTouched};
+    return location.href.split('#')[0] + '#a=' + toBase64Url(JSON.stringify(payload));
+  }
+  document.getElementById('share-link').addEventListener('click', function(){
+    var url = buildShareUrl();
+    function fallback(){ try { window.prompt('Copy this link:', url); } catch(e){} }
+    try {
+      if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function(){ ioStatus('Share link copied (' + url.length + ' characters).', false); }, fallback);
+      else fallback();
+    } catch(e){ fallback(); }
+  });
+  function applyShareHash(){
+    var m = /^#a=([A-Za-z0-9_-]+)$/.exec(location.hash || '');
+    if(!m || m[1].length > 20000) return;
+    try {
+      var res = applyAnswers(JSON.parse(fromBase64Url(m[1])));
+      ioStatus('Answers loaded from the share link (' + res.applied + ' answers).', false);
+    } catch(e){ ioStatus('The share link could not be read.', true); }
+  }
 
   // Chips jump to their question.
   function goToQuestion(chip){
@@ -2425,6 +2511,7 @@
     try { localStorage.setItem(checklistStorageKey(box.getAttribute('data-check-key')), box.checked ? '1' : '0'); } catch(err){}
   });
   render();
+  applyShareHash();
 })();
 </script>
 </body>
