@@ -349,6 +349,12 @@
             <span class="opt-text"><b>Kubernetes Ingress controller</b><span>NGINX Ingress — no longer maintained upstream</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="gatewayapi">
             <span class="opt-text"><b>Kubernetes Gateway API</b><span>Preselected on Kubernetes — the recommended route</span></span></label>
+          <label class="opt" data-rp="istio"><input type="radio" name="reverseProxy" value="istio">
+            <span class="opt-text"><b>Istio Ingress Gateway</b><span>Kubernetes — Istio installed separately</span></span></label>
+          <label class="opt" data-rp="cloudfront"><input type="radio" name="reverseProxy" value="cloudfront">
+            <span class="opt-text"><b>Amazon CloudFront</b><span>EKS — CDN in front of the gateway service</span></span></label>
+          <label class="opt" data-rp="appgw"><input type="radio" name="reverseProxy" value="appgw">
+            <span class="opt-text"><b>Azure Application Gateway</b><span>AKS — created separately</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="route">
             <span class="opt-text"><b>OpenShift Route</b><span>HAProxy router</span></span></label>
           <label class="opt"><input type="radio" name="reverseProxy" value="iis">
@@ -511,7 +517,7 @@
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
     egress:{direct:'Direct outbound', proxy:'Via proxy', airgapped:'Air-gapped'},
     certSource:{'ca-issued':'CA-issued', 'self-signed':'Self-signed', 'none':'No HTTPS (plain HTTP)'},
-    reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', gatewayapi:'Kubernetes Gateway API', route:'OpenShift Route', iis:'IIS + ARR', undecided:'Not decided yet'},
+    reverseProxy:{nginx:'External reverse proxy', ingress:'Kubernetes Ingress', gatewayapi:'Kubernetes Gateway API', istio:'Istio Ingress Gateway', cloudfront:'Amazon CloudFront', appgw:'Azure Application Gateway', route:'OpenShift Route', iis:'IIS + ARR', undecided:'Not decided yet'},
     auth:{local:'Local accounts', saml:'SAML 2.0 SSO', oidc:'OpenID Connect (OIDC)', ldap:'LDAP / Active Directory'},
     llmProvider:{anthropic:'Anthropic API', openai:'OpenAI API', 'azure-openai':'Azure OpenAI', other:'Custom / internal LLM gateway'},
     auditContext:{standard:'Standard deployment', audit:'Audit / structural-analysis engagement'}
@@ -625,6 +631,13 @@
   // multi-server-only requirements (shared storage, inter-node firewall paths) don't apply.
   function hasDistributedNodes(a){ return a.topology === 'multi' && (hasAnalysis(a) || (hasNeo4j(a) && a.neo4jDedicated)); }
   // The HTTP(S) port clients use to reach the reverse proxy, following the HTTPS answer.
+  // Entry options CAST documents for one provider only (EKS: CloudFront, AKS: Application Gateway) or for plain Kubernetes (Istio).
+  function rpAvailable(value, isPlainKube, provider){
+    if(value === 'istio') return isPlainKube && provider !== 'openshift';
+    if(value === 'cloudfront') return isPlainKube && provider === 'eks';
+    if(value === 'appgw') return isPlainKube && provider === 'aks';
+    return true;
+  }
   function clientPort(a){ return a.certSource === 'none' ? '80 (or your proxy\'s HTTP port)' : '443'; }
   function clientProto(a){ return a.certSource === 'none' ? 'HTTP' : 'HTTPS'; }
   // Shared storage across servers: always with distributed VMs; on Kubernetes/OpenShift the Helm chart always
@@ -1031,7 +1044,7 @@
     ]).concat(!hasUi ? [
       {src:'End-user browser (Console, Control Panel)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Console (/console — delivery and administration) and Control Panel (/admin) are browser UIs even in a scenario without Viewer or Dashboards', tag:'conditional', note:'Reasonable inference — both are UI services behind Gateway; only needed if staff use them from a browser rather than the APIs'}
     ] : []).concat([
-      {src:proxyDst, dst:'Gateway', port:'8090', proto:'HTTP', purpose:'The reverse proxy\'s upstream — Gateway listens on 8090 (not 80) and is CAST Imaging\'s single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below)', tag:'mandatory', note:(a.reverseProxy === 'ingress' ? 'In-cluster Service traffic from the Ingress controller' : undefined)}
+      {src:proxyDst, dst:'Gateway', port:'8090', proto:'HTTP', purpose:'The reverse proxy\'s upstream — Gateway listens on 8090 (not 80) and is CAST Imaging\'s single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below)', tag:'mandatory', note:(a.reverseProxy === 'ingress' ? 'In-cluster Service traffic from the Ingress controller' : a.reverseProxy === 'istio' ? 'In-cluster Service traffic from the Istio ingress gateway' : a.reverseProxy === 'cloudfront' ? 'CloudFront origin: HTTP only, port 8090, origin domain = the console-gateway-service hostname (CAST\'s EKS page). Reasonable inference: this exposes 8090 to the internet side — restrict its source to CloudFront (e.g. the AWS-managed CloudFront prefix list); CAST\'s page does not cover it' : a.reverseProxy === 'appgw' ? 'Backend of the Application Gateway towards console-gateway-service — port 8090 is inferred from Gateway\'s single entry point; the setup itself is in CAST\'s Azure-ApplicationGateway PDF, not read by this tool' : undefined)}
     ]).concat(adminRows).concat([
       {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? (isK8s && a.dbHosting !== 'managed' ? 'Outside the cluster — egress from the core pods to the database host must be allowed' : 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened') : undefined)}
     ]);
@@ -1202,6 +1215,9 @@
     var isK8s = isKube(a);
     var unitWord = isK8s ? 'pod' : 'machine';
 
+    document.querySelectorAll('[data-rp]').forEach(function(l){
+      l.style.display = rpAvailable(l.getAttribute('data-rp'), a.platform === 'kubernetes', a.k8sProvider) ? '' : 'none';
+    });
     var mcpHidden = mcpBlocked();
     document.getElementById('mcp').closest('label').style.display = mcpHidden ? 'none' : '';
     document.getElementById('mcp-blocked-note').style.display = mcpHidden ? '' : 'none';
@@ -1590,8 +1606,17 @@
     } else if(a.reverseProxy === 'route' && !isOcp(a)){
       proxyMismatchHtml = '<div class="callout warn"><b>An OpenShift Route only applies to an OpenShift install</b>, but your platform is '+esc(LABELS.platform[a.platform])+' — pick '+(a.platform === 'kubernetes' ? 'Kubernetes Gateway API (or Ingress)' : 'an external reverse proxy'+(a.platform==='windows' ? ' (or IIS with ARR)' : ''))+' instead.</div>';
     }
+    if(!rpAvailable(a.reverseProxy, a.platform === 'kubernetes', a.k8sProvider)){
+      proxyMismatchHtml = '<div class="callout warn"><b>'+esc(LABELS.reverseProxy[a.reverseProxy])+' is not an option for your platform</b> — CAST documents it '+(a.reverseProxy === 'istio' ? 'for Kubernetes clusters (not OpenShift)' : a.reverseProxy === 'cloudfront' ? 'on its EKS page only' : 'for AKS only')+'; pick '+(isOcp(a) ? 'an OpenShift Route' : a.platform === 'kubernetes' ? 'Kubernetes Gateway API (or Ingress)' : 'an external reverse proxy'+(a.platform==='windows' ? ' (or IIS with ARR)' : ''))+' instead.</div>';
+    }
     if(a.reverseProxy === 'ingress' && a.platform === 'kubernetes'){
       proxyMismatchHtml = '<div class="callout info"><b>NGINX Ingress is no longer maintained upstream; Kubernetes Gateway API is now the recommended route.</b> CAST\'s Helm chart (<code>com.castsoftware.castimaging-v3.kubernetessetup</code>) still carries Ingress settings because existing customers run NGINX Ingress, so it remains a working choice — but prefer Gateway API for a new deployment (as the user-supplied AIFE target-architecture document does). <span class="hint">Source: AIFE requirements document and the chart repository as read for this tool — not a CAST doc statement.</span></div>';
+    }
+    var rpOptionHtml = '';
+    if(a.platform === 'kubernetes' && !proxyMismatchHtml){
+      if(a.reverseProxy === 'istio') rpOptionHtml = '<div class="callout info"><b>Istio Ingress Gateway (CAST\'s '+a.k8sProvider.toUpperCase()+' page):</b> set <code>UseIstioGateway: true</code> (the page\'s Istio step writes <code>CreateIstioGateway</code> in one place and <code>UseIstioGateway</code> elsewhere and in its values reference — check <code>values.yaml</code>); Istio is installed separately (<code>istioctl install --set profile=default -y</code>) unless the cluster already runs it — ask your administrator; to attach to an existing gateway set <code>ExistingIstioGatewayName: "namespace/gateway"</code>. The TLS secrets <code>tls-secret-cast</code> (and <code>tls-secret-cast-extend</code>) are created in <b><code>istio-system</code></b>, not in the CAST namespace. DNS points at the <code>istio-ingressgateway</code> service\'s external IP.'+(a.k8sProvider === 'aks' ? ' On AKS the page also gives an install variant with <code>service.beta.kubernetes.io/azure-load-balancer-internal: "true"</code> so the gateway gets an internal IP (not reachable from the internet).' : '')+'</div>';
+      else if(a.reverseProxy === 'cloudfront') rpOptionHtml = '<div class="callout info"><b>Amazon CloudFront (CAST\'s EKS page):</b> a CloudFront distribution whose origin is the hostname of <code>console-gateway-service</code> (<code>kubectl get service -n castimaging-v3 console-gateway-service</code>), protocol <b>HTTP only</b>, HTTP port <b>8090</b>; the page says not to enable the WAF security protections, turns IPv6 off, and has you edit the default behaviour (viewer protocol policy and cache key settings, shown only in screenshots). <code>FrontEndHost</code> is set to the distribution domain name (<code>https://xxxx.cloudfront.net</code>). The page has no TLS-secret step — the viewer-facing certificate is CloudFront\'s. <b>Not covered by CAST\'s page:</b> whether to keep <code>CreateLoadBalancer: true</code> (the origin hostname implies a load-balancer Service — inference), how to restrict the origin to CloudFront, and any custom domain certificate.</div>';
+      else if(a.reverseProxy === 'appgw') rpOptionHtml = '<div class="callout info"><b>Azure Application Gateway (CAST\'s AKS page):</b> set <code>UseApplicationGateway: true</code> (AKS only; the application networking options are mutually exclusive, so <code>CreateLoadBalancer</code> is set to <code>false</code>). CAST\'s page only points to <code>Azure-ApplicationGateway-for-CastImaging.pdf</code> at the root of the cloned chart repository for the instructions — <b>listener, backend pool, probe and certificate details are not on the page and this tool has not read the PDF</b>, so nothing more is asserted here. The "Final steps" (TLS secrets, DNS) of the other options are skipped for Application Gateway.</div>';
     }
     var kubeNetHtml = !isK8s ? '' : (isOcp(a)
       ? '<div class="callout info"><b>OpenShift networking (CAST\'s chart 3.6.9):</b> <code>Routes.enable: true</code> creates <code>castimaging-route</code> (host from <code>FrontEndHost</code>, target <code>console-gateway-service</code>:8090) and, with the Extend proxy enabled, <code>extendproxy-route</code> (:8085). With <code>Routes.tls: true</code> the routes use <b>edge termination</b> with the certificate and key you pass at install (<code>--set-file tls.certificate=… --set-file tls.key=…</code>), plain HTTP is not redirected. Request timeouts are set with <code>haproxy.router.openshift.io/timeout</code> from <code>NetworkTimeoutSeconds</code> (300 s) and <code>ExtendProxy.timeoutSeconds</code> (3600 s; the router default is 30 s when unset) — any reverse proxy or DMZ in front of the router must allow at least as long. <code>CreateLoadBalancer</code> is the alternative entry point. <b>Since 3.6.9</b> the gateway only forwards <code>X-Forwarded-*</code> headers when <code>GATEWAYSERVICE.SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_TRUSTEDPROXIES</code> is set (default <code>".*"</code>, a regex on the calling IP — restrict it to the router pod network if you wish); without it the OAuth2 login callback is built as <code>http://</code>. The OpenShift router sets <code>X-Forwarded-Proto/-Host</code>; a reverse proxy, load balancer or DMZ in front of the router must forward the original ones.</div>'
@@ -1602,7 +1627,7 @@
       (authNeedsHttps(a) && a.certSource==='none' ?
         '<div class="callout danger"><b>Conflict: '+authShortName(a)+' requires HTTPS, but "No HTTPS" is selected (question 6, HTTPS / TLS certificate).</b> Pick CA-issued or self-signed there before proceeding — '+(a.auth === 'oidc' ? 'CAST\'s OpenID Connect setup assumes CAST Imaging is already reachable over HTTPS.' : 'CAST Imaging cannot complete the SAML browser-redirect flow over plain HTTP.')+'</div>'
         : '') +
-      proxyMismatchHtml + kubeNetHtml +
+      proxyMismatchHtml + kubeNetHtml + rpOptionHtml +
       '<ul>' +
       '<li>Reverse proxy: <b>'+esc(LABELS.reverseProxy[a.reverseProxy])+'</b>' + (a.reverseProxy==='undecided' ? ' — <b>must be decided and deployed before install day</b>; this determines the firewall path in Section 3.' : '.') + '</li>' +
       '<li>Certificate source: <b>'+esc(LABELS.certSource[a.certSource])+'</b>' + (a.certSource==='self-signed' && a.scale!=='poc' ? ' — <b>replace before production go-live</b>.' : (a.certSource==='none' ? (authNeedsHttps(a) ? ' — <b>not valid with '+authShortName(a)+' selected</b>; see the conflict above.' : ' — traffic between browser/client and the reverse proxy is unencrypted; reconsider once the deployment is reachable beyond a fully trusted, isolated network segment.') : '.')) + '</li>' +
@@ -1610,7 +1635,7 @@
         '<li>You must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
         (a.platform === 'windows'
           ? '<li>CAST\'s Windows HTTPS procedure (below) terminates TLS <b>at the Gateway itself</b> (<code>server.port: 443</code>), not at a reverse proxy. CAST\'s Windows reverse-proxy example is HTTP-facing (<code>listen 80</code>, <code>proxy_pass …:8090/</code>) and says nothing about keeping Gateway TLS behind it — if you keep a reverse proxy in front, confirm with CAST which port and protocol it must use towards the Gateway; the 8090 rows of this document are the default HTTP port.</li>'
-          : '<li>Once HTTPS is confirmed working, disable the reverse proxy\'s own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway\'s 8090 stays the proxy\'s internal upstream — keep it reachable only from the reverse proxy, not from users.</li>')
+          : (a.reverseProxy === 'cloudfront' || a.reverseProxy === 'appgw' ? '' : '<li>Once HTTPS is confirmed working, disable the reverse proxy\'s own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway\'s 8090 stays the proxy\'s internal upstream — keep it reachable only from the reverse proxy, not from users.</li>'))
         : '') +
       (a.platform === 'windows' && a.certSource !== 'none' ?
         '<li><b>HTTPS on Windows — CAST\'s procedure</b> (local administrator; commands differ by release — the variants for versions before 3.6.2, 3.6.4 and 3.6.9 are noted; read verbatim from CAST\'s Windows HTTPS page): ' +
@@ -1832,6 +1857,9 @@
       var k8sPrep = [isOcp(a) ? 'OpenShift project' : 'Cluster namespace', 'RBAC'];
       if(a.reverseProxy === 'ingress' && a.certSource !== 'none') k8sPrep.push('ingress-nginx controller installed'+(a.platform === 'kubernetes' && a.k8sProvider === 'eks' ? ' (CAST\'s EKS page sets <code>service.beta.kubernetes.io/aws-load-balancer-type=nlb</code> on its Service)' : a.platform === 'kubernetes' && a.k8sProvider === 'aks' ? ' (CAST\'s AKS page sets <code>service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path=/healthz</code> on its Service)' : '')+', and the Ingress TLS secret <code>tls-secret-cast</code> (plus <code>tls-secret-cast-extend</code> for a separate Extend Local Server host) in the CAST namespace');
       if(a.reverseProxy === 'gatewayapi' && a.certSource !== 'none') k8sPrep.push('Gateway API CRDs and a GatewayClass controller installed (CAST\'s pages use NGINX Gateway Fabric), and the TLS secret <code>tls-secret-cast</code> (plus <code>tls-secret-cast-extend</code> for a separate Extend Local Server host) in the CAST namespace — a shared Gateway needs listeners named <code>https</code> (and <code>https-extend</code>) that allow routes from that namespace');
+      if(a.reverseProxy === 'istio') k8sPrep.push('Istio installed (<code>istioctl install --set profile=default -y</code>) or an existing mesh gateway named in <code>ExistingIstioGatewayName</code>'+(a.certSource !== 'none' ? ', and the TLS secret <code>tls-secret-cast</code> (plus <code>tls-secret-cast-extend</code> for a separate Extend Local Server host) created in <b>istio-system</b>' : ''));
+      if(a.reverseProxy === 'cloudfront') k8sPrep.push('CloudFront distribution created (origin = the <code>console-gateway-service</code> hostname, HTTP only, port 8090; <code>FrontEndHost</code> = its distribution domain) — no TLS secret in the cluster');
+      if(a.reverseProxy === 'appgw') k8sPrep.push('Azure Application Gateway created separately in front of the gateway service, following <code>Azure-ApplicationGateway-for-CastImaging.pdf</code> from the chart repository (<code>UseApplicationGateway: true</code>, <code>CreateLoadBalancer: false</code>)');
       if(a.reverseProxy === 'route' && a.certSource !== 'none') k8sPrep.push('Route TLS certificate and key (<code>--set-file tls.certificate / tls.key</code>)');
       var stoParts = ['a block StorageClass (<code>DiskClassName</code>, ReadWriteOnce) <b>and</b> a shared-file StorageClass (<code>FileClassName</code>, <b>ReadWriteMany</b> — mandatory for <code>pvc-shared-datadir</code>'+(hasAnalysis(a) ? ', even with a single analysis-node pod' : '')+'), CSI drivers installed by the cluster administrator (CAST does not depend on a particular driver)'];
       if(a.platform === 'kubernetes' && a.k8sProvider === 'other'){
@@ -1873,7 +1901,7 @@
 
     var reverseProxyItems = [item('rp-deployed:'+a.reverseProxy+(proxyMismatchHtml ? ':mismatch' : ''), 'Reverse proxy deployed in front of Gateway — <b>mandatory prerequisite</b> ('+esc(LABELS.reverseProxy[a.reverseProxy])+(a.reverseProxy==='undecided' ? ' — must be decided and deployed before install day' : '')+(proxyMismatchHtml ? ' — <b>incompatible with your platform</b>, see Section 4' : '')+')')];
     if(a.certSource !== 'none'){
-      reverseProxyItems.push(item('rp-tls:'+a.certSource, 'TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and configured on the reverse proxy'));
+      reverseProxyItems.push(item('rp-tls:'+a.certSource+(['istio', 'cloudfront', 'appgw'].indexOf(a.reverseProxy) >= 0 ? ':'+a.reverseProxy : ''), 'TLS certificate obtained ('+esc(LABELS.certSource[a.certSource])+') and configured on '+(a.reverseProxy === 'istio' ? 'the Istio ingress gateway (secret in <code>istio-system</code>)' : a.reverseProxy === 'cloudfront' ? 'the CloudFront distribution (how is not covered by CAST\'s page)' : a.reverseProxy === 'appgw' ? 'the Application Gateway (not covered by CAST\'s page)' : 'the reverse proxy')));
     }
     if(a.egress === 'airgapped') reverseProxyItems.push(item('rp-extend-local'+(isK8s ? (isOcp(a) ? '-ocp' : '-k8s') : ''), isK8s ? (isOcp(a) ? 'Extend Local Server hostname (<code>ExtendProxy.exthostname</code>, served by its own Route <code>extendproxy-route</code>) decided, with DNS record and TLS certificate, and any reverse proxy or DMZ in front allows large bundle uploads and the 3600 s timeout' : 'Extend Local Server hostname (<code>ExtendProxy.exthostname</code>) decided — shared host under <code>/extendproxy</code> or its own hostname, with DNS record and TLS certificate/secret — and any reverse proxy or DMZ in front allows large bundle uploads (3072m on the chart\'s Ingress) and the 3600 s timeout') : 'Decided how the Extend Local Server is reached (host:8085 directly — nothing to add on the reverse proxy — or a dedicated proxy hostname/port if your standards require it)'));
     if(a.certSource === 'self-signed') reverseProxyItems.push(item('self-signed-trust', 'Self-signed certificate (or its CA) trusted on every workstation that accesses CAST Imaging'));
@@ -2124,6 +2152,9 @@
     radio.addEventListener('change', function(){ reverseProxyTouched = true; });
   });
   function syncReverseProxyDefault(){
+    var cur = document.querySelector('input[name=reverseProxy]:checked');
+    var curPlatform = document.querySelector('input[name=platform]:checked').value;
+    if(cur && !rpAvailable(cur.value, curPlatform === 'kubernetes', document.querySelector('input[name=k8sProvider]:checked').value)) reverseProxyTouched = false;   // the chosen entry option isn't offered for this provider any more
     if(reverseProxyTouched) return;
     var platform = document.querySelector('input[name=platform]:checked').value;
     if(platform === 'kubernetes' && document.querySelector('input[name=k8sProvider]:checked').value === 'openshift') platform = 'openshift';
