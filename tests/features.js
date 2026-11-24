@@ -30,6 +30,13 @@ const L = require('./lib');
   ok(/End-user browser\s+SAML Identity Provider/.test(hl) && /Headless scenario — only if staff sign in/.test(hl), 'headless SAML browser -> IdP row missing');
   await L.set(page, { scenario: 'full', auth: 'local' });
 
+  // MCP is hidden without a Viewer on every platform
+  await L.set(page, { platform: 'docker', scenario: 'analysis-only' });
+  ok(await page.evaluate(() => document.getElementById('mcp').closest('label').style.display === 'none'), 'MCP option still offered on Docker without a Viewer');
+  await L.set(page, { platform: 'windows', scenario: 'full' });
+  ok(await page.evaluate(() => document.getElementById('mcp').closest('label').style.display !== 'none'), 'MCP option hidden on Windows with a Viewer');
+  await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');

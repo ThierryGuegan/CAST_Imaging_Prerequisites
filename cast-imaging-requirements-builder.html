@@ -410,7 +410,7 @@
       <legend>8 · Optional integrations</legend>
       <p class="hint" style="margin-top:0;">Tick every integration that applies.</p>
       <div class="q">
-        <p class="hint" id="mcp-blocked-note" style="display:none;margin:0 0 8px;">AI / MCP Server features are not offered here: CAST's Helm chart deploys the MCP server only together with the Viewer, and the selected scenario has no Viewer.</p>
+        <p class="hint" id="mcp-blocked-note" style="display:none;margin:0 0 8px;">AI / MCP Server features are not offered here: the Semantic search and Text2Cypher servers read the Viewer's Neo4j graph (and on Kubernetes CAST's Helm chart deploys the MCP server only together with the Viewer), and the selected scenario has no Viewer.</p>
         <label class="opt"><input type="checkbox" id="mcp">
           <span class="opt-text"><b>AI / MCP Server features</b><span>Expose CAST Imaging knowledge to AI assistants (MCP + Gatekeeper + OAuth)</span></span></label>
         <div class="sub-block" id="mcp-sub">
@@ -521,6 +521,7 @@
   var TOOL_VERSION = '2026-11-24';
   var CHANGELOG = [
     ['2026-11-24', 'Entry options for Kubernetes: Istio, Amazon CloudFront (EKS) and Azure Application Gateway (AKS, from CAST\'s chart PDF)'],
+    ['2026-11-24', 'AI / MCP option hidden on every platform when the scenario has no Viewer; headless scenarios keep the browser path to Console'],
     ['2026-11-24', 'Provider-specific wording: nothing from another cloud provider is shown any more; MCP option hidden without a Viewer on Kubernetes'],
     ['2026-11-24', 'New: points-to-confirm list, ports CSV export, values.yaml starting point, comparison with a saved answers file'],
     ['2026-11-23', 'PostgreSQL on Windows is 2284; Windows HTTPS procedure from CAST\'s page'],
@@ -691,10 +692,10 @@
   }
   function slugify(t){ return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50); }
 
-  // CAST's Helm chart deploys the MCP server only with Viewer.enable: true, so the option is hidden (and ignored) on Kubernetes/OpenShift when the scenario has no Viewer.
+  // The MCP servers need the Viewer's Neo4j (and CAST's Helm chart deploys the MCP server only with Viewer.enable: true), so the option is hidden and ignored on every platform when the scenario has no Viewer (maintainer decision 2026-11-24).
   function mcpBlocked(){
     var sc = document.querySelector('input[name=scenario]:checked').value;
-    return document.querySelector('input[name=platform]:checked').value === 'kubernetes' && !hasViewer({scenario: sc});
+    return !hasViewer({scenario: sc});
   }
 
   function state(){
