@@ -122,7 +122,7 @@ render() references section numbers in generated text (e.g. "see Section 3"), so
 be a search-and-fix pass, not a rename in isolation.
 
 1. **Platform & topology** — host platform (Docker / Podman / Kubernetes / Windows Server, radio — Kubernetes opens a five-way flavour radio `k8sProvider`: EKS / AKS / GKE / on-premises vanilla K8S (value `other`) / on-premises OpenShift or OKD (value `openshift`); internally `state()` still reports `platform: 'openshift'` for that last choice so `isOcp(a)` and the OpenShift code paths are unchanged; `isKube(a)` = Kubernetes or OpenShift, `a.k8sProvider` (aks/eks/gke/other, radio `k8sProvider` in a sub-block shown only on Kubernetes) selects the provider-specific storage text (`kubeProviderStorage`), the EKS EFS / AKS-FIPS-NFS port rows and checklist items, `isOcp(a)` = OpenShift — every former `a.platform === 'kubernetes'` test is `isKube(a)`; OpenShift adds the `route` reverse-proxy option and its own chart facts: Routes, `restricted-v2` SCC, `registry.redhat.io` PostgreSQL image, no StorageClass creation),
-   deployment scenario (select: which components exist — this is what later drives every
+   deployment scenario (radio cards: which components exist — this is what later drives every
    `has*(a)` predicate), topology (single machine / multi-machine, radio), plus conditional
    sub-blocks that only show when relevant (analysis-node count when topology is multi and the
    scenario includes analysis; a Neo4j-dedicated-machine checkbox when topology is multi and the
@@ -132,7 +132,7 @@ be a search-and-fix pass, not a rename in isolation.
    nodes) — because "single/multi pod" was never what the choice meant there; `topologyLabel(a)`
    returns the same words for the chips and callouts.
 
-   The scenario `<select>` has exactly these five `value`s — don't infer a different set from the
+   The scenario radio group has exactly these five `value`s — don't infer a different set from the
    predicates alone; the predicates are derived from these five, not the other way around:
 
    | `value` | Meaning | Components | `hasAnalysis` | `hasViewer` | `hasDashboards` |
@@ -168,14 +168,14 @@ be a search-and-fix pass, not a rename in isolation.
    This is a **mandatory prerequisite independent of HTTPS** — CAST Imaging is not intended to run
    with Gateway directly internet-facing, so don't fold this into the HTTPS section or make it
    conditional on HTTPS being enabled. Kept as its own section (split out from HTTPS after an
-   earlier draft combined them and blurred that independence). The select **defaults to the
+   earlier draft combined them and blurred that independence). The radio group **defaults to the
    platform's natural choice** — Kubernetes Gateway API on Kubernetes, an OpenShift Route on OpenShift, an external reverse proxy
    elsewhere — via `syncReverseProxyDefault()`, which keeps following the platform until the user
-   changes the select themselves (`reverseProxyTouched`), after which their choice is never
+   changes the choice themselves (`reverseProxyTouched`), after which their choice is never
    overwritten. Options on Kubernetes: Ingress controller (NGINX Ingress — legacy, but the Helm chart still carries it for existing customers) and Gateway API (the non-legacy route); selecting Ingress shows an info callout. Impossible pairs (IIS + ARR off Windows, Ingress/Gateway API off Kubernetes) aren't blocked;
    the HTTPS section shows a warning callout (`proxyMismatchHtml`) and the checklist item says
    "incompatible with your platform".
-6. **HTTPS / TLS certificate** (legend renamed from the bare "HTTPS", which didn't say what was being asked) — certificate source and TLS termination point. Kept separate from egress (Section 4)
+6. **HTTPS / TLS certificate** (legend renamed from the bare "HTTPS", which didn't say what was being asked) — certificate source and TLS termination point. Kept separate from egress (question 4)
    and from Reverse proxy (Section 5) because all three are orthogonal decisions a reader might
    answer differently. The certificate-source choice includes a real "no HTTPS — serve over plain
    HTTP" option, not just CA-issued/self-signed — HTTPS itself is highly recommended but not
