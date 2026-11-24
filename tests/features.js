@@ -46,6 +46,22 @@ const L = require('./lib');
   ok(!/does not describe this setup|POC only/.test(await L.resultsText(page)), 'warning shown with a CA-issued certificate');
   await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
 
+  // Kubernetes: the entry option's prerequisites live in the k8s-prep item, not in duplicate rp-* items
+  await L.set(page, { platform: 'kubernetes', k8sProvider: 'gke', reverseProxy: 'gatewayapi', certSource: 'ca-issued' });
+  let keys = await L.checkKeys(page);
+  ok(!keys.some(k => /^rp-deployed|^rp-tls/.test(k)) && keys.some(k => /^k8s-prep/.test(k)), 'duplicate rp-* items on Kubernetes with Gateway API');
+  await L.set(page, { reverseProxy: 'nginx' });
+  keys = await L.checkKeys(page);
+  ok(keys.some(k => /^rp-deployed/.test(k)), 'rp-deployed missing for an external reverse proxy on Kubernetes');
+  await L.set(page, { k8sProvider: 'aks', reverseProxy: 'appgw' });
+  keys = await L.checkKeys(page);
+  ok(keys.some(k => /^rp-tls/.test(k)), 'rp-tls missing for Application Gateway');
+  // Windows install items
+  await L.set(page, { platform: 'windows', scenario: 'dashboards-only', reverseProxy: 'nginx' });
+  keys = await L.checkKeys(page);
+  ok(keys.includes('win-dashboards-standalone') && keys.includes('win-install-media'), 'Windows dashboards-only items missing');
+  await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
