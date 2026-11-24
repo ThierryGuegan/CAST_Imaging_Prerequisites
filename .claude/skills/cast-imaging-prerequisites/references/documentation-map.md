@@ -244,6 +244,10 @@ Not done on purpose: splitting the tool into modules with a build step (CLAUDE.m
 ## Tooling added 2026-11-24
 `tests/` — `syntax.js` (inline script `node --check`), `lint.js` (ESLint `no-undef` and friends; it found a duplicate `var`), `sweep.js` (combinations, garbage text, duplicate ids, provider leaks), `facts.js` (CAST's port tables, service and container counts, PostgreSQL range), `features.js` (exports, share link, worksheets, items), `diagram.js` (no line crosses a box, no overlap, nothing clipped; 450 combinations, 0 issues), `a11y.js` (axe-core; it found scrollable tables without keyboard access and a low-contrast tag in the light theme, both fixed). `references/decisions.md` is the short list of maintainer decisions.
 
+## Checklist phases and wider tests (2026-11-24)
+- The checklist has a second reading, **by phase** (`CHECKLIST_PHASES`: decide / prepare / install / after), chosen per item **id prefix** (an unlisted id falls back to "prepare" — add new ids to the list when you add items). Ticks are keyed by item id, so both views share them. **Regression fixed**: the "Show mandatory rows only" checkbox added to the ports table shifted the checkbox-by-index mapping of the checklist export (ticks landed on the wrong items); the export now maps ticks by `data-check-key` and drops the interactive controls (`.export-hide`).
+- `tests/facts.js` now also pins the Kubernetes chart ports (8089, 8091, 8092, 8098, 2381, 8090, 8096, 8097, 8085, 8285), the image names, the chart default requests (0.5 CPU / 8 GB, OpenShift 1 CPU / 16 GB), the provider storage wording, and a "text names an excluded component" check per scenario (found: the autoscaler note named `viewer-neo4j` without a Viewer). The air-gapped analysis-node image is written `castimaging/analysis-node:<ver>_core<core version>` on purpose.
+
 ## Using this map
 
 1. Find the row matching the section you're auditing.

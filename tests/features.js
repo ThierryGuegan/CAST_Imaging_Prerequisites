@@ -133,6 +133,20 @@ const L = require('./lib');
   ok(vis.length > 0 && vis.every(t => t === 'mandatory'), 'mandatory-only filter shows other rows: ' + [...new Set(vis)].join(','));
   await page.uncheck('#ports-mandatory');
 
+  // checklist export keeps the right tick (keyed by item id) with the ports filter and the view switch present in the page
+  await L.set(page, { platform: 'docker', scenario: 'full', topology: 'single' });
+  await page.evaluate(() => { try { Object.keys(localStorage).filter(k => /checklist/i.test(k)).forEach(k => localStorage.removeItem(k)); } catch (e) {} });
+  await L.set(page, { scale: 'poc' });
+  await page.evaluate(() => { const b = document.querySelector('[data-check-key="tmp-exec"]'); b.click(); });
+  const exp = await download(() => page.click('#export-html'));
+  const tickedKeys = [...exp.text.matchAll(/<input type="checkbox"[^>]*data-check-key="([^"]+)"[^>]*checked/g)].map(m => m[1]);
+  ok(tickedKeys.length === 1 && tickedKeys[0] === 'tmp-exec', 'checklist export ticks: ' + tickedKeys.join(','));
+  ok(!/ports-mandatory|name="checklist-view"/.test(exp.text), 'interactive controls left in the export');
+  // phase view
+  await page.check('input[name=checklist-view][value=phase]');
+  ok(await page.evaluate(() => [...document.querySelectorAll('#checklist-section h4')].map(h => h.textContent).join('|').includes('Decide with your teams') && document.querySelector('[data-check-key="tmp-exec"]').checked), 'phase view missing or tick lost');
+  await page.check('input[name=checklist-view][value=role]');
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');

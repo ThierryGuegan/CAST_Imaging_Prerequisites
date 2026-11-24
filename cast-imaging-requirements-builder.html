@@ -534,6 +534,7 @@
   var TOOL_VERSION = '2026-11-24';
   var CHANGELOG = [
     ['2026-11-24', 'Entry options for Kubernetes: Istio, Amazon CloudFront (EKS) and Azure Application Gateway (AKS, from CAST\'s chart PDF)'],
+    ['2026-11-24', 'Checklist can be read by phase (decide, prepare, install, after); the checklist export keeps its ticks by item id'],
     ['2026-11-24', 'MCP licensing and Podman / air-gapped notes, Extend Local requirements, dedicated Neo4j machine; "mandatory rows only" filter on the ports table; keyboard access to scrollable tables'],
     ['2026-11-24', 'Authentication re-read from CAST\'s pages (LDAP 5,000-user limit, SAML and LDAP mappers, Keycloak accounts, redirect URIs); Advanced options question (URL path, certificate-based database connections); share link without the project name by default'],
     ['2026-11-24', 'Docker/Podman: install plan per scenario, configuration.conf variables, prechecks, Dashboards-only read-only mode, NFS notes; share link and installer-variables worksheet'],
@@ -1456,7 +1457,7 @@
       machineSummaryHtml +
       (isK8s ? '<div class="callout info">On Kubernetes these figures are <b>pod resource requests</b>, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk (the Disk column shows the chart\'s <b>default PVC sizes</b> for what each row hosts, with CAST\'s sizing guidance beside it — raise the <code>size_*</code> values, mainly <code>size_db_data</code>, <code>size_neo4jdata</code> and <code>size_castdir</code>, toward that guidance as your data grows; volumes can be increased but not reduced). "Single node pool" vs. one pod per row below mirrors the topology answer (question 1), not a hard requirement — the scheduler places pods across whatever nodes you give it.</div>' +
         '<div class="callout info"><b>Cluster requirements per CAST\'s Kubernetes hardware doc'+(isOcp(a) ? ' (applied to OpenShift — this tool found no separate OpenShift hardware page; the OpenShift chart has no <code>EnforceAnalysisNodeIsolation</code>/<code>EnforceNeo4jIsolation</code>/<code>EnforcePostgresIsolation</code> settings: only <code>EnforceBalancedAffinity</code> (true by default), which already keeps Neo4j and the analysis-nodes on different nodes and never puts two analysis-nodes on one node — so the base 2 nodes and +1 per extra analysis-node replica apply, with no isolation node. Its templates also read <code>EnforceNodeAffinity</code>, which its <code>values.yaml</code> does not list)' : '')+':</b> <b>2 nodes minimum</b>, <b>4 vCPU per node minimum</b>, <b>32 GB RAM per node minimum</b> (64 GB recommended; 128 GB for multiple complex/large applications). Your profile above needs <b>'+k8sMinNodes+' node'+(k8sMinNodes===1?'':'s')+' minimum</b>: the base 2, '+(k8sIsolationActive ? '+1 for running the analysis-node/Neo4j workload on its own dedicated node(s) (this tool\'s Isolated nodes topology'+(hasNeo4j(a)&&a.neo4jDedicated?' and dedicated-Neo4j checkbox':'')+' — CAST\'s <code>EnforceAnalysisNodeIsolation</code>/<code>EnforceNeo4jIsolation</code> Helm settings, which require <code>EnforceBalancedAffinity: true</code>), ' : '')+(k8sAnalysisReplicaCount > 1 ? '+'+(k8sAnalysisReplicaCount-1)+' in total (one per analysis-node replica beyond the first, <code>AnalysisNodeReplicaCount</code> in <code>values.yaml</code>)' : (hasAnalysis(a) ? 'no further additions for a single analysis-node replica' : 'no analysis-node in this scenario'))+(k8sCapacityNodes > k8sFloorNodes ? '; but the pod requests below total <b>'+k8sSumCpu+' vCPU / '+k8sSumRam+' GB</b>, which need at least <b>'+k8sCapacityNodes+' nodes</b> at the 4 vCPU / 32 GB per-node minimum — use larger nodes to need fewer' : '')+'. '+(hasAnalysis(a) || (a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) ? 'Each node hosting an analysis-node or dedicated Neo4j pod must be at least as large as that pod\'s request. ' : '')+''+(isOcp(a) || a.dbHosting !== 'colocated' ? '' : 'Not modeled here: further isolating the embedded PostgreSQL pod onto its own node (<code>EnforcePostgresIsolation</code>) costs one more node again — CAST\'s own "extra large" example (3 analysis-node replicas + all three isolation flags) reaches 6 nodes minimum.')+' All cluster nodes (and any managed PostgreSQL instance) should sit in the <b>same Availability Zone</b>.</div>' : '') +
-      (isK8s && hasAnalysis(a) ? '<div class="callout info"><b>Optional analysis-node autoscaler</b> (CAST Imaging 3.6.9 or later, <code>AnalysisNodeAutoscaling</code>, off by default): one schedulable worker node per analysis-node <b>'+(hasNeo4j(a) ? 'plus one for <code>viewer-neo4j</code></b>, so at most <i>schedulable worker nodes − 1</i> analysis-nodes' : '</b> (CAST\'s +1 for <code>viewer-neo4j</code> applies with the Viewer)')+'; <code>minNodes</code> must never be 0. It relies on the OpenKruise operator'+(a.k8sProvider === 'gke' ? ' — installing it needs cluster-admin, and a namespace-only user needs the built-in <code>admin</code> role on the CAST namespace (<code>edit</code> is not sufficient)' : '')+'.'+(isOcp(a) ? ' On OpenShift the autoscaler pod runs under the <code>restricted-v2</code> SCC (no fixed UID); on Single Node OpenShift or OpenShift Local set <code>AnalysisNodeAutoscaling.allowNodeRead: false</code>.' : '')+' Per CAST\'s chart documentation (<code>docs/analysis-node-autoscaling.md</code>)'+(a.k8sProvider === 'gke' ? ' and the GKE page' : '')+'.</div>' : '') +
+      (isK8s && hasAnalysis(a) ? '<div class="callout info"><b>Optional analysis-node autoscaler</b> (CAST Imaging 3.6.9 or later, <code>AnalysisNodeAutoscaling</code>, off by default): one schedulable worker node per analysis-node <b>'+(hasNeo4j(a) ? 'plus one for <code>viewer-neo4j</code></b>, so at most <i>schedulable worker nodes − 1</i> analysis-nodes' : '</b>')+'; <code>minNodes</code> must never be 0. It relies on the OpenKruise operator'+(a.k8sProvider === 'gke' ? ' — installing it needs cluster-admin, and a namespace-only user needs the built-in <code>admin</code> role on the CAST namespace (<code>edit</code> is not sufficient)' : '')+'.'+(isOcp(a) ? ' On OpenShift the autoscaler pod runs under the <code>restricted-v2</code> SCC (no fixed UID); on Single Node OpenShift or OpenShift Local set <code>AnalysisNodeAutoscaling.allowNodeRead: false</code>.' : '')+' Per CAST\'s chart documentation (<code>docs/analysis-node-autoscaling.md</code>)'+(a.k8sProvider === 'gke' ? ' and the GKE page' : '')+'.</div>' : '') +
       (isK8s ? '<div class="callout info"><b>Helm chart 3.6.9 defaults (<code>values.yaml</code>)</b> — '+(function(){ var oc = isOcp(a), p = []; if(hasAnalysis(a)) p.push(oc ? 'analysis-node requests 1 CPU / 16 GB, limits 2 CPU / 32 GB (<code>MaxParallelAnalysisPerNode: 2</code>)' : 'analysis-node requests 0.5 CPU / 8 GB, limits 4 CPU / 32 GB (<code>MaxParallelAnalysisPerNode: 2</code>)'); if(hasNeo4j(a)) p.push(oc ? 'Neo4j requests 1 CPU / 16 GB, limits 2 CPU / 32 GB with a 12 GB heap (<code>NEO4J_server_memory_heap_*</code>) and 10 GB transaction memory' : 'Neo4j requests 0.5 CPU / 16 GB, limits 4 CPU / 32 GB with a 12 GB heap (<code>NEO4J_server_memory_heap_*</code>) and 10 GB transaction memory'); if(a.dbHosting === 'colocated') p.push(oc ? 'embedded PostgreSQL requests 1 CPU / 8 GB, limits 2 CPU / 16 GB' : 'embedded PostgreSQL requests 0.5 CPU / 8 GB, limits 2 CPU / 16 GB'); if(hasViewer(a)) p.push(oc ? 'viewer-server and ETL limit 0.5 CPU / 8 GB each' : 'viewer-server and ETL limit 8 GB each'); if(a.mcp) p.push('the MCP server (<code>McpServer.enable</code>) requests 0.5 CPU / 1 GB, limits 2 CPU / 4 GB'); p.push('the other services stay at or under 4 GB'); return p.join('; ') + '. '; })()+(function(){ var w = []; if(hasAnalysis(a)) w.push('analysis-node'); if(a.dbHosting === 'colocated') w.push('PostgreSQL'); if(hasNeo4j(a)) w.push('Neo4j'); return w.length ? 'The '+w.join(', ').replace(/, ([^,]*)$/, ' and $1')+' pods carry <code>cluster-autoscaler.kubernetes.io/safe-to-evict: "false"</code> and <code>karpenter.sh/do-not-disrupt: "true"</code>, so a cluster autoscaler or Karpenter never removes the nodes hosting them. ' : ''; })()+'These are chart defaults, not CAST\'s sizing guidance — Section 1\'s figures remain the baseline.</div>' : '') +
       '<h4>Server components</h4>' +
       '<div class="tbl-wrap" tabindex="0" role="region" aria-label="Table (scrollable)"><table><thead><tr><th>Component</th><th>vCPU</th><th>RAM</th><th>'+(isK8s ? 'Disk (chart default PVCs)' : 'Disk')+'</th></tr></thead><tbody>' +
@@ -1664,7 +1665,7 @@
 
     var netHtml = '<h3>3. Network ports &amp; FQDN allowlist — tailored to your answers</h3>' +
       '<p>Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.</p><!--WINPORTS-->' +
-      '<p class="no-print" style="margin:0 0 6px;"><label class="hint"><input type="checkbox" id="ports-mandatory"> Show mandatory rows only</label></p>' +
+      '<p class="no-print export-hide" style="margin:0 0 6px;"><label class="hint"><input type="checkbox" id="ports-mandatory"> Show mandatory rows only</label></p>' +
       '<div class="tbl-wrap" tabindex="0" role="region" aria-label="Table (scrollable)"><table><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Protocol</th><th>Reason</th><th></th></tr></thead><tbody>' +
       portRows.map(function(r){
         return '<tr data-tag="'+esc(r.tag || '')+'"><td>'+esc(r.src)+'</td><td>'+esc(r.dst)+'</td><td>'+esc(r.port)+'</td><td>'+esc(r.proto)+'</td><td>'+esc(r.purpose)+(r.note?' <span class="hint">— '+esc(r.note)+'</span>':'')+'</td><td>'+tagHtml(r.tag)+'</td></tr>';
@@ -2066,19 +2067,31 @@
       ]});
     }
 
-    var checklistGroupsHtml = groups.map(function(g){
-      return '<h4>'+esc(g.title)+'</h4><ul class="checklist">' +
-        g.items.map(function(it){
-          return '<li><label><input type="checkbox" data-check-key="'+esc(it.id)+'"> <span>'+it.html+'</span></label></li>';
-        }).join('') + '</ul>';
-    }).join('');
+    function checklistItemHtml(it, role){
+      return '<li><label><input type="checkbox" data-check-key="'+esc(it.id)+'"> <span>'+it.html+(role ? ' <span class="hint">['+esc(role)+']</span>' : '')+'</span></label></li>';
+    }
+    var checklistGroupsHtml;
+    if(checklistByPhase){
+      checklistGroupsHtml = CHECKLIST_PHASES.map(function(ph){
+        var rows = [];
+        groups.forEach(function(g){
+          g.items.forEach(function(it){ if(checklistPhaseOf(it.id) === ph.key) rows.push(checklistItemHtml(it, g.title.replace(/\s*\(.*$/, ''))); });
+        });
+        return rows.length ? '<h4>'+esc(ph.title)+'</h4><ul class="checklist">'+rows.join('')+'</ul>' : '';
+      }).join('');
+    } else {
+      checklistGroupsHtml = groups.map(function(g){
+        return '<h4>'+esc(g.title)+'</h4><ul class="checklist">' + g.items.map(function(it){ return checklistItemHtml(it, ''); }).join('') + '</ul>';
+      }).join('');
+    }
 
     var optionalSections = [mcpHtml].filter(function(h){ return h; });
     var nextNum = 7;
     var optionalHtml = optionalSections.map(function(h){ return h.replace('{N}', String(nextNum++)); }).join('');
     var checklistHtml = '<section id="checklist-section"><h3>'+nextNum+'. Pre-installation checklist for your profile</h3>' +
       machineSummaryHtml +
-      '<p>Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers. <span class="checklist-persist-note">Checked boxes are remembered in your browser as you tweak answers or reload the page.</span></p>' +
+      '<p class="no-print export-hide" style="margin:0 0 6px;"><label class="hint"><input type="radio" name="checklist-view" value="role"'+(checklistByPhase ? '' : ' checked')+'> Group by machine / role</label> &nbsp; <label class="hint"><input type="radio" name="checklist-view" value="phase"'+(checklistByPhase ? ' checked' : '')+'> Group by phase (decide, prepare, install, after)</label></p>' +
+      '<p>Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers — or, with the phase view, in the order you will work through them. <span class="checklist-persist-note">Checked boxes are remembered in your browser as you tweak answers or reload the page.</span></p>' +
       checklistGroupsHtml + '</section>';
 
     var allHtml = sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + optionalHtml + checklistHtml;
@@ -2095,6 +2108,20 @@
 
     restoreChecklistState();
   }
+
+  // Checklist phases (a second way to read the same items; ticks are keyed by item id, so both views share them).
+  var CHECKLIST_PHASES = [
+    {key:'decide', title:'1 · Decide with your teams', ids:['server-sizing','pg-hosting','pg-ha','pg-version','pg-config','k8s-extdb','k8s-provider','rp-deployed','rp-tls','rp-extend-local','self-signed-trust','saml-sp','saml-needs-https','ldap-bind','ldaps-ca','oidc-register','oidc-claims','oidc-clock','oidc-network','oidc-needs-https','mcp','mcp-llm','license-key','extend-api-key','extend-local','ctx-url','db-tls','neo4j-dedicated','win-readonly-source','win-multi-install']},
+    {key:'prepare', title:'2 · Prepare before install day', ids:['firewall-rules','fw-docker-nat','win-firewall','shared-storage','dk-nfs','win-shared-folders','win-jdk','win-imaging-core','win-full-control','win-prechecks','dk-prechecks','curl','sudoers','podman-compose','podman-linger','tmp-exec','docker-hub','images-loaded','images-mirrored','extend-outbound','neo4j-connectivity','analysis-connectivity','analysis-db-path','smtp','highlight','k8s-storage','k8s-prep','k8s-cluster-rights','k8s-loadbalancer','k8s-telemetry','k8s-tls-key-unencrypted','k8s-etc-cast-imaging','k8s-install-time','helm-chart-clone','browser','report-generator','delivery-workstation','audit-tools']},
+    {key:'install', title:'3 · Install day', ids:['win-install-media','win-config-variables','dk-config','dk-install-plan','dk-dashboards-standalone','win-dashboards-standalone']},
+    {key:'after', title:'4 · After the installation', ids:['win-services','win-startup-checker','win-https','appgw-saml-rewrite','oidc-keycloak','oidc-admin','oidc-disable-local','kc-accounts','kc-redirect-uris','k8s-backup']}
+  ];
+  function checklistPhaseOf(id){
+    var base = String(id).split(':')[0];
+    for(var i = 0; i < CHECKLIST_PHASES.length; i++) if(CHECKLIST_PHASES[i].ids.indexOf(base) >= 0) return CHECKLIST_PHASES[i].key;
+    return 'prepare';   // an item not listed yet is something to arrange before the install
+  }
+  var checklistByPhase = false;
 
   var lastPortRows = [], lastState = null, portsMandatoryOnly = false;
   // "Show mandatory rows only" on the ports table (screen only; the checkbox lives in the regenerated results).
@@ -2185,9 +2212,11 @@
     pane.querySelectorAll('.checklist-persist-note').forEach(function(el){
       el.textContent = 'Boxes ticked at export time are shown checked; ticks made in this file are not saved — re-export from the tool to keep them.' + (checklistOnly ? ' References to other Sections point to the full requirements report (Print / Save as PDF in the tool).' : '');
     });
-    var srcBoxes = document.querySelectorAll('main.results-pane input[type=checkbox]');
-    pane.querySelectorAll('input[type=checkbox]').forEach(function(box, i){
-      if(srcBoxes[i] && srcBoxes[i].checked) box.setAttribute('checked', ''); else box.removeAttribute('checked');
+    pane.querySelectorAll('.export-hide').forEach(function(el){ el.remove(); });   // interactive view / filter controls
+    pane.querySelectorAll('input[type=checkbox]').forEach(function(box){
+      var key = box.getAttribute('data-check-key');
+      var src = key ? Array.prototype.filter.call(document.querySelectorAll('main.results-pane input[type=checkbox][data-check-key]'), function(b){ return b.getAttribute('data-check-key') === key; })[0] : null;
+      if(src && src.checked) box.setAttribute('checked', ''); else box.removeAttribute('checked');
     });
     var css = Array.prototype.map.call(document.querySelectorAll('head style'), function(st){ return st.textContent; }).join('\n') +
       '\n.results-pane{height:auto;overflow:visible;max-width:1200px;margin:0 auto;}\n';
@@ -2556,6 +2585,7 @@
   document.getElementById('form-pane').addEventListener('change', render);
   document.getElementById('results-content').addEventListener('change', function(e){
     if(e.target && e.target.id === 'ports-mandatory'){ portsMandatoryOnly = e.target.checked; applyPortsFilter(); return; }
+    if(e.target && e.target.name === 'checklist-view'){ checklistByPhase = e.target.value === 'phase'; render(); return; }
     var box = e.target.closest('input[type=checkbox][data-check-key]');
     if(!box) return;
     try { localStorage.setItem(checklistStorageKey(box.getAttribute('data-check-key')), box.checked ? '1' : '0'); } catch(err){}
