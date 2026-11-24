@@ -221,7 +221,7 @@
             <label class="opt"><input type="radio" name="k8sProvider" value="other" checked>
               <span class="opt-text"><b>On-premises / vanilla Kubernetes — K8S</b><span>no managed storage classes, load balancer or ingress assumed</span></span></label>
             <label class="opt"><input type="radio" name="k8sProvider" value="openshift">
-              <span class="opt-text"><b>On-premises / OpenShift</b><span>CAST's OpenShift Helm chart, Routes</span></span></label>
+              <span class="opt-text"><b>On-premises / OpenShift or OKD</b><span>CAST's OpenShift Helm chart, Routes</span></span></label>
           </div>
         </div>
       </div>
@@ -504,7 +504,7 @@
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
     users:{tiny:'< 10 users', small:'10–50 users', medium:'50–200 users', large:'200+ users'},
     platform:{docker:'Docker', podman:'Podman', kubernetes:'Kubernetes', openshift:'OpenShift', windows:'Windows Server'},
-    k8sProvider:{eks:'Amazon Web Services — EKS', aks:'Microsoft Azure — AKS', gke:'Google Cloud Platform — GKE', other:'On-premises / vanilla Kubernetes — K8S', openshift:'On-premises / OpenShift'},
+    k8sProvider:{eks:'Amazon Web Services — EKS', aks:'Microsoft Azure — AKS', gke:'Google Cloud Platform — GKE', other:'On-premises / vanilla Kubernetes — K8S', openshift:'On-premises / OpenShift or OKD'},
     scenario:{full:'Full (analysis + Viewer + Dashboards)', 'analysis-dashboards':'Analysis + Dashboards (no Viewer)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
     topology:{single:'Single machine', multi:'Multi-machine'},
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
