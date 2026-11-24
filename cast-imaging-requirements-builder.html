@@ -205,23 +205,23 @@
           <label class="opt"><input type="radio" name="platform" value="podman">
             <span class="opt-text"><b>Podman</b><span>Rootless / daemonless container engine (hardened Linux, RHEL-family)</span></span></label>
           <label class="opt"><input type="radio" name="platform" value="kubernetes">
-            <span class="opt-text"><b>Kubernetes</b><span>Existing cluster, Helm/manifests, HA-capable</span></span></label>
-          <label class="opt"><input type="radio" name="platform" value="openshift">
-            <span class="opt-text"><b>OpenShift</b><span>Existing OpenShift cluster, CAST's OpenShift Helm chart, Routes</span></span></label>
+            <span class="opt-text"><b>Kubernetes</b><span>Existing cluster and CAST's Helm chart — EKS, AKS, GKE, on-premises or OpenShift (choose below)</span></span></label>
           <label class="opt"><input type="radio" name="platform" value="windows">
             <span class="opt-text"><b>Windows Server</b><span>Native installation, no container runtime</span></span></label>
         </div>
         <div class="sub-block" id="k8s-provider-sub">
-          <label class="qlabel">Kubernetes provider (<code>K8SProvider</code> in CAST's <code>values.yaml</code>)</label>
+          <label class="qlabel">Which Kubernetes? (<code>K8SProvider</code> in CAST's <code>values.yaml</code>; OpenShift has its own chart)</label>
           <div class="opt-row">
-            <label class="opt"><input type="radio" name="k8sProvider" value="aks">
-              <span class="opt-text"><b>Azure AKS</b></span></label>
             <label class="opt"><input type="radio" name="k8sProvider" value="eks">
-              <span class="opt-text"><b>AWS EKS</b></span></label>
+              <span class="opt-text"><b>Amazon Web Services — EKS</b></span></label>
+            <label class="opt"><input type="radio" name="k8sProvider" value="aks">
+              <span class="opt-text"><b>Microsoft Azure — AKS</b></span></label>
             <label class="opt"><input type="radio" name="k8sProvider" value="gke">
-              <span class="opt-text"><b>Google GKE</b></span></label>
+              <span class="opt-text"><b>Google Cloud Platform — GKE</b></span></label>
             <label class="opt"><input type="radio" name="k8sProvider" value="other" checked>
-              <span class="opt-text"><b>Other / self-managed</b><span>no managed storage classes or load balancer assumed</span></span></label>
+              <span class="opt-text"><b>On-premises / vanilla Kubernetes — K8S</b><span>no managed storage classes, load balancer or ingress assumed</span></span></label>
+            <label class="opt"><input type="radio" name="k8sProvider" value="openshift">
+              <span class="opt-text"><b>On-premises / OpenShift or OKD</b><span>CAST's OpenShift Helm chart, Routes</span></span></label>
           </div>
         </div>
       </div>
@@ -504,7 +504,7 @@
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
     users:{tiny:'< 10 users', small:'10–50 users', medium:'50–200 users', large:'200+ users'},
     platform:{docker:'Docker', podman:'Podman', kubernetes:'Kubernetes', openshift:'OpenShift', windows:'Windows Server'},
-    k8sProvider:{aks:'Azure AKS', eks:'AWS EKS', gke:'Google GKE', other:'Other / self-managed'},
+    k8sProvider:{eks:'Amazon Web Services — EKS', aks:'Microsoft Azure — AKS', gke:'Google Cloud Platform — GKE', other:'On-premises / vanilla Kubernetes — K8S', openshift:'On-premises / OpenShift or OKD'},
     scenario:{full:'Full (analysis + Viewer + Dashboards)', 'analysis-dashboards':'Analysis + Dashboards (no Viewer)', 'viewer-readonly':'Viewer + Dashboards, read-only', 'dashboards-only':'Dashboards only, read-only', 'analysis-only':'Analysis only, headless'},
     topology:{single:'Single machine', multi:'Multi-machine'},
     dbHosting:{colocated:'Co-located', dedicated:'Dedicated server', managed:'Managed / clustered DBaaS'},
@@ -649,7 +649,7 @@
       scale: document.querySelector('input[name=scale]:checked').value,
       users: document.querySelector('input[name=users]:checked').value,
       auditContext: document.querySelector('input[name=auditContext]:checked').value,
-      platform: document.querySelector('input[name=platform]:checked').value,
+      platform: (document.querySelector('input[name=platform]:checked').value === 'kubernetes' && document.querySelector('input[name=k8sProvider]:checked').value === 'openshift') ? 'openshift' : document.querySelector('input[name=platform]:checked').value,
       k8sProvider: document.querySelector('input[name=k8sProvider]:checked').value,
       scenario: document.querySelector('input[name=scenario]:checked').value,
       topology: document.querySelector('input[name=topology]:checked').value,
@@ -1187,7 +1187,7 @@
 
     document.getElementById('mcp-sub').className = 'sub-block' + (a.mcp ? ' show' : '');
     document.getElementById('analysis-nodes-sub').className = 'sub-block' + (a.topology === 'multi' && hasAnalysis(a) ? ' show' : '');
-    document.getElementById('k8s-provider-sub').className = 'sub-block' + (a.platform === 'kubernetes' ? ' show' : '');
+    document.getElementById('k8s-provider-sub').className = 'sub-block' + (isKube(a) ? ' show' : '');
     document.getElementById('neo4j-dedicated-sub').className = 'sub-block' + (a.topology === 'multi' && hasNeo4j(a) ? ' show' : '');
     document.getElementById('topology-hint').textContent =
       (a.scale === 'enterprise' && a.topology === 'single') ? (isK8s ? 'A single node pool' : 'Single machine')+' is not recommended at Enterprise scale — consider '+(isK8s ? 'isolated nodes' : 'Multi-machine or Kubernetes')+'.' :
@@ -1219,7 +1219,7 @@
     var chips = (a.clientProject ? chip('client / project', a.clientProject) : '') + chip('scale', LABELS.scale[a.scale]) + chip('users', LABELS.users[a.users]) +
       chip('platform', LABELS.platform[a.platform]) + chip('scenario', LABELS.scenario[a.scenario]) +
       chip('topology', topologyLabel(a));
-    if(a.platform === 'kubernetes') chips += chip('Kubernetes provider', LABELS.k8sProvider[a.k8sProvider]);
+    if(a.platform === 'kubernetes') chips += chip('Kubernetes', LABELS.k8sProvider[a.k8sProvider]);
     if(a.topology === 'multi' && hasAnalysis(a)) chips += chip('analysis nodes', a.analysisNodes.replace('-', '–'));
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) chips += chip('Neo4j', 'dedicated');
     chips += chip('database', LABELS.dbHosting[a.dbHosting]) + chip('egress', LABELS.egress[a.egress]) +
@@ -1974,7 +1974,7 @@
   // choice was picked by hand. Import validates everything against the form's own controls and ignores
   // what it doesn't recognise; nothing in the file is ever evaluated or inserted as HTML.
   var ANSWERS_FORMAT = 'cast-imaging-requirements-builder/answers';
-  var ANSWERS_SCHEMA = 1;
+  var ANSWERS_SCHEMA = 2;   // 2: OpenShift is the k8sProvider value 'openshift' under platform 'kubernetes' (schema 1 had platform 'openshift')
   function ioStatus(msg, isError){
     var el = document.getElementById('io-status');
     el.textContent = msg;
@@ -2016,6 +2016,9 @@
     if(typeof data.schema !== 'number') throw new Error('This file has no valid schema number.');
     if(data.schema > ANSWERS_SCHEMA) throw new Error('This file comes from a newer version of the tool (schema ' + data.schema + ').');
     var answers = data.answers;
+    if(answers && typeof answers === 'object' && !Array.isArray(answers) && answers.platform === 'openshift'){
+      answers = Object.assign({}, answers, {platform: 'kubernetes', k8sProvider: 'openshift'});
+    }
     if(!answers || typeof answers !== 'object' || Array.isArray(answers)) throw new Error('The file has no answers.');
     var applied = 0, ignored = [];
     // radios: the value must be one of the group's own options
@@ -2084,11 +2087,12 @@
   function syncReverseProxyDefault(){
     if(reverseProxyTouched) return;
     var platform = document.querySelector('input[name=platform]:checked').value;
+    if(platform === 'kubernetes' && document.querySelector('input[name=k8sProvider]:checked').value === 'openshift') platform = 'openshift';
     var want = platform === 'kubernetes' ? 'gatewayapi' : platform === 'openshift' ? 'route' : 'nginx';
     var radio = document.querySelector('input[name=reverseProxy][value="'+want+'"]');
     if(radio) radio.checked = true;
   }
-  document.querySelectorAll('input[name=platform]').forEach(function(radio){
+  document.querySelectorAll('input[name=platform], input[name=k8sProvider]').forEach(function(radio){
     radio.addEventListener('change', syncReverseProxyDefault);
   });
   syncReverseProxyDefault();
