@@ -126,6 +126,13 @@ const L = require('./lib');
   ok(/Advanced Attribute to Group/.test(await L.resultsText(page)) && (await L.checkKeys(page)).includes('kc-accounts'), 'SAML group mapper or Keycloak accounts item missing');
   await L.set(page, { auth: 'local' });
 
+  // mandatory-only filter on the ports table
+  await L.set(page, { platform: 'docker', scenario: 'full', topology: 'multi' });
+  await page.check('#ports-mandatory');
+  const vis = await page.evaluate(() => [...document.querySelectorAll('#results-content tr[data-tag]')].filter(tr => tr.style.display !== 'none').map(tr => tr.getAttribute('data-tag')));
+  ok(vis.length > 0 && vis.every(t => t === 'mandatory'), 'mandatory-only filter shows other rows: ' + [...new Set(vis)].join(','));
+  await page.uncheck('#ports-mandatory');
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
