@@ -156,6 +156,25 @@ const L = require('./lib');
   await L.set(page, { platform: 'docker', ctxUrl: false, mcp: false, topology: 'single' });
   ok(await page.evaluate(() => !document.getElementById('disagree-box')), 'conflicts box shown without a conflict');
 
+  // collapsible sections: fold all, the state survives a re-render, exports show every section
+  await L.set(page, { platform: 'docker', scenario: 'full', topology: 'single' });
+  await page.click('#collapse-all');
+  ok(await page.evaluate(() => [...document.querySelectorAll('details.section-box')].every(d => !d.open) && document.querySelectorAll('details.section-box').length >= 6), 'collapse all');
+  await L.set(page, { scale: 'enterprise' });
+  ok(await page.evaluate(() => [...document.querySelectorAll('details.section-box')].every(d => !d.open)), 'folded state lost on re-render');
+  const full = await download(() => page.click('#save-html'));
+  ok(!/<details class="section-box"(?![^>]*\bopen)/.test(full.text), 'a section is folded in the exported file');
+  ok(/docker-full-\d{4}-/.test(full.name), 'export file name lacks the profile: ' + full.name);
+  await page.click('#expand-all');
+  ok(await page.evaluate(() => [...document.querySelectorAll('details.section-box')].every(d => d.open)), 'expand all');
+  await L.set(page, { scale: 'poc' });
+
+  // Highlight, e-mail, proxy and source-folder items from CAST's administration pages
+  await L.set(page, { platform: 'windows', scenario: 'full', egress: 'proxy', highlight: true, email: true, repoSmb: true });
+  keys = await L.checkKeys(page);
+  ok(['highlight:v2', 'smtp:v2', 'proxy-settings', 'source-folder:win'].every(k => keys.includes(k)), 'administration items missing: ' + keys.filter(k => /highlight|smtp|proxy|source-folder/.test(k)).join(','));
+  await L.set(page, { platform: 'docker', egress: 'direct', highlight: false, email: false, repoSmb: false });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
