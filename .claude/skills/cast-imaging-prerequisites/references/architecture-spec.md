@@ -122,7 +122,7 @@ render() references section numbers in generated text (e.g. "see Section 3"), so
 be a search-and-fix pass, not a rename in isolation.
 
 1. **Platform & topology** — host platform (Docker / Podman / Kubernetes / Windows Server, radio — Kubernetes opens a five-way flavour radio `k8sProvider`: EKS / AKS / GKE / on-premises vanilla K8S (value `other`) / on-premises OpenShift or OKD (value `openshift`); internally `state()` still reports `platform: 'openshift'` for that last choice so `isOcp(a)` and the OpenShift code paths are unchanged; `isKube(a)` = Kubernetes or OpenShift, `a.k8sProvider` (aks/eks/gke/other, radio `k8sProvider` in a sub-block shown only on Kubernetes) selects the provider-specific storage text (`kubeProviderStorage`), the EKS EFS / AKS-FIPS-NFS port rows and checklist items, `isOcp(a)` = OpenShift — every former `a.platform === 'kubernetes'` test is `isKube(a)`; OpenShift adds the `route` reverse-proxy option and its own chart facts: Routes, `restricted-v2` SCC, `registry.redhat.io` PostgreSQL image, no StorageClass creation),
-   deployment scenario (select: which components exist — this is what later drives every
+   deployment scenario (radio cards: which components exist — this is what later drives every
    `has*(a)` predicate), topology (single machine / multi-machine, radio), plus conditional
    sub-blocks that only show when relevant (analysis-node count when topology is multi and the
    scenario includes analysis; a Neo4j-dedicated-machine checkbox when topology is multi and the
@@ -132,7 +132,7 @@ be a search-and-fix pass, not a rename in isolation.
    nodes) — because "single/multi pod" was never what the choice meant there; `topologyLabel(a)`
    returns the same words for the chips and callouts.
 
-   The scenario `<select>` has exactly these five `value`s — don't infer a different set from the
+   The scenario radio group has exactly these five `value`s — don't infer a different set from the
    predicates alone; the predicates are derived from these five, not the other way around:
 
    | `value` | Meaning | Components | `hasAnalysis` | `hasViewer` | `hasDashboards` |
@@ -168,14 +168,14 @@ be a search-and-fix pass, not a rename in isolation.
    This is a **mandatory prerequisite independent of HTTPS** — CAST Imaging is not intended to run
    with Gateway directly internet-facing, so don't fold this into the HTTPS section or make it
    conditional on HTTPS being enabled. Kept as its own section (split out from HTTPS after an
-   earlier draft combined them and blurred that independence). The select **defaults to the
+   earlier draft combined them and blurred that independence). The radio group **defaults to the
    platform's natural choice** — Kubernetes Gateway API on Kubernetes, an OpenShift Route on OpenShift, an external reverse proxy
    elsewhere — via `syncReverseProxyDefault()`, which keeps following the platform until the user
-   changes the select themselves (`reverseProxyTouched`), after which their choice is never
+   changes the choice themselves (`reverseProxyTouched`), after which their choice is never
    overwritten. Options on Kubernetes: Ingress controller (NGINX Ingress — legacy, but the Helm chart still carries it for existing customers) and Gateway API (the non-legacy route); selecting Ingress shows an info callout. Impossible pairs (IIS + ARR off Windows, Ingress/Gateway API off Kubernetes) aren't blocked;
    the HTTPS section shows a warning callout (`proxyMismatchHtml`) and the checklist item says
    "incompatible with your platform".
-6. **HTTPS / TLS certificate** (legend renamed from the bare "HTTPS", which didn't say what was being asked) — certificate source and TLS termination point. Kept separate from egress (Section 4)
+6. **HTTPS / TLS certificate** (legend renamed from the bare "HTTPS", which didn't say what was being asked) — certificate source and TLS termination point. Kept separate from egress (question 4)
    and from Reverse proxy (Section 5) because all three are orthogonal decisions a reader might
    answer differently. The certificate-source choice includes a real "no HTTPS — serve over plain
    HTTP" option, not just CA-issued/self-signed — HTTPS itself is highly recommended but not
@@ -644,7 +644,7 @@ own.
    one (`DB_MODE=external`), `curlimages/curl` and `castimaging/extend-proxy` always, and the two MCP
    images (`castimaging/imaging-mcp-server`, `castimaging/gatekeeper-mcp-server`, Docker Hub pages given by
    the user) when `a.mcp`. A short note explains the tag (`<ver>` = release installed; curl has its own
-   versions); Kubernetes/OpenShift replace the Docker table by the image list of CAST's Helm chart 3.6.8 (`values.yaml` — init-util, analysis-node `<ver>_core…`, extend-proxy, imaging-mcp-server pinned tags; no Gatekeeper image; OpenShift: `registry.redhat.io/rhel8/postgresql-15`) plus a private-registry note (override `*Image.name`, `UseImagePullSecrets`); Windows has no images.
+   versions); Kubernetes/OpenShift replace the Docker table by the image list of CAST's Helm chart 3.6.9 (`values.yaml` — init-util, analysis-node `<ver>_core…`, extend-proxy, imaging-mcp-server pinned tags; no Gatekeeper image; OpenShift: `registry.redhat.io/rhel8/postgresql-15`) plus a private-registry note (override `*Image.name`, `UseImagePullSecrets`); Windows has no images.
    The Docker/Podman network table has no registry row, since CAST's procedure is `save`/`load` Update the table when the doc text is
    pasted in verbatim — outbound access to CAST's extension/update
    service (direct or via the air-gapped Local Update Server), generating an **API key from the
@@ -794,7 +794,7 @@ combinations just because the file is new.
 
 **Kubernetes provider on the diagram** — with `platform === 'kubernetes'` and a provider other than "other": the Reverse proxy box adds the provider (`· EKS`), the Shared storage box names the provider's service (Amazon EFS with a mount target per AZ and NFS :2049; Azure Files with SMB :445 and NFS :2049 on FIPS nodes; Filestore CSI) and the core line to it carries the protocol (`core pods · NFS :2049` / `· SMB :445`), and an external PostgreSQL box reads `external · same VPC/zone` (VNet on AKS). No new lines or boxes: labels on existing ones (a private-registry box for air-gapped installs is not drawn).
 
-**Windows ports** — the generated HTML is written with the Docker/Podman port values and `windowsPorts(html)` translates a fixed set for Windows right before it is inserted (8089→8099, 8083→8093, 8082→8094, 9001→9011, 7687→7697, 7474→7484, 7473→7483, 6362→6372); a `<!--WINPORTS-->` marker in Section 3 is replaced by the Windows-ports callout after the translation so its Docker numbers survive. PostgreSQL stays 2285 on purpose (recorded decision). Kubernetes/OpenShift storage is one checklist item `k8s-storage:<provider|openshift>`; on VMs the single topology says "single machine" everywhere (`coreWord`/`coreWordDiagram`).
+**Windows ports** — the generated HTML is written with the Docker/Podman port values and `windowsPorts(html)` translates a fixed set for Windows right before it is inserted (8089→8099, 8083→8093, 8082→8094, 9001→9011, 7687→7697, 7474→7484, 7473→7483, 6362→6372); a `<!--WINPORTS-->` marker in Section 3 is replaced by the Windows-ports callout after the translation so its Docker numbers survive. PostgreSQL is 2284 on Windows and 2285 elsewhere (recorded maintainer decisions). Kubernetes/OpenShift storage is one checklist item `k8s-storage:<provider|openshift>`; on VMs the single topology says "single machine" everywhere (`coreWord`/`coreWordDiagram`).
 
 **Windows HTTPS** — with `platform === 'windows'` and a certificate source other than "none", Section 4 carries CAST's Windows procedure (TLS terminates at the Gateway on 443; SSO/Auth steps differ ≤ 3.6.8 vs ≥ 3.6.9) in place of the Docker/NGINX "disable the proxy's HTTP listener" bullet, and the checklist gets `win-https:<certSource>`. `windowsPorts` also translates PostgreSQL 2285 → 2284 (maintainer, 2026-11-23). The Highlight rows list the three maintainer-given hosts (rpa, cloud, auth).
 
