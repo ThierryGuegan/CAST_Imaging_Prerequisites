@@ -80,6 +80,14 @@ const L = require('./lib');
   ok(!keys.includes('win-imaging-core') && keys.includes('win-readonly-source:dashboards-only'), 'Core item shown without analysis, or read-only item missing');
   await L.set(page, { platform: 'docker', scenario: 'full', topology: 'single', dbHosting: 'colocated' });
 
+  // Firewall / NAT, startup checker, Windows HTTPS port note
+  await L.set(page, { platform: 'docker', scenario: 'full' });
+  ok((await L.checkKeys(page)).includes('fw-docker-nat'), 'Docker NAT firewall item missing');
+  await L.set(page, { platform: 'windows', certSource: 'ca-issued', reverseProxy: 'nginx' });
+  ok(/moves the Gateway itself to port 443/.test(await L.resultsText(page)) && !/undefined/.test(await L.resultsText(page)), 'Windows HTTPS Gateway-port note');
+  ok(/CAST-Imaging-sync-all-services-on-startup\.bat/.test(await L.resultsText(page)), 'startup checker path');
+  await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
