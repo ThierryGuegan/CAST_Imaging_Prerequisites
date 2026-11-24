@@ -60,7 +60,7 @@
     <tr><td style="border:1px solid #c8c6c4;"><b>Hardware sizing</b></td><td style="border:1px solid #c8c6c4;">Composed from your answers rather than a fixed table per scenario. Includes the Kubernetes cluster-node minimum, an architecture diagram of the components and network paths that apply, and the OS/runtime and storage requirements.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Network ports / FQDN allowlist</b></td><td style="border:1px solid #c8c6c4;">Filtered to the flows your configuration actually needs — no unused rows, no wildcards. Each row is labelled <i>mandatory</i>, <i>conditional</i>, <i>optional</i> or <i>recommended</i>.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Database requirements</b></td><td style="border:1px solid #c8c6c4;">CAST Imaging supports PostgreSQL only; matched to your chosen hosting model. Neo4j requirements are added when your scenario includes the Viewer.</td></tr>
-    <tr><td style="border:1px solid #c8c6c4;"><b>Reverse proxy &amp; HTTPS / TLS</b></td><td style="border:1px solid #c8c6c4;">The reverse proxy is a mandatory prerequisite (Kubernetes Gateway API is preselected on Kubernetes, with the legacy NGINX Ingress still available). HTTPS/TLS guidance is matched to your certificate source.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Reverse proxy &amp; HTTPS / TLS</b></td><td style="border:1px solid #c8c6c4;">The reverse proxy is a mandatory prerequisite (Kubernetes Gateway API is preselected on Kubernetes, with the legacy NGINX Ingress, Istio, Amazon CloudFront (EKS only), Azure Application Gateway (AKS only) and, on OpenShift, its Route also offered). HTTPS/TLS guidance is matched to your certificate source.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Authentication</b></td><td style="border:1px solid #c8c6c4;">Prerequisites for the exact method you picked (Local / SAML / OpenID Connect / LDAP), all brokered through CAST's embedded SSO Service and Auth service.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>CAST Extend access &amp; licensing</b></td><td style="border:1px solid #c8c6c4;">Steps adapted for direct, proxy or air-gapped egress.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>MCP Server (AI)</b></td><td style="border:1px solid #c8c6c4;">Prerequisites, shown only if you enable that integration.</td></tr>
@@ -71,6 +71,8 @@
 <h2 style="font-size:22px;margin:28px 0 8px;">Printing and export</h2>
 <ul>
   <li><b>Print / Save as PDF</b> — the whole result. The questionnaire pane and the "generated live" wording are hidden from the print output.</li>
+  <li><b>Save as HTML</b> — downloads the whole generated document as a standalone page.</li>
+  <li><b>Save answers (JSON)</b> / <b>Import answers (JSON)</b> — keep your questionnaire answers and ticks in a file and reload them later (the optional Client / project name is part of it).</li>
   <li><b>Export checklist as HTML</b> — downloads just the checklist, with your profile and your current ticks, as a standalone page you can hand to the teams that own each server.</li>
   <li><b>Privacy</b> — everything runs client-side in the browser; no data leaves the page.</li>
 </ul>
