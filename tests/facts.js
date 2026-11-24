@@ -54,6 +54,34 @@ const DOCKER_COUNT = { full: '13 containers', 'viewer-readonly': '11 containers'
     if (sc === 'dashboards-only' && !keys.includes('dk-dashboards-standalone')) fails.push('docker dashboards-only: standalone item missing');
   }
 
+  // Kubernetes: chart 3.6.9 container ports, images and defaults (CAST-Extend charts, provider pages)
+  const K8S_PORTS = [8089, 8091, 8092, 8098, 2381, 8090, 8096, 8097, 8085, 8285];
+  await L.set(page, { platform: 'kubernetes', k8sProvider: 'eks', scenario: 'full', topology: 'multi', dbHosting: 'dedicated', egress: 'airgapped', mcp: true });
+  const kt = await L.resultsText(page);
+  for (const p of K8S_PORTS) if (!has(kt, p)) fails.push('kubernetes: port ' + p + ' missing');
+  for (const frag of ['imaging-mcp-server:3.1.0', 'extend-proxy', 'castimaging/analysis-node:<ver>_core', 'pvc-shared-datadir', 'ReadWriteMany', 'EFS']) if (!kt.includes(frag)) fails.push('kubernetes: "' + frag + '" missing');
+  if (!/requests 0\.5 CPU \/ 8 GB/.test(kt)) fails.push('kubernetes: chart default analysis-node request (0.5 CPU / 8 GB) missing');
+  await L.set(page, { k8sProvider: 'openshift', reverseProxy: 'route' });
+  const ot = await L.resultsText(page);
+  if (!/requests 1 CPU \/ 16 GB/.test(ot) || !/Routes\.enable/.test(ot) || /EnforceAnalysisNodeIsolation[^.]*:\s*true/.test(ot)) fails.push('openshift: chart defaults or Routes text');
+  await L.set(page, { k8sProvider: 'aks', reverseProxy: 'gatewayapi' });
+  const at = await L.resultsText(page);
+  if (!/SMB/.test(at) || !/FIPS/.test(at)) fails.push('aks: Azure Files SMB / FIPS NFS text missing');
+  await L.set(page, { k8sProvider: 'gke' });
+  if (!/Filestore/.test(await L.resultsText(page))) fails.push('gke: Filestore missing');
+
+  // Text that names a component the scenario excludes (the class of defect found by several audits)
+  const EXCLUDED = [
+    ['dashboards-only', /even with a single analysis-node pod|Each node hosting an analysis-node|analysis-node pods carry|requests 0\.5 CPU \/ 8 GB, limits 4 CPU \/ 32 GB \(<code>MaxParallel|analysis-node requests/],
+    ['viewer-readonly', /even with a single analysis-node pod|analysis-node requests/],
+    ['analysis-only', /viewer-neo4j|Neo4j requests|viewer-server and ETL/],
+  ];
+  for (const platform of ['kubernetes', 'docker', 'windows']) for (const [sc, re] of EXCLUDED) {
+    await L.set(page, { platform, k8sProvider: 'eks', scenario: sc, topology: 'single', dbHosting: 'dedicated', egress: 'direct' });
+    const m = (await L.resultsText(page)).match(re);
+    if (m) fails.push(platform + '/' + sc + ': text names an excluded component ("' + m[0].slice(0, 60) + '")');
+  }
+
   // PostgreSQL range and Windows port
   await L.set(page, { platform: 'windows', dbHosting: 'dedicated', scenario: 'full' });
   const pg = await L.resultsText(page);
