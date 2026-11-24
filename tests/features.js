@@ -24,6 +24,12 @@ const L = require('./lib');
   await page.click('.chip[data-q="reverseProxy"]');
   ok(await page.evaluate(() => document.activeElement && document.activeElement.name === 'reverseProxy'), 'chip did not focus its question');
 
+  // headless scenario keeps the browser path (Console / Control Panel) incl. the identity-provider redirect
+  await L.set(page, { platform: 'docker', scenario: 'analysis-only', auth: 'saml' });
+  const hl = await L.resultsText(page);
+  ok(/End-user browser\s+SAML Identity Provider/.test(hl) && /Headless scenario — only if staff sign in/.test(hl), 'headless SAML browser -> IdP row missing');
+  await L.set(page, { scenario: 'full', auth: 'local' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');

@@ -747,7 +747,7 @@
     function byKey(row, key){ for(var i=0;i<row.length;i++){ if(row[i].key===key) return row[i]; } return null; }
 
     var y = 16 + headerH;
-    var browserRow = layoutRow([hasUiScenario(a) ? {key:'browser', label:'Browser', sub:'end user'} : {key:'browser', label:'API client / CI', sub:'no UI in this scenario'}]); var yBrowser = y; y += boxH+gapY;
+    var browserRow = layoutRow([hasUiScenario(a) ? {key:'browser', label:'Browser', sub:'end user'} : {key:'browser', label:'API client / Browser', sub:'no Viewer UI · Console by browser'}]); var yBrowser = y; y += boxH+gapY;
     var testerBox = {x: browserRow[0].x+browserRow[0].w+60, w: 220};
     testerBox.cx = testerBox.x + testerBox.w/2;
     testerBox.label = 'Tester / admin workstation'; testerBox.sub = 'setup/testing phase only';
@@ -1203,11 +1203,11 @@
 
     if(a.auth === 'saml'){
       rows.push({src:'SSO Service', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'SSO metadata exchange and assertion validation — brokered through CAST\'s embedded SSO Service (port 8096, /auth path), not imaging-services directly', tag:'mandatory', note:'SAML selected'+(a.egress === 'airgapped' ? ' — an IdP outside your network needs an explicit exception to your air-gapped egress policy' : a.egress === 'proxy' ? ' — whether the SSO Service can use an egress proxy for it isn\'t covered by CAST\'s pages' : '')});
-      if(hasUi) rows.push({src:'End-user browser', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'The user is redirected to the IdP to sign in and back to CAST Imaging with the SAML assertion (through the reverse proxy)', tag:'conditional', note:'Reasonable inference from the SAML browser-redirect flow'});
+      rows.push({src:'End-user browser', dst:'SAML Identity Provider (your IdP FQDN)', port:'443', proto:'HTTPS', purpose:'The user is redirected to the IdP to sign in and back to CAST Imaging with the SAML assertion (through the reverse proxy)', tag:'conditional', note:(hasUi ? '' : 'Headless scenario — only if staff sign in to Console / Control Panel from a browser. ')+'Reasonable inference from the SAML browser-redirect flow'});
     }
     if(a.auth === 'oidc'){
       rows.push({src:'SSO Service (Keycloak, '+coreWord+')', dst:'OIDC identity provider — discovery (.well-known/openid-configuration), token, UserInfo and JWKS endpoints', port:'443', proto:'HTTPS', purpose:'Keycloak contacts these endpoints directly, server to server — the token exchange is not a browser redirect — to fetch the discovery document and signing keys and to validate tokens', tag:'mandatory', note:'Per CAST\'s OpenID Connect page; a failure usually means a firewall or proxy blocks the host'+(a.egress === 'proxy' ? ' (whether Keycloak can use an egress proxy for these calls isn\'t covered by CAST\'s page)' : a.egress === 'airgapped' ? ' — an identity provider inside your network is typical; a cloud one (Entra ID, Okta, Auth0) needs an explicit exception to your air-gapped egress policy' : '')});
-      if(hasUi) rows.push({src:'End-user browser', dst:'OIDC identity provider — authorization endpoint', port:'443', proto:'HTTPS', purpose:'The user is redirected to the provider to sign in and back to the redirect URI (https://<imaging-fqdn>/auth/realms/aip-realm/broker/<idp-alias>/endpoint, through the reverse proxy)', tag:'conditional', note:'Reasonable inference from the redirect flow — CAST\'s page states only that the token exchange is server to server'});
+      rows.push({src:'End-user browser', dst:'OIDC identity provider — authorization endpoint', port:'443', proto:'HTTPS', purpose:'The user is redirected to the provider to sign in and back to the redirect URI (https://<imaging-fqdn>/auth/realms/aip-realm/broker/<idp-alias>/endpoint, through the reverse proxy)', tag:'conditional', note:(hasUi ? '' : 'Headless scenario — only if staff sign in to Console / Control Panel from a browser. ')+'Reasonable inference from the redirect flow — CAST\'s page states only that the token exchange is server to server'});
     }
     if(a.auth === 'ldap'){
       rows.push({src:'SSO Service', dst:'LDAP / Active Directory server', port:'389 (LDAP / StartTLS) or 636 (LDAPS) — pick one', proto:'TCP', purpose:'Directory lookup and authentication — brokered through CAST\'s embedded SSO Service (port 8096, /auth path), not imaging-services directly', tag:'mandatory', note:'LDAP selected'});
