@@ -125,6 +125,11 @@
     box-shadow:0 3px 14px rgba(62,166,255,.45);letter-spacing:.01em;}
   .btn-print:hover{box-shadow:0 4px 18px rgba(62,166,255,.6);transform:translateY(-1px);}
 
+  .chip[data-q]{cursor:pointer;}
+  .chip[data-q]:hover, .chip[data-q]:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+  details.confirm-box summary{cursor:pointer;}
+  details.confirm-box ul{margin:8px 0 0;padding-left:20px;}
+  details.changelog{margin-top:8px;}
   footer.doc-footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--border);color:var(--text-dim);font-size:11.5px;}
 
   @media (max-width: 980px){
@@ -258,9 +263,9 @@
           <label class="opt"><input type="radio" name="analysisNodes" value="1" checked>
             <span class="opt-text"><b>1 analysis-node</b><span>no parallel analyses</span></span></label>
           <label class="opt"><input type="radio" name="analysisNodes" value="2-3">
-            <span class="opt-text"><b>2–3 analysis-nodes</b><span>analyze a few applications in parallel</span></span></label>
+            <span class="opt-text"><b>2–3 analysis-nodes</b><span>analyze a few applications in parallel — sized for 2</span></span></label>
           <label class="opt"><input type="radio" name="analysisNodes" value="4+">
-            <span class="opt-text"><b>4+ analysis-nodes</b><span>large/numerous codebases, high analysis throughput</span></span></label>
+            <span class="opt-text"><b>4 or more analysis-nodes</b><span>large/numerous codebases, high analysis throughput — sized for 4</span></span></label>
           </div>
           <p class="hint" id="analysis-nodes-hint">Each analysis-node registers itself against the same imaging-services instance and can run on its own machine — this is CAST Imaging's horizontal scaling mechanism for analysis workload.</p>
         </div>
@@ -471,6 +476,7 @@
     <p class="page-sub" id="generated-live-note"><span class="screen-only">Generated live from your answers. </span>Reference structure: <code>doc.castsoftware.com/imaging/install</code>.</p>
 
     <div class="profile-chips" id="profile-chips"></div>
+    <div id="compare-result" class="no-print"></div>
 
     <div class="toolbar no-print">
       <button class="btn btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
@@ -478,6 +484,10 @@
       <button class="btn btn-print" id="export-html" type="button">⬇ Export checklist as HTML</button>
       <button class="btn secondary" id="save-json" type="button" title="Download your answers (and checklist ticks) as a JSON file to reuse later">📥 Save answers (JSON)</button>
       <button class="btn secondary" id="import-json" type="button" title="Load answers saved earlier from a JSON file">📤 Import answers (JSON)</button>
+      <button class="btn secondary" id="compare-json" type="button" title="Compare your current answers with a saved answers file (e.g. POC vs production)">🔍 Compare with a saved file</button>
+      <input type="file" id="compare-json-file" accept="application/json,.json" hidden>
+      <button class="btn secondary" id="export-ports-csv" type="button" title="Download the network ports / FQDN matrix as CSV for your network team">📋 Export ports (CSV)</button>
+      <button class="btn secondary" id="export-values" type="button" title="Download a commented values.yaml starting point from your answers (Kubernetes / OpenShift)" hidden>📄 Export values.yaml (starting point)</button>
       <input type="file" id="import-json-file" accept="application/json,.json" hidden>
       <span id="io-status" class="hint" role="status" aria-live="polite" style="align-self:center;margin:0;"></span>
     </div>
@@ -495,6 +505,7 @@
     <footer class="doc-footer">
       CAST Imaging — Requirements Builder · Internal planning tool<span class="screen-only"> · Regenerated live in your browser</span>
       · <span id="tool-version"></span>
+      <details class="changelog screen-only"><summary>What changed recently</summary><ul id="changelog-list"></ul></details>
     </footer>
   </main>
 
@@ -508,6 +519,13 @@
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
   var TOOL_VERSION = '2026-11-24';
+  var CHANGELOG = [
+    ['2026-11-24', 'Entry options for Kubernetes: Istio, Amazon CloudFront (EKS) and Azure Application Gateway (AKS, from CAST\'s chart PDF)'],
+    ['2026-11-24', 'Provider-specific wording: nothing from another cloud provider is shown any more; MCP option hidden without a Viewer on Kubernetes'],
+    ['2026-11-24', 'New: points-to-confirm list, ports CSV export, values.yaml starting point, comparison with a saved answers file'],
+    ['2026-11-23', 'PostgreSQL on Windows is 2284; Windows HTTPS procedure from CAST\'s page'],
+    ['2026-11-22', 'Kubernetes flavours (EKS, AKS, GKE, on-premises K8S, OpenShift/OKD) and chart 3.6.9']
+  ];
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
@@ -1214,6 +1232,8 @@
     var timeStr = now.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
     el.textContent = 'Generated ' + dateStr + ' at ' + timeStr;
 
+    var clEl = document.getElementById('changelog-list');
+    if(clEl && !clEl.children.length) CHANGELOG.forEach(function(c){ var li = document.createElement('li'); li.textContent = c[0] + ' — ' + c[1]; clEl.appendChild(li); });
     var vEl = document.getElementById('tool-version');
     if(vEl) vEl.textContent = 'Tool content last updated ' + TOOL_VERSION;
   }
@@ -1267,19 +1287,25 @@
     // profile chips
     // One chip per questionnaire answer that shapes the output, in form order, so the profile
     // (also carried into the HTML checklist export) fully identifies the configuration.
-    function chip(label, value){ return '<span class="chip">'+esc(label)+': <b>'+esc(value)+'</b></span>'; }
+    // Each chip jumps to the questionnaire control that produced it.
+    var CHIP_TARGET = {'scale':'scale', 'users':'users', 'platform':'platform', 'scenario':'scenario', 'topology':'topology', 'Kubernetes':'k8sProvider',
+      'analysis nodes':'analysisNodes', 'Neo4j':'neo4jDedicated', 'database':'dbHosting', 'egress':'egress', 'reverse proxy':'reverseProxy',
+      'HTTPS / TLS certificate':'certSource', 'user authentication':'auth', 'MCP/AI':'mcp', 'Highlight':'highlight', 'Email notifications':'email',
+      'source code access':'repoHttps', 'client / project':'clientProject'};
+    function chipAttr(label){ return CHIP_TARGET[label] ? ' data-q="'+CHIP_TARGET[label]+'" role="button" tabindex="0" title="Go to this question"' : ''; }
+    function chip(label, value){ return '<span class="chip"'+chipAttr(label)+'>'+esc(label)+': <b>'+esc(value)+'</b></span>'; }
     var chips = (a.clientProject ? chip('client / project', a.clientProject) : '') + chip('scale', LABELS.scale[a.scale]) + chip('users', LABELS.users[a.users]) +
       chip('platform', LABELS.platform[a.platform]) + chip('scenario', LABELS.scenario[a.scenario]) +
       chip('topology', topologyLabel(a));
     if(a.platform === 'kubernetes') chips += chip('Kubernetes', LABELS.k8sProvider[a.k8sProvider]);
-    if(a.topology === 'multi' && hasAnalysis(a)) chips += chip('analysis nodes', a.analysisNodes.replace('-', '–'));
+    if(a.topology === 'multi' && hasAnalysis(a)) chips += chip('analysis nodes', a.analysisNodes === '2-3' ? '2–3 (sized for 2)' : a.analysisNodes === '4+' ? '4 or more (sized for 4)' : a.analysisNodes);
     if(a.topology === 'multi' && hasNeo4j(a) && a.neo4jDedicated) chips += chip('Neo4j', 'dedicated');
     chips += chip('database', LABELS.dbHosting[a.dbHosting]) + chip('egress', LABELS.egress[a.egress]) +
       chip('reverse proxy', LABELS.reverseProxy[a.reverseProxy]) + chip('HTTPS / TLS certificate', LABELS.certSource[a.certSource]) +
       chip('user authentication', LABELS.auth[a.auth]);
-    if(a.mcp) chips += '<span class="chip">MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
-    if(a.highlight) chips += '<span class="chip">Highlight: <b>enabled</b></span>';
-    if(a.email) chips += '<span class="chip">Email notifications: <b>enabled</b></span>';
+    if(a.mcp) chips += '<span class="chip"'+chipAttr('MCP/AI')+'>MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
+    if(a.highlight) chips += '<span class="chip"'+chipAttr('Highlight')+'>Highlight: <b>enabled</b></span>';
+    if(a.email) chips += '<span class="chip"'+chipAttr('Email notifications')+'>Email notifications: <b>enabled</b></span>';
     if(hasAnalysis(a) && (a.repoHttps || a.repoSmb)){
       chips += chip('source code access', [a.repoHttps ? 'Git/SVN clones by own tooling' : '', a.repoSmb ? 'SMB source folder' : ''].filter(Boolean).join(' + '));
     }
@@ -1605,6 +1631,7 @@
         '</tbody></table></div>' : '');
 
     var portRows = buildPortRows(a);
+    lastPortRows = portRows; lastState = a;
 
     var netHtml = '<h3>3. Network ports &amp; FQDN allowlist — tailored to your answers</h3>' +
       '<p>Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.</p><!--WINPORTS-->' +
@@ -1841,7 +1868,7 @@
 
     var coreNode = separateEveryMachineGroup ? [] : everyMachine.slice();
     coreNode.push(item('server-sizing:'+a.platform+':'+a.scenario+':'+a.topology, (isK8s ? 'Node pool capacity' : 'Server(s)') + ' provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(topologyLabel(a))+')'));
-    if(isK8s && a.dbHosting !== 'colocated') coreNode.push(item('k8s-extdb:'+(isOcp(a) ? 'ocp' : a.k8sProvider), 'External PostgreSQL (CAST\'s supported 14.x–18.x; '+(a.k8sProvider === 'eks' || a.k8sProvider === 'gke' ? '; 8 GB RAM minimum recommended on its '+a.k8sProvider.toUpperCase()+' page' : '')+') '+(a.platform === 'kubernetes' && a.k8sProvider !== 'other' ? 'in the same '+(a.k8sProvider === 'aks' ? 'VNet' : 'VPC')+' and the same zone as the cluster nodes' : 'on the same network and in the same data center as the cluster nodes, reachable from every node')+', and <code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>) set in <code>values.yaml</code> <span class="hint">(per CAST\'s '+(a.platform === 'kubernetes' && a.k8sProvider !== 'other' ? 'EKS / GKE install pages' : 'on-premises page')+')</span>'));
+    if(isK8s && a.dbHosting !== 'colocated') coreNode.push(item('k8s-extdb:'+(isOcp(a) ? 'ocp' : a.k8sProvider), 'External PostgreSQL (CAST\'s supported 14.x–18.x; '+(a.k8sProvider === 'eks' || a.k8sProvider === 'gke' ? '; 8 GB RAM minimum recommended on its '+a.k8sProvider.toUpperCase()+' page' : '')+') '+(a.platform === 'kubernetes' && a.k8sProvider !== 'other' ? 'in the same '+(a.k8sProvider === 'aks' ? 'VNet' : 'VPC')+' and the same zone as the cluster nodes' : 'on the same network and in the same data center as the cluster nodes, reachable from every node')+', and <code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>) set in <code>values.yaml</code> <span class="hint">(per CAST\'s '+(a.platform === 'kubernetes' && (a.k8sProvider === 'eks' || a.k8sProvider === 'gke') ? a.k8sProvider.toUpperCase()+' install page' : a.platform === 'kubernetes' && a.k8sProvider === 'aks' ? 'chart values reference' : 'on-premises page')+')</span>'));
     coreNode.push(a.dbHosting === 'colocated' && (a.platform === 'docker' || a.platform === 'podman' || isK8s) ? item('pg-hosting:colocated:embedded', 'PostgreSQL deployed by CAST\'s '+(isK8s ? 'Helm chart' : 'installer')+' (embedded database) — nothing to provision') : item('pg-hosting:'+a.dbHosting, 'PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting])));
     var pgEmbedded = a.dbHosting === 'colocated' && (a.platform === 'docker' || a.platform === 'podman' || isK8s);
     if(!pgEmbedded && !isK8s) coreNode.push(item('pg-version', 'PostgreSQL 14.x–18.x (64-bit, 18.x recommended) with UTF-8 and the collation CAST specifies (see Section 2)'));
@@ -1890,7 +1917,7 @@
       coreNode.push(item('k8s-storage:'+(isOcp(a) ? 'openshift' : a.k8sProvider), 'Storage ready: '+stoParts.join('; ')));
       coreNode.push(item('k8s-prep:'+a.reverseProxy+':'+(a.certSource !== 'none' ? 'tls' : 'plain')+(isOcp(a) ? ':ocp' : ':'+a.k8sProvider), k8sPrep.join('; ') + ' — prepared'));
       if(a.platform === 'kubernetes' && a.k8sProvider === 'other') coreNode.push(item('k8s-loadbalancer', 'A load-balancer implementation (e.g. MetalLB) available on the cluster — without it the services\' external IP stays <code>&lt;pending&gt;</code>; installed and operated by the cluster administrator'));
-      if(isK8s && a.egress === 'airgapped') coreNode.push(item('k8s-telemetry', '<code>TELEMETRY_PUSH_ENABLED: false</code> set for the CAST services — CAST\'s EKS page recommends it when the cluster has no outbound internet access'));
+      if(isK8s && a.egress === 'airgapped') coreNode.push(item('k8s-telemetry', '<code>TELEMETRY_PUSH_ENABLED: false</code> set for the CAST services — '+(a.platform === 'kubernetes' && a.k8sProvider === 'eks' ? 'CAST\'s EKS page recommends it' : 'a chart setting that CAST\'s EKS page (the only one to say so) recommends')+' when the cluster has no outbound internet access'));
       if(a.platform === 'kubernetes' && a.k8sProvider === 'other') coreNode.push(item('k8s-provider:other', '<code>K8SProvider: K8S</code> set in <code>values.yaml</code> together with <code>CreateStorageClass: false</code> and the names of your existing classes, when the cluster is not a managed cloud one (EKS / AKS / GKE — the providers the chart documents) — a non-managed cluster provides neither managed storage classes nor a load-balancer integration of its own <span class="hint">(per the AIFE requirements document)</span>'));
       if(!isOcp(a)) coreNode.push(item('k8s-install-time', '<b>Install-time-only settings decided before the first <code>helm install</code></b> — they can\'t be changed afterwards: <code>K8SProvider</code>, <code>DiskClassName</code>, <code>FileClassName</code>, every <code>AnalysisNodeFS.*</code>, the <code>*_DSdriver</code> / <code>*_FSdriver</code>, <code>CastStorageService.enable</code>, <code>CustomPostgres.enable</code>, <code>RestrictedSecurityMode</code>; <code>KCADMIN_USERNAME</code> only before a new install, and <code>CONTROLPANEL.IMAGING_DOMAIN_SYNCHRO_ENABLED</code> is to be decided at installation <span class="hint">(CAST\'s values.yaml reference)</span>'));
       if(!isOcp(a)) coreNode.push(item('k8s-etc-cast-imaging', 'Kubernetes has read/write rights on <code>/etc/cast-imaging</code> <span class="hint">(per the AIFE requirements document — not independently confirmed against CAST\'s docs)</span>'));
@@ -1966,11 +1993,31 @@
     // documentation map), then add the note that lists the differences.
     if(a.platform === 'windows') allHtml = windowsPorts(allHtml);
     allHtml = allHtml.replace('<!--WINPORTS-->', a.platform === 'windows' ? '<div class="callout info"><b>Windows ports.</b> CAST\'s hardware page lists other service ports for Windows than for Docker/Podman, and this document uses the Windows values: analysis-node <b>8099</b> (Docker: 8089); imaging-viewer front-end <b>8093</b> (8083), AI Manager <b>8094</b> (8082), back-end <b>9010</b> (9000), ETL <b>9011</b> (9001); Neo4j <b>7697</b> / <b>7484</b> / <b>7483</b> / <b>6372</b> (7687 / 7474 / 7473 / 6362); the SSO Service also uses <b>9002</b>. <b>PostgreSQL</b> <b>2284</b> (Docker/Podman embedded database: 2285), per CAST\'s hardware page.</div>' : '');
+    allHtml = pointsToConfirm(allHtml) + allHtml;
     document.getElementById('results-content').innerHTML = allHtml;
+    document.getElementById('export-values').hidden = !isKube(a);
 
     restoreChecklistState();
   }
 
+  var lastPortRows = [], lastState = null;
+
+  // Points to confirm with CAST: every note in the generated document that the tool itself labels as an inference or as not confirmed.
+  function pointsToConfirm(html){
+    var tmp = document.createElement('div'); tmp.innerHTML = html;
+    var seen = {}, items = [];
+    tmp.querySelectorAll('.hint').forEach(function(h){
+      var tx = h.textContent.replace(/^\s*[—-]\s*/, '').replace(/^\(|\)$/g, '').replace(/\s+/g, ' ').trim();
+      if(!/inference|not independently|not verified|unconfirmed|not confirmed|not stated|not covered|not documented|AIFE|no CAST page/i.test(tx)) return;
+      var row = h.closest('tr'), li = h.closest('li');
+      var ctx = row ? row.children[0].textContent.replace(/\s+/g, ' ').trim() : li ? (function(){ var cl = li.cloneNode(true); cl.querySelectorAll('.hint').forEach(function(x){ x.remove(); }); return cl.textContent.replace(/\s+/g, ' ').trim().slice(0, 90); })() : '';
+      var key = ctx + '|' + tx.slice(0, 80);
+      if(seen[key]) return; seen[key] = true;
+      items.push((ctx ? '<b>' + esc(ctx.slice(0, 70)) + '</b> — ' : '') + esc(tx.length > 240 ? tx.slice(0, 237) + '…' : tx));
+    });
+    if(!items.length) return '';
+    return '<details class="callout info confirm-box" id="confirm-box"><summary><b>Points to confirm with CAST ('+items.length+')</b> — statements below are this tool\'s inference or are not stated on CAST\'s pages</summary><ul><li>'+items.join('</li><li>')+'</li></ul></details>';
+  }
   function windowsPorts(html){
     var map = {'2285':'2284','8089':'8099','8083':'8093','8082':'8094','9001':'9011','7687':'7697','7474':'7484','7473':'7483','6362':'6372'};
     return html.replace(/(^|[^\d.])(2285|8089|8083|8082|9001|7687|7474|7473|6362)(?!\d)/g, function(m, pre, port){ return pre + map[port]; });
@@ -2142,6 +2189,135 @@
     render();
     return {applied: applied, ignored: ignored};
   }
+
+  // ---- Exports and helpers added with the "suggestions" round ----
+  function downloadText(filename, text, mime){
+    var blob = new Blob([text], {type: mime}), url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = filename;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+  function exportBaseName(){ var n = clientProjectName(); return (n && slugify(n) ? slugify(n) + '-' : '') + new Date().toISOString().slice(0, 10); }
+
+  // Network ports / FQDN matrix as CSV (Windows port values applied, like the page).
+  document.getElementById('export-ports-csv').addEventListener('click', function(){
+    if(!lastState) return;
+    var win = lastState.platform === 'windows';
+    function cell(v){ v = String(v == null ? '' : v); if(win) v = windowsPorts(v); return '"' + v.replace(/"/g, '""') + '"'; }
+    var lines = [['Source', 'Destination', 'Port', 'Protocol', 'Purpose', 'Requirement', 'Note'].map(cell).join(',')];
+    lastPortRows.forEach(function(row){ lines.push([row.src, row.dst, row.port, row.proto, row.purpose, row.tag, row.note].map(cell).join(',')); });
+    downloadText('cast-imaging-ports-' + exportBaseName() + '.csv', '﻿' + lines.join('\r\n') + '\r\n', 'text/csv;charset=utf-8');
+    ioStatus('Exported ' + lastPortRows.length + ' port rows.', false);
+  });
+
+  // values.yaml starting point: only keys named in CAST's values reference (chart 3.6.9), commented, placeholders in <angle brackets>.
+  function buildValuesYaml(a){
+    var o = [];
+    function c(t){ o.push('# ' + t); }
+    c('Starting point generated by the CAST Imaging requirements builder from your answers (' + TOOL_VERSION + ').');
+    c('Keys come from CAST\'s values.yaml reference for chart 3.6.9 — check every key against the values.yaml of the chart release you install.');
+    c('Values in <angle brackets> are yours to fill in; anything not listed keeps the chart default.');
+    o.push('');
+    if(isOcp(a)){
+      c('OpenShift / OKD (CAST\'s OpenShift chart): both class names are your cluster\'s own classes (the chart default is the OpenShift Local provisioner).');
+      o.push('DiskClassName: "<your block StorageClass>"', 'FileClassName: "<your ReadWriteMany StorageClass>"');
+    } else {
+      c('Install-time only — cannot be changed after the first helm install.');
+      o.push('K8SProvider: ' + (a.k8sProvider === 'other' ? 'K8S' : a.k8sProvider.toUpperCase()));
+      if(a.k8sProvider === 'other'){
+        o.push('CreateStorageClass: false', 'DiskClassName: "<your block StorageClass>"', 'FileClassName: "<your ReadWriteMany StorageClass>"');
+      } else if(a.k8sProvider === 'eks'){
+        o.push('EFSsystemID: "<fs-xxxxxxxx>"', '# EFSaccessPointID: "<fsap-xxxxxxxx>"   # optional access point');
+      } else if(a.k8sProvider === 'aks'){
+        o.push('AnalysisNodeFS:', '  AKSprotocol: smb   # "nfs" is required on FIPS-enabled nodes');
+      }
+    }
+    o.push('');
+    o.push('FrontEndHost: "' + (a.certSource === 'none' ? 'http' : 'https') + '://<your FQDN>"   # scheme and host only; must match the certificate and DNS entry');
+    o.push('');
+    c('Application networking — only one of CreateIngress, UseIstioGateway, UseGatewayAPI, UseApplicationGateway may be enabled.');
+    if(a.reverseProxy === 'route'){
+      o.push('Routes:', '  enable: true', '  tls: ' + (a.certSource !== 'none'));
+      if(a.certSource !== 'none') c('pass the certificate and key with --set-file tls.certificate=… --set-file tls.key=… at install');
+    } else if(a.reverseProxy === 'gatewayapi'){
+      o.push('CreateLoadBalancer: false', 'UseGatewayAPI: true', 'Gateway:', '  create: true', '  className: nginx   # nginx for NGINX Gateway Fabric, or your controller\'s gatewayClassName');
+    } else if(a.reverseProxy === 'ingress'){
+      o.push('CreateLoadBalancer: false', 'CreateIngress: true');
+    } else if(a.reverseProxy === 'istio'){
+      o.push('CreateLoadBalancer: false', 'UseIstioGateway: true', '# ExistingIstioGatewayName: "<namespace>/<gateway>"   # only to attach to an existing gateway');
+    } else if(a.reverseProxy === 'appgw'){
+      o.push('UseApplicationGateway: true', '# CAST\'s pages disagree on CreateLoadBalancer here: the values reference says false, the Application Gateway PDF takes the backend from the console-gateway-service external IP — confirm with CAST.');
+    } else if(a.reverseProxy === 'cloudfront'){
+      o.push('# CloudFront: FrontEndHost is the distribution domain name; confirm with CAST whether to keep CreateLoadBalancer (the origin is the console-gateway-service hostname).');
+    } else {
+      o.push('CreateLoadBalancer: true   # chart default — creates a PUBLIC cloud load balancer in front of console-gateway-service; ' + (a.k8sProvider === 'other' ? 'needs a load-balancer implementation such as MetalLB' : 'UseInternalLoadBalancer: true makes it private'));
+    }
+    o.push('');
+    if(a.egress === 'airgapped'){
+      o.push('ExtendProxy:', '  enable: true', '  exthostname: "<FQDN>"   # same host as FrontEndHost = served under /extendproxy; another host needs its own certificate');
+      c('No outbound internet: CAST\'s EKS page recommends TELEMETRY_PUSH_ENABLED: false for the CAST services (see the checklist).');
+      o.push('');
+    }
+    if(hasViewer(a)) o.push('Viewer:', '  enable: true');
+    if(a.mcp) o.push('McpServer:', '  enable: true   # reached at <FrontEndHost>/mcp; the chart deploys it only together with the Viewer');
+    if(a.dbHosting !== 'colocated'){
+      o.push('', 'CastStorageService:', '  enable: false', 'CustomPostgres:', '  enable: true', '  # host, port (2285 by default), admin login and PostgresDbPassword: see the values reference');
+    }
+    o.push('');
+    c('Not generated: analysis-node replica count, resource requests/limits and the other chart settings — see the sizing in Section 1 and the chart\'s values.yaml.');
+    return o.join('\n') + '\n';
+  }
+  document.getElementById('export-values').addEventListener('click', function(){
+    if(!lastState || !isKube(lastState)) return;
+    downloadText('values-starting-point-' + exportBaseName() + '.yaml', buildValuesYaml(lastState), 'text/yaml;charset=utf-8');
+    ioStatus('values.yaml starting point exported — review it against the chart before use.', false);
+  });
+
+  // Compare the current answers with a saved answers file (e.g. POC vs production).
+  document.getElementById('compare-json').addEventListener('click', function(){ document.getElementById('compare-json-file').click(); });
+  document.getElementById('compare-json-file').addEventListener('change', function(ev){
+    var input = ev.target, file = input.files && input.files[0], box = document.getElementById('compare-result');
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var data = JSON.parse(String(reader.result));
+        if(!data || data.format !== ANSWERS_FORMAT || !data.answers || typeof data.answers !== 'object') throw new Error('This file is not a saved answers file from this tool.');
+        var now = collectAnswers(), diffs = [];
+        function shown(k, v){ if(typeof v === 'boolean') return v ? 'yes' : 'no'; return (LABELS[k] && LABELS[k][v]) ? LABELS[k][v] : String(v); }
+        Object.keys(data.answers).sort().forEach(function(k){
+          if(!(k in now) || String(data.answers[k]) === String(now[k])) return;
+          diffs.push('<li><b>' + esc(k) + '</b>: ' + esc(shown(k, data.answers[k])) + ' (file) → ' + esc(shown(k, now[k])) + ' (now)</li>');
+        });
+        box.innerHTML = '<div class="callout info"><b>Comparison with ' + esc(file.name) + '</b> — ' + (diffs.length ? diffs.length + ' difference(s):<ul>' + diffs.join('') + '</ul>' : 'no difference in the answers.') +
+          ' <button type="button" class="btn secondary" id="compare-close">Close</button></div>';
+        document.getElementById('compare-close').addEventListener('click', function(){ box.innerHTML = ''; });
+      } catch(e){
+        ioStatus(e instanceof SyntaxError ? 'This file is not valid JSON.' : e.message, true);
+      }
+      input.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  // Chips jump to their question.
+  function goToQuestion(chip){
+    var key = chip.getAttribute('data-q');
+    var el = document.querySelector('#form-pane input[name="' + key + '"]:checked') || document.getElementById(key);
+    if(!el) return;
+    el.scrollIntoView({block: 'center'});
+    el.focus({preventScroll: true});
+  }
+  document.getElementById('profile-chips').addEventListener('click', function(e){ var c = e.target.closest('.chip[data-q]'); if(c) goToQuestion(c); });
+  document.getElementById('profile-chips').addEventListener('keydown', function(e){
+    if(e.key !== 'Enter' && e.key !== ' ') return;
+    var c = e.target.closest('.chip[data-q]'); if(c){ e.preventDefault(); goToQuestion(c); }
+  });
+
+  // The "points to confirm" list is collapsed on screen; open it for the printout.
+  window.addEventListener('beforeprint', function(){ var d = document.getElementById('confirm-box'); if(d) d.setAttribute('open', ''); });
+  window.addEventListener('afterprint', function(){ var d = document.getElementById('confirm-box'); if(d) d.removeAttribute('open'); });
+
   document.getElementById('save-json').addEventListener('click', saveAnswers);
   document.getElementById('import-json').addEventListener('click', function(){ document.getElementById('import-json-file').click(); });
   document.getElementById('import-json-file').addEventListener('change', function(ev){

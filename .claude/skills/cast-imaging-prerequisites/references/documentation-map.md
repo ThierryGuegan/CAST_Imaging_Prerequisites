@@ -191,6 +191,10 @@ Fixed: Gatekeeper no longer named in the Kubernetes sizing row; the 8 GB Postgre
 Not changed on purpose: the dedicated-database "Version" row names both Windows and Linux because the database machine's OS is independent of the application platform.
 Open (asked to the maintainer): headless scenarios — keep an optional browser/IdP path for Console and Control Panel?; MCP on VMs without a Viewer (block, or drop the Neo4j-backed servers from the text; Gatekeeper path/row gated on Dashboards?); CloudFront / Application Gateway with "No HTTPS" or self-signed (force, ignore or warn); merge the `rp-*` checklist items with `k8s-prep:*`; keep the MCP checkbox state while hidden; checklist ticks without localStorage.
 
+## Suggestions round (2026-11-24)
+Added: `tests/` (sweep with provider-leak check, feature checks) + `.github/workflows/test.yml` + `package.json`; **Points to confirm with CAST** (collected from the `.hint` notes that say inference / not stated / not confirmed); ports **CSV**; **values.yaml starting point** (only keys named in CAST's values reference — analysis-node replicas, resources and Dashboards keys are deliberately not generated); **comparison** with a saved answers file; clickable chips (`CHIP_TARGET`); in-page `CHANGELOG` (update it with `TOOL_VERSION`); analysis-node bands labelled "sized for 2" / "sized for 4". The leak check found and fixed two cross-provider citations (managed-database item, telemetry item).
+Not done on purpose: splitting the tool into modules with a build step (CLAUDE.md: one self-contained file, no build step); a separate facts table (large refactor); a private-registry diagram box and the unread pages (need the maintainer's content); merging questions 1 and 5 (UX decision).
+
 ## Using this map
 
 1. Find the row matching the section you're auditing.

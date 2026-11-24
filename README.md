@@ -24,6 +24,7 @@ integrations, how source code reaches the analysis-nodes, and the deployment con
   hosting model, plus Neo4j requirements when your scenario includes the Viewer.
 - Reverse proxy (a mandatory prerequisite — Kubernetes Gateway API is preselected on
   Kubernetes, with the legacy NGINX Ingress, Istio, CloudFront (EKS only) and Azure Application Gateway (AKS only) also offered; an OpenShift Route on OpenShift, chosen as the provider under Kubernetes) and HTTPS/TLS guidance matched to your certificate source.
+- Exports and helpers: a collapsible **Points to confirm with CAST** list (every statement the tool itself labels as inference or unconfirmed), the ports matrix as **CSV** for your network team, a commented **values.yaml starting point** on Kubernetes/OpenShift, a **comparison** of your answers with a saved file, clickable answer chips and a short in-page changelog.
 - Authentication prerequisites for the exact method you picked (Local / SAML / OpenID Connect / LDAP),
   all brokered through CAST's embedded SSO Service and Auth service.
 - CAST Extend access and licensing steps, adapted for direct/proxy/air-gapped egress.
