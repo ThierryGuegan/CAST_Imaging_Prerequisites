@@ -37,6 +37,15 @@ const L = require('./lib');
   ok(await page.evaluate(() => document.getElementById('mcp').closest('label').style.display !== 'none'), 'MCP option hidden on Windows with a Viewer');
   await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local' });
 
+  // CloudFront / Application Gateway with a certificate answer that doesn't fit: warn
+  await L.set(page, { platform: 'kubernetes', k8sProvider: 'eks', reverseProxy: 'cloudfront', certSource: 'none' });
+  ok(/does not describe this setup/.test(await L.resultsText(page)), 'no warning for CloudFront + No HTTPS');
+  await L.set(page, { k8sProvider: 'aks', reverseProxy: 'appgw', certSource: 'self-signed' });
+  ok(/POC only/.test(await L.resultsText(page)), 'no warning for Application Gateway + self-signed');
+  await L.set(page, { certSource: 'ca-issued' });
+  ok(!/does not describe this setup|POC only/.test(await L.resultsText(page)), 'warning shown with a CA-issued certificate');
+  await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
