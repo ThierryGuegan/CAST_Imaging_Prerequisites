@@ -32,7 +32,7 @@ const LEAKS = {
     // (options a provider doesn't offer are covered by the mismatch callout and are skipped here)
     const offered = proxies.filter(p => !(p === 'cloudfront' && pv !== 'eks') && !(p === 'appgw' && pv !== 'aks') && !(p === 'istio' && (pl !== 'kubernetes')) && !(p === 'ingress' && pl !== 'kubernetes') && !(p === 'gatewayapi' && pl !== 'kubernetes') && !(p === 'route' && pl !== 'openshift' && pv !== 'openshift') && !(p === 'iis' && pl !== 'windows'));
     const rp = offered[n % offered.length];
-    await L.set(page, { platform: pl, k8sProvider: pv, scenario: sc, topology: tp, dbHosting: db, egress: eg, auth: au, reverseProxy: rp, certSource: n % 3 ? 'ca-issued' : 'none' });
+    await L.set(page, { platform: pl, k8sProvider: pv, scenario: sc, topology: tp, dbHosting: db, egress: eg, auth: au, reverseProxy: rp, certSource: ['ca-issued', 'none', 'self-signed'][n % 3], mcp: !!(n & 1), highlight: !!(n & 2), email: !!(n & 4), repoHttps: !!(n & 8), repoSmb: !!(n & 16) });
     const t = await L.resultsText(page);
     const tag = [pl, pv, sc, tp, db, eg, au, rp].join('/');
     if (/undefined|NaN|\[object/.test(t)) fails.push('garbage text: ' + tag);
