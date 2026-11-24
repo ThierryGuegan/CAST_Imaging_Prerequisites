@@ -465,6 +465,16 @@
       </div>
     </fieldset>
 
+    <fieldset>
+      <legend>11 · Advanced options</legend>
+      <div class="q">
+        <label class="opt"><input type="checkbox" id="ctxUrl">
+          <span class="opt-text"><b>Serve CAST Imaging under a URL path</b><span>e.g. https://host/imaging instead of https://host/ — needs extra configuration on every platform</span></span></label>
+        <label class="opt"><input type="checkbox" id="dbTls">
+          <span class="opt-text"><b>Certificate-based (mutual TLS) PostgreSQL connections</b><span>CAST Imaging 3.4.1 or later, with a separate PostgreSQL — ignored with the bundled database</span></span></label>
+      </div>
+    </fieldset>
+
     <p class="hint">Your answers regenerate the document instantly — nothing is sent anywhere, everything runs in your browser.</p>
   </aside>
 
@@ -483,6 +493,7 @@
       <button class="btn btn-print" id="save-html" type="button">💾 Save as HTML</button>
       <button class="btn btn-print" id="export-html" type="button">⬇ Export checklist as HTML</button>
       <button class="btn secondary" id="share-link" type="button" title="Copy a link that reproduces your answers (they are stored in the link itself — nothing is sent anywhere)">🔗 Copy share link</button>
+      <label class="hint" style="align-self:center;margin:0;"><input type="checkbox" id="share-with-name"> include the client / project name</label>
       <button class="btn secondary" id="save-json" type="button" title="Download your answers (and checklist ticks) as a JSON file to reuse later">📥 Save answers (JSON)</button>
       <button class="btn secondary" id="import-json" type="button" title="Load answers saved earlier from a JSON file">📤 Import answers (JSON)</button>
       <button class="btn secondary" id="compare-json" type="button" title="Compare your current answers with a saved answers file (e.g. POC vs production)">🔍 Compare with a saved file</button>
@@ -523,6 +534,7 @@
   var TOOL_VERSION = '2026-11-24';
   var CHANGELOG = [
     ['2026-11-24', 'Entry options for Kubernetes: Istio, Amazon CloudFront (EKS) and Azure Application Gateway (AKS, from CAST\'s chart PDF)'],
+    ['2026-11-24', 'Authentication re-read from CAST\'s pages (LDAP 5,000-user limit, SAML and LDAP mappers, Keycloak accounts, redirect URIs); Advanced options question (URL path, certificate-based database connections); share link without the project name by default'],
     ['2026-11-24', 'Docker/Podman: install plan per scenario, configuration.conf variables, prechecks, Dashboards-only read-only mode, NFS notes; share link and installer-variables worksheet'],
     ['2026-11-24', 'Firewall: CAST\'s sample scripts and the Docker/Podman NAT caveat; startup-checker path; encrypted database connections noted'],
     ['2026-11-24', 'Windows: CAST Imaging Core on every analysis machine, installer prechecks and variables, multi-machine install plan, read-only scenarios; PostgreSQL role, encoding and configuration item'],
@@ -629,6 +641,8 @@
   function hasViewer(a){ return a.scenario === 'full' || a.scenario === 'viewer-readonly'; }
   function hasDashboards(a){ return a.scenario !== 'analysis-only'; }
   function hasNeo4j(a){ return hasViewer(a); }
+  // The bundled / in-cluster PostgreSQL cannot be configured for certificate authentication; only a separate instance can.
+  function dbTlsActive(a){ return !!a.dbTls && !(a.dbHosting === 'colocated' && a.platform !== 'windows'); }
   // Federated sign-in needs HTTPS on CAST Imaging: CAST's OIDC page lists it as a prerequisite; for SAML it is
   // this tool's inference (browser/IdP redirect flow).
   // Provider-specific storage/exposure facts from CAST's EKS / GKE / AKS install pages (read 2026-11-22) and the
@@ -728,7 +742,9 @@
       highlight: document.getElementById('highlight').checked,
       email: document.getElementById('email').checked,
       repoHttps: document.getElementById('repoHttps').checked,
-      repoSmb: document.getElementById('repoSmb').checked
+      repoSmb: document.getElementById('repoSmb').checked,
+      ctxUrl: document.getElementById('ctxUrl').checked,
+      dbTls: document.getElementById('dbTls').checked
     };
   }
 
@@ -1300,7 +1316,7 @@
     var CHIP_TARGET = {'scale':'scale', 'users':'users', 'platform':'platform', 'scenario':'scenario', 'topology':'topology', 'Kubernetes':'k8sProvider',
       'analysis nodes':'analysisNodes', 'Neo4j':'neo4jDedicated', 'database':'dbHosting', 'egress':'egress', 'reverse proxy':'reverseProxy',
       'HTTPS / TLS certificate':'certSource', 'user authentication':'auth', 'MCP/AI':'mcp', 'Highlight':'highlight', 'Email notifications':'email',
-      'source code access':'repoHttps', 'client / project':'clientProject'};
+      'source code access':'repoHttps', 'URL path':'ctxUrl', 'database TLS':'dbTls', 'client / project':'clientProject'};
     function chipAttr(label){ return CHIP_TARGET[label] ? ' data-q="'+CHIP_TARGET[label]+'" role="button" tabindex="0" title="Go to this question"' : ''; }
     function chip(label, value){ return '<span class="chip"'+chipAttr(label)+'>'+esc(label)+': <b>'+esc(value)+'</b></span>'; }
     var chips = (a.clientProject ? chip('client / project', a.clientProject) : '') + chip('scale', LABELS.scale[a.scale]) + chip('users', LABELS.users[a.users]) +
@@ -1313,6 +1329,8 @@
       chip('reverse proxy', LABELS.reverseProxy[a.reverseProxy]) + chip('HTTPS / TLS certificate', LABELS.certSource[a.certSource]) +
       chip('user authentication', LABELS.auth[a.auth]);
     if(a.mcp) chips += '<span class="chip"'+chipAttr('MCP/AI')+'>MCP/AI: <b>enabled ('+esc(LABELS.llmProvider[a.llmProvider])+')</b></span>';
+    if(a.ctxUrl) chips += '<span class="chip"'+chipAttr('URL path')+'>URL path: <b>custom</b></span>';
+    if(dbTlsActive(a)) chips += '<span class="chip"'+chipAttr('database TLS')+'>database TLS: <b>certificates</b></span>';
     if(a.highlight) chips += '<span class="chip"'+chipAttr('Highlight')+'>Highlight: <b>enabled</b></span>';
     if(a.email) chips += '<span class="chip"'+chipAttr('Email notifications')+'>Email notifications: <b>enabled</b></span>';
     if(hasAnalysis(a) && (a.repoHttps || a.repoSmb)){
@@ -1740,13 +1758,14 @@
       authHtml += '<ul><li>No external identity provider required.</li><li>Plan manual account lifecycle management and a break-glass local admin account — recommended even alongside SSO.</li></ul>';
     } else if(a.auth === 'saml'){
       authHtml += '<ul>' +
-        '<li>Gather IdP metadata (or manually: Entity ID, SSO URL, signing certificate) from your identity team.</li>' +
-        '<li>Register CAST Imaging as a Service Provider at the IdP.</li>' +
-        '<li>Agree attribute/claim mapping (email, name, groups → CAST Imaging roles) before go-live.</li>' +
-        '<li>Network: HTTPS (443) reachable between browser ⇄ IdP and CAST Imaging ⇄ IdP (see Section 3).</li>' +
-        '<li><b>HTTPS on CAST Imaging itself is mandatory with SAML</b> (Section 4) — the browser/IdP redirect flow requires an HTTPS callback URL; plain HTTP is not a valid choice here.' + (a.certSource==='none' ? ' <b>Your current HTTPS answer ("No HTTPS", question 6) conflicts with this — change it before proceeding.</b>' : '') + '</li>' +
-        '<li>Keep a local break-glass administrator account in case of IdP outage.</li>' +
-        '</ul>';
+        '<li><b>HTTPS must already be set up</b> on CAST Imaging (CAST\'s SAML page; Section 4) — plain HTTP is not a valid choice with SAML.' + (a.certSource==='none' ? ' <b>Your current HTTPS answer ("No HTTPS", question 6) conflicts with this — change it before proceeding.</b>' : '') + '</li>' +
+        '<li>Export CAST Imaging\'s own SAML metadata from Keycloak (<code>aip-realm</code> → Realm settings → General → <i>SAML 2.0 Identity Provider Metadata</i>, saved as <code>metadata.xml</code>) and send it to your identity team, who register CAST Imaging as a Service Provider and return an <b>IdP metadata URL</b>.</li>' +
+        '<li>Declare the IdP in Keycloak (<code>aip-realm</code> → Identity providers → <i>SAML v2.0</i>): the metadata URL goes in <i>SAML entity descriptor</i> and the settings fill in by themselves.</li>' +
+        '<li>Attribute mappers <code>firstName</code>, <code>lastName</code> and <code>email</code> (type <i>Attribute Importer</i>; <i>Attribute Name</i> = the ClaimType URI found in the IdP metadata; name format <code>ATTRIBUTE_FORMAT_BASIC</code>).</li>' +
+        '<li>Groups (optional): the IdP must send them in the assertion and <b>group import is not supported</b> — create each group in Keycloak and add an <i>Advanced Attribute to Group</i> mapper per group (key = the group attribute name, value = a regex, <i>Regex Attribute Values</i> on, sync mode <i>Force</i>); the attribute name is read by decoding the <code>SAMLResponse</code> in the browser\'s DevTools.</li>' +
+        '<li>Grant the <code>ADMIN</code> profile to at least one SAML user with the local <code>admin</code> account and test the login; CAST then recommends disabling the existing authentication methods (switch SAML off temporarily to see the local users). Keep a documented break-glass procedure for an IdP outage <span class="hint">(this tool\'s recommendation)</span>. If SAML is not offered at login, set the realm\'s <i>Login theme</i> to <code>keycloak</code>.</li>' +
+        '<li>Network: browser ⇄ IdP over HTTPS (443) and CAST Imaging fetching the IdP metadata (see Section 3) <span class="hint">(reasonable inference from the SAML flow — CAST\'s page names no port)</span>.</li>' +
+        '</ul><p class="hint">Source: CAST\'s <i>Authentication – SAML</i> page (<a href="https://doc.castsoftware.com/imaging/install/authentication/saml/" target="_blank" rel="noopener">install/authentication/saml</a>).</p>';
     } else if(a.auth === 'oidc'){
       authHtml += '<p>CAST Imaging authenticates users through an <b>OpenID Connect</b>-compliant identity provider (Microsoft Entra ID, Okta, Auth0…). The setup is done in parallel on two sides: at your identity provider, where CAST Imaging is registered as a client application, and in the <b>Keycloak</b> authentication system provided with CAST Imaging (realm <code>aip-realm</code>), where the provider is declared and its claims are mapped onto CAST Imaging groups. The Keycloak side is identical whichever provider you use. Source: CAST\'s <i>Authentication – OpenID Connect</i> page (<a href="https://doc.castsoftware.com/imaging/install/authentication/" target="_blank" rel="noopener">install/authentication</a>).</p>' +
         '<h4>Prerequisites</h4><ul>' +
@@ -1766,11 +1785,14 @@
         '</ol><p><b>Troubleshooting (per CAST):</b> if the provider isn\'t offered at login, set the realm\'s <i>Login theme</i> to <code>keycloak</code>; decode the ID token (browser DevTools → Network → Preserve log) to check the claims; invalid/expired-token errors are often clock drift; the user is authenticated but in no group when the mapper\'s claim name or value (case included) doesn\'t match the token.</p>';
     } else {
       authHtml += '<ul>' +
-        '<li>LDAP(S) server hostname/port, and a bind (service) account with read access.</li>' +
-        '<li>Base DN(s) for user and group search.</li>' +
-        '<li>Group-to-role mapping agreed with the directory team.</li>' +
-        '<li>If using LDAPS (port 636), the directory\'s CA certificate must be trusted by CAST Imaging\'s SSO Service (on the '+(isK8s ? 'SSO Service pod — CAST\'s chart documents no trust-store setting for it (<code>UseCustomTrustStore</code> was removed in 3.6.7), so confirm with CAST how to add the CA' : 'machine running imaging-services')+').</li>' +
-        '</ul>';
+        '<li>A directory reachable by <b>Keycloak</b> (user federation in <code>aip-realm</code>; CAST\'s page gives the connection URL as <code>ldap://&lt;host&gt;</code> and names no port, LDAPS or certificate) and a dedicated <b>bind (service) account</b> — bind type <i>simple</i>, Bind DN and credentials — checked with <i>Test connection</i> and <i>Test authentication</i>.</li>' +
+        '<li>Users DN (the OU that holds the users); on Active Directory: vendor <i>Active Directory</i>, username attribute <code>sAMAccountName</code>, UUID attribute <code>objectGUID</code>; edit mode <b>UNSYNCED</b> when importing users (<i>Import users</i> on — users are imported at their first login — and <i>Periodic Full Sync</i> on), <i>Sync Registrations</i> off.</li>' +
+        '<li><b>Size limit:</b> CAST tested up to <b>5,000</b> LDAP users synchronised into Keycloak; above that the synchronisation may become unreliable.</li>' +
+        '<li>Group mapping (<code>group-ldap-mapper</code>): LDAP Groups DN, group name attribute <code>cn</code>, membership attribute <code>member</code> (or <code>memberUid</code>), mode <b>IMPORT</b> recommended, and on Active Directory the retrieve strategy <code>LOAD_GROUPS_BY_MEMBER_ATTRIBUTE_RECURSIVELY</code> (recommended by CAST). Users who logged in before the mapper existed must be deleted so their groups are read again.</li>' +
+        '<li>Passwords are verified against the directory at every login; a user deleted from it can no longer log in.</li>' +
+        '<li>Grant the <code>ADMIN</code> profile to at least one LDAP user or group with the local <code>admin</code> account, then disable or delete the local users and groups (switch LDAP off temporarily to see them).</li>' +
+        '<li>If using LDAPS (636), the directory\'s CA certificate must be trusted by CAST Imaging\'s SSO Service (on the '+(isK8s ? 'SSO Service pod — CAST\'s chart documents no trust-store setting for it (<code>UseCustomTrustStore</code> was removed in 3.6.7), so confirm with CAST how to add the CA' : 'machine running imaging-services')+') <span class="hint">(general requirement — CAST\'s LDAP page does not mention LDAPS)</span>.</li>' +
+        '</ul><p class="hint">Source: CAST\'s <i>Authentication – LDAP</i> page (<a href="https://doc.castsoftware.com/imaging/install/authentication/ldap/" target="_blank" rel="noopener">install/authentication/ldap</a>).</p>';
     }
 
     var extendHtml = '<h3>6. CAST Extend access &amp; licensing</h3><ul>' +
@@ -1935,7 +1957,7 @@
     else fleetItems.forEach(function(it){ coreNode.push(it); });
     coreNode.push(item('extend-api-key', 'CAST Extend API key generated and stored securely'));
     coreNode.push(item('license-key', 'CAST Imaging license key obtained, covering the selected modules'));
-    if(a.auth === 'saml') coreNode.push(item('saml-sp', 'SAML metadata exchanged and CAST Imaging registered as a Service Provider at the IdP'));
+    if(a.auth === 'saml') coreNode.push(item('saml-sp:v2', 'CAST Imaging\'s SAML metadata (<code>metadata.xml</code> from Keycloak) sent to the identity team and the <b>IdP metadata URL</b> received; the IdP declared in Keycloak with the <code>firstName</code> / <code>lastName</code> / <code>email</code> Attribute Importer mappers and, if used, one group mapper per group'));
     if(a.auth === 'oidc'){
       coreNode.push(item('oidc-register', 'OIDC client registered at the identity provider as a confidential/web application, with the redirect URI <code>https://&lt;imaging-fqdn&gt;/auth/realms/aip-realm/broker/&lt;idp-alias&gt;/endpoint</code>; Client ID, Client secret and discovery endpoint (or the four endpoint URLs) obtained'));
       coreNode.push(item('oidc-claims', 'Identity provider emits <code>email</code>, <code>given_name</code>, <code>family_name</code> and — for group-based permissions — a role/group claim whose exact name and values are confirmed'));
@@ -1945,8 +1967,16 @@
       coreNode.push(item('oidc-admin', '<code>ADMIN</code> profile granted to at least one OIDC user (via local authentication and User Permissions) and the OIDC login tested in a private browsing window'));
       coreNode.push(item('oidc-disable-local', 'Existing authentication methods (Local Authentication users/groups) disabled or deleted once OIDC works — CAST highly recommends it'));
     }
-    if(a.auth === 'ldap') coreNode.push(item('ldap-bind', 'LDAP bind account, base DN(s), and group mapping confirmed'));
+    if(a.auth === 'ldap') coreNode.push(item('ldap-bind:v2', 'LDAP bind account, Users DN, group mapping (Groups DN, membership attribute) and the <b>5,000-user</b> synchronisation limit confirmed with the directory team'));
     if(a.auth === 'ldap') coreNode.push(item('ldaps-ca', 'If using LDAPS (636): directory CA certificate trusted by CAST Imaging\'s SSO Service'));
+    if(a.ctxUrl){
+      if(a.platform === 'docker' || a.platform === 'podman') coreNode.push(item('ctx-url:vm', 'URL path decided (<code>https://&lt;fqdn&gt;/&lt;path&gt;</code>) and CAST\'s context-URL procedure planned: NGINX <code>location /&lt;path&gt;</code> with <code>proxy_pass …:8090/</code>; <code>docker-compose.override.yml</code> in <code>imaging-services</code> (SSO <code>KC_HOSTNAME_*</code>, Gateway and Auth <code>APP_CONTEXT</code>, Control Panel <code>PUBLIC_URL</code>); <code>APP_CONTEXT</code> and <code>PUBLIC_URL</code> (protocol mandatory) in <code>imaging-services/.env</code> and <code>APP_CONTEXT</code> in <code>imaging-viewer/.env</code>; two database updates (<code>control_panel.properties</code> <code>keycloak.uri</code> and the Keycloak <code>frontendUrl</code> of <code>aip-realm</code> and <code>master</code>); <code>docker compose down</code> then <code>up -d</code> (not <code>docker restart</code>) <span class="hint">(per CAST\'s Docker reverse-proxy page; its HTTPS page uses different forwarded-header settings)</span>'));
+      else if(a.platform === 'windows') coreNode.push(item('ctx-url:win', 'URL path decided and CAST\'s Windows context-URL procedure (3.5.x or later, NGINX only) planned: <code>PUBLIC_URL</code> as a system variable on the imaging-services machine; <code>keycloak.conf</code>, the Gateway, Auth Service and Control Panel <code>application-default.yml</code> (<code>app-context</code>, <code>public-url</code>) and the Viewer <code>index.html</code> (<code>window.defaultBasePath</code>) edited; two database updates (<code>keycloak.uri</code>, Keycloak <code>frontendUrl</code>); services restarted in order SSO → Control Panel → Gateway → Authentication → Console <span class="hint">(per CAST\'s Windows reverse-proxy page; its examples use <code>http</code> for the database updates and <code>https</code> for <code>PUBLIC_URL</code> — check the scheme)</span>'));
+      else coreNode.push(item('ctx-url:k8s', 'URL path decided: <code>ContextUrl.enable: true</code> and <code>ContextUrl.appcontext</code> (e.g. <code>/cast</code>) in <code>values.yaml</code> — it requires <code>CreateIngress</code>, <code>UseIstioGateway</code> or <code>UseGatewayAPI</code>; services restarted after the upgrade <span class="hint">(per CAST\'s values reference'+(isOcp(a) ? '; not checked for the OpenShift chart' : '')+')</span>'));
+    }
+    if(dbTlsActive(a)) coreNode.push(item('db-tls', 'Certificate-based PostgreSQL connections prepared (CAST Imaging 3.4.1 or later, separate PostgreSQL): server key and certificate plus <code>root.crt</code> beside <code>postgresql.conf</code> with <code>ssl = on</code> and <code>hostssl … clientcert=1</code> lines in <code>pg_hba.conf</code>; for <code>verify-ca</code> / <code>verify-full</code> a client key and certificate (also as <code>client.pk8</code>, <code>client.pem.pk8</code>, <code>client.pfx</code>) on every machine running analysis-node, imaging-services, imaging-viewer or dashboards, an <code>.ini</code> file named by the <code>CASTCONNECTIONEXTRAPARAMETERS</code> '+(a.platform === 'windows' ? 'system' : 'environment')+' variable'+(a.platform === 'windows' ? ' and the key file permissions restricted with <code>icacls</code> (3.6.8 or later)' : '')+'; <code>require</code> needs 3.4.3 on Linux or 3.4.4 on Windows <span class="hint">(per CAST\'s encrypted-database pages)</span>'));
+    coreNode.push(item('kc-accounts', 'Keycloak accounts planned — the UI administrator <code>kcadmin</code> (3.6.0 or later; its name is set at a fresh install with <code>'+(isK8s ? 'KCADMIN_USERNAME' : 'KEYCLOAK_LOGIN_ADMIN_USER')+'</code>) has the temporary password <code>admin</code>, to be changed at first login; the internal service account <code>admin</code> must <b>not</b> be changed in the Keycloak UI alone (login then fails with a Whitelabel error) — its initial password is random from 3.6.6 on '+(a.platform === 'windows' ? 'Docker/Podman and Kubernetes but <code>admin</code> on Windows' : 'this platform (read it in the installation <code>.env</code>)')+'; the CAST local user <code>admin</code> / <code>admin</code> must change its password at first login (3.6.5 or later); avoid passwords that are fully quoted, contain a space followed by <code>#</code>, or contain a backslash or slash <span class="hint">(per CAST\'s accounts and passwords page)</span>'));
+    coreNode.push(item('kc-redirect-uris', 'Keycloak client redirect URIs restricted once access works — by default they accept <b>any</b> URI (<code>*</code>, an open-redirect risk): <i>Valid redirect URIs</i> <code>&lt;base&gt;/login/oauth2/code/&lt;client-id&gt;</code> (client <code>aip-console-client</code> behind a reverse proxy, <code>&lt;hostname&gt;-client-aip-realm</code> for direct access), <i>Valid post logout redirect URIs</i> <code>&lt;base&gt;</code>, <i>Web origins</i> <code>+</code>; MCP clients need nothing <span class="hint">(per CAST\'s redirect-URIs page)</span>'));
     if(a.mcp) coreNode.push(item('mcp'+(isK8s ? ':k8s' : ''), (isK8s ? 'MCP Server 3.1 deployed (CAST\'s Helm chart ships no Gatekeeper MCP)' : 'MCP Server 3.1 + Gatekeeper MCP deployed')+', and the client authentication method chosen: API key, or OAuth with one Keycloak client profile and policy per AI client (profile linked to the policy)'));
     if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (rpa.casthighlight.com, cloud.casthighlight.com and auth.casthighlight.com)'));
     if(a.email) coreNode.push(item('smtp', 'SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)'));
@@ -2409,7 +2439,9 @@
   function toBase64Url(text){ return btoa(unescape(encodeURIComponent(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
   function fromBase64Url(b64){ b64 = b64.replace(/-/g, '+').replace(/_/g, '/'); while(b64.length % 4) b64 += '='; return decodeURIComponent(escape(atob(b64))); }
   function buildShareUrl(){
-    var payload = {format: ANSWERS_FORMAT, schema: ANSWERS_SCHEMA, answers: collectAnswers(), reverseProxyChosenByUser: reverseProxyTouched};
+    var answers = collectAnswers();
+    if(!document.getElementById('share-with-name').checked) delete answers.clientProject;   // the name stays out of the link unless asked
+    var payload = {format: ANSWERS_FORMAT, schema: ANSWERS_SCHEMA, answers: answers, reverseProxyChosenByUser: reverseProxyTouched};
     return location.href.split('#')[0] + '#a=' + toBase64Url(JSON.stringify(payload));
   }
   document.getElementById('share-link').addEventListener('click', function(){
