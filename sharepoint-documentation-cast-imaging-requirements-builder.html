@@ -44,6 +44,8 @@
     <tr><td style="border:1px solid #c8c6c4;"><b>Optional integrations</b></td><td style="border:1px solid #c8c6c4;">MCP / AI and CAST Highlight.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Source code access</b></td><td style="border:1px solid #c8c6c4;">How source code reaches the analysis-nodes.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>Deployment context</b></td><td style="border:1px solid #c8c6c4;">Standard deployment or audit engagement.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Advanced options</b></td><td style="border:1px solid #c8c6c4;">Serving CAST Imaging under a URL path, and certificate-based (mutual TLS) PostgreSQL connections.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Client / project name</b></td><td style="border:1px solid #c8c6c4;">Optional; shown in the page title, the profile, the printed copy and the saved files.</td></tr>
   </tbody>
 </table>
 
@@ -64,7 +66,8 @@
     <tr><td style="border:1px solid #c8c6c4;"><b>Authentication</b></td><td style="border:1px solid #c8c6c4;">Prerequisites for the exact method you picked (Local / SAML / OpenID Connect / LDAP), all brokered through CAST's embedded SSO Service and Auth service.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>CAST Extend access &amp; licensing</b></td><td style="border:1px solid #c8c6c4;">Steps adapted for direct, proxy or air-gapped egress.</td></tr>
     <tr><td style="border:1px solid #c8c6c4;"><b>MCP Server (AI)</b></td><td style="border:1px solid #c8c6c4;">Prerequisites, shown only if you enable that integration.</td></tr>
-    <tr><td style="border:1px solid #c8c6c4;"><b>Pre-installation checklist</b></td><td style="border:1px solid #c8c6c4;">Built from your actual answers and grouped by the machine or role responsible for each item. Ticks are remembered in your browser.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Overview and reading aids</b></td><td style="border:1px solid #c8c6c4;">An "At a glance" summary, a short "How to read this document", a list of <b>points to confirm with CAST</b> (statements the tool infers or takes from a summary of a CAST page) and a box naming <b>where CAST's own pages disagree</b> for your answers. Every section can be folded.</td></tr>
+    <tr><td style="border:1px solid #c8c6c4;"><b>Pre-installation checklist</b></td><td style="border:1px solid #c8c6c4;">Built from your actual answers and readable by machine or role, or by phase (decide, prepare, install day, after the installation). Ticks are remembered in your browser.</td></tr>
   </tbody>
 </table>
 
@@ -74,6 +77,9 @@
   <li><b>Save as HTML</b> — downloads the whole generated document as a standalone page.</li>
   <li><b>Save answers (JSON)</b> / <b>Import answers (JSON)</b> — keep your questionnaire answers and ticks in a file and reload them later (the optional Client / project name is part of it).</li>
   <li><b>Export checklist as HTML</b> — downloads just the checklist, with your profile and your current ticks, as a standalone page you can hand to the teams that own each server.</li>
+  <li><b>Export ports (CSV)</b> — the network ports / FQDN matrix for your network team.</li>
+  <li><b>Export values.yaml</b> (Kubernetes / OpenShift) and <b>Export installer variables</b> (Windows, Docker, Podman) — commented starting points built from your answers, to be checked against CAST's pages.</li>
+  <li><b>Copy share link</b> — a link that reproduces your answers (they are stored in the link itself; the client name is left out unless you tick the box). <b>Compare with a saved file</b> lists the differences with an earlier answers file.</li>
   <li><b>Privacy</b> — everything runs client-side in the browser; no data leaves the page.</li>
 </ul>
 
@@ -81,7 +87,7 @@
   <tr>
     <td style="border-left:5px solid #ffaa44;background:#fff4ce;padding:12px 16px;">
       <p style="margin:0 0 6px;"><b>Validation notice</b></p>
-      <p style="margin:0;">Recommendations are derived from CAST Imaging's published documentation structure and standard CAST Software deployment practices. Wherever a specific fact couldn't be verified, the tool says so directly in its own text (e.g. "not independently verified here") rather than presenting a guess as confirmed. Always confirm exact minimum versions, default ports, and sizing against the current <a href="https://doc.castsoftware.com/imaging/install/">doc.castsoftware.com/imaging/install</a> for the CAST Imaging release you are deploying.</p>
+      <p style="margin:0;">Recommendations are derived from CAST Imaging's published documentation structure and standard CAST Software deployment practices. Wherever a specific fact couldn't be verified, the tool says so directly in its own text (e.g. "not independently confirmed against CAST's docs") rather than presenting a guess as confirmed. Always confirm exact minimum versions, default ports, and sizing against the current <a href="https://doc.castsoftware.com/imaging/install/">doc.castsoftware.com/imaging/install</a> for the CAST Imaging release you are deploying.</p>
     </td>
   </tr>
 </table>

@@ -10,8 +10,10 @@ answer the questions on the left — platform &
 topology, deployment scenario (which components you need: analysis, Viewer, Dashboards —
 five scenarios, from *Full* to *Analysis only, headless*), project scale, database,
 network egress, reverse proxy, HTTPS, authentication, optional MCP/AI and CAST Highlight
-integrations, how source code reaches the analysis-nodes, and the deployment context
-(standard or audit engagement) — and the document on the right regenerates live:
+integrations, how source code reaches the analysis-nodes, the deployment context
+(standard or audit engagement) and a few advanced options (a custom URL path, certificate-based PostgreSQL
+connections) — and the document on the right regenerates live, starting with an **At a glance** summary, a short
+"How to read this document" and a box naming **where CAST's own pages disagree** for your answers; every section can be folded:
 
 - Hardware sizing for exactly the profile you selected (not every possible combination),
   composed from your answers rather than a fixed table per scenario — including the
@@ -47,7 +49,7 @@ client-side in the browser — no data leaves the page.
 > **Validation notice.** Recommendations are derived from CAST Imaging's published
 > documentation structure and standard CAST Software deployment practices. Wherever a
 > specific fact couldn't be verified, the tool says so directly in its own text (e.g.
-> "not independently verified here") rather than presenting a guess as confirmed. Always
+> "not independently confirmed against CAST's docs") rather than presenting a guess as confirmed. Always
 > confirm exact minimum versions, default ports, and sizing against the current
 > [doc.castsoftware.com/imaging/install](https://doc.castsoftware.com/imaging/install/)
 > for the CAST Imaging release you are deploying.
@@ -82,14 +84,18 @@ Concretely, the skill:
   predicate pattern, the sizing/ports data shapes, the confidence-labeling convention) —
   without exempting a fresh build from the same fact-checking and testing discipline
   applied to a one-line fix.
-- **Tests every change** with Playwright across the input matrix before shipping (JS
-  errors, garbage text, duplicate checklist ids, diagram screenshots in both themes, print
-  and export), and reconciles with `origin/main` before opening a PR, since PRs on this
-  repo tend to merge fast.
-- **Remembers decisions.** Facts the user supplied, choices they made (e.g. the scenario
-  list stays as is) and questions that are still open (e.g. the analysis-node port on
-  Windows) are recorded in `references/documentation-map.md` so the next audit doesn't
-  re-ask or silently "fix" them.
+- **Tests every change** with the suite in [`tests/`](tests/) before shipping — inline-script syntax and ESLint,
+  the input-matrix sweep (JS errors, garbage text, duplicate checklist ids, text leaking across cloud providers),
+  fact fixtures taken from CAST's own tables, feature checks of the exports, cross-checks between diagram, text and
+  references, snapshots of eight realistic profiles (`tests/snapshots/`, refreshed with `node tests/profiles.js --update`
+  after reviewing the diff), an axe-core accessibility scan and a diagram geometry check — run by the GitHub Action on every
+  PR; and reconciles with `origin/main` before opening a PR, since PRs on this repo tend to merge fast.
+- **Remembers decisions and sources.** Choices the maintainer made and the questions still open (e.g. the Gateway port
+  on Windows with HTTPS, SMB versus NFS for the Linux shared folder) are in
+  [`references/decisions.md`](.claude/skills/cast-imaging-prerequisites/references/decisions.md); every CAST page read, whether it
+  was read verbatim, and its "Updated" date are in `references/sources.md`; the facts and findings of each reading pass are in
+  `references/documentation-map.md` — so the next audit doesn't re-ask or silently "fix" them. A scheduled task re-reads those
+  pages monthly and reports which ones changed; a monthly workflow checks the documentation links.
 
 See the skill's `SKILL.md` for the full workflow.
 
