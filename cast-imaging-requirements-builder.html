@@ -125,6 +125,9 @@
     box-shadow:0 3px 14px rgba(62,166,255,.45);letter-spacing:.01em;}
   .btn-print:hover{box-shadow:0 4px 18px rgba(62,166,255,.6);transform:translateY(-1px);}
 
+  details.section-box > summary{cursor:pointer;list-style:revert;}
+  details.section-box > summary > h3{display:inline;}
+  @media print{ details.section-box > summary::marker{content:'';} }
   .chip[data-q]{cursor:pointer;}
   .chip[data-q]:hover, .chip[data-q]:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
   details.confirm-box summary{cursor:pointer;}
@@ -498,6 +501,8 @@
       <button class="btn secondary" id="import-json" type="button" title="Load answers saved earlier from a JSON file">📤 Import answers (JSON)</button>
       <button class="btn secondary" id="compare-json" type="button" title="Compare your current answers with a saved answers file (e.g. POC vs production)">🔍 Compare with a saved file</button>
       <input type="file" id="compare-json-file" accept="application/json,.json" hidden>
+      <button class="btn secondary" id="collapse-all" type="button" title="Fold every section of the document">▾ Collapse sections</button>
+      <button class="btn secondary" id="expand-all" type="button">▸ Expand sections</button>
       <button class="btn secondary" id="export-ports-csv" type="button" title="Download the network ports / FQDN matrix as CSV for your network team">📋 Export ports (CSV)</button>
       <button class="btn secondary" id="export-values" type="button" title="Download a commented values.yaml starting point from your answers (Kubernetes / OpenShift)" hidden>📄 Export values.yaml (starting point)</button>
       <button class="btn secondary" id="export-conf" type="button" title="Download the installer variables (names and defaults from CAST's pages) filled from your answers (Windows / Docker / Podman)" hidden>📄 Export installer variables</button>
@@ -534,6 +539,7 @@
   var TOOL_VERSION = '2026-11-24';
   var CHANGELOG = [
     ['2026-11-24', 'Entry options for Kubernetes: Istio, Amazon CloudFront (EKS) and Azure Application Gateway (AKS, from CAST\'s chart PDF)'],
+    ['2026-11-24', 'Collapsible sections; export file names carry the platform and scenario; Highlight, SMTP, proxy and source-folder items from CAST\'s administration pages'],
     ['2026-11-24', 'At a glance summary; list of conflicts between CAST pages; MCP installation settings; values an update cannot change; license and DB_DATABASE notes from the 3.6 release notes'],
     ['2026-11-24', 'Checklist can be read by phase (decide, prepare, install, after); the checklist export keeps its ticks by item id'],
     ['2026-11-24', 'MCP licensing and Podman / air-gapped notes, Extend Local requirements, dedicated Neo4j machine; "mandatory rows only" filter on the ports table; keyboard access to scrollable tables'],
@@ -715,6 +721,7 @@
     var el = document.getElementById('clientProject');
     return el ? el.value.replace(/\s+/g, ' ').trim() : '';
   }
+  function profileSlug(){ var a = state(); return slugify([a.platform, a.platform === 'kubernetes' ? a.k8sProvider : '', a.scenario].filter(Boolean).join('-')); }
   function slugify(t){ return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50); }
 
   // The MCP servers need the Viewer's Neo4j (and CAST's Helm chart deploys the MCP server only with Viewer.enable: true), so the option is hidden and ignored on every platform when the scenario has no Viewer (maintainer decision 2026-11-24).
@@ -1990,8 +1997,10 @@
     coreNode.push(item('kc-redirect-uris', 'Keycloak client redirect URIs restricted once access works — by default they accept <b>any</b> URI (<code>*</code>, an open-redirect risk): <i>Valid redirect URIs</i> <code>&lt;base&gt;/login/oauth2/code/&lt;client-id&gt;</code> (client <code>aip-console-client</code> behind a reverse proxy, <code>&lt;hostname&gt;-client-aip-realm</code> for direct access), <i>Valid post logout redirect URIs</i> <code>&lt;base&gt;</code>, <i>Web origins</i> <code>+</code>; MCP clients need nothing <span class="hint">(per CAST\'s redirect-URIs page)</span>'));
     if(a.mcp && !isK8s) coreNode.push(item('mcp-install:'+a.platform, 'MCP Server 3.1 installation prepared (CAST Imaging 3.6.9 or later; package <code>'+(a.platform === 'windows' ? 'com.castsoftware.imaging.mcpserver' : 'com.castsoftware.imaging.mcpserver.docker')+'</code>): <b>three settings required before installing</b> — <code>'+(a.platform === 'windows' ? 'HOSTNAME_CONTROL_PANEL' : 'HOST_CONTROL_PANEL')+'</code> (the imaging-services machine, never <code>localhost</code>), <code>SERVICE_HOST</code> (this MCP machine as clients and CAST Imaging see it, never <code>localhost</code>) and <code>NEO4J_URL</code> (<code>bolt://&lt;neo4j-host&gt;:7687</code>, <code>7697</code> on Windows); '+(a.platform === 'windows' ? 'edited in <code>configuration.conf</code> then <code>mcp-server-installer.bat --install configuration.conf</code> from an administrator prompt (after the install, settings live in the deployed <code>app.config</code> — changing <code>configuration.conf</code> has no effect); the service <code>cast-imaging-mcp-server</code> does not always restart after a reboot, so schedule <code>mcpserver_syncronization.bat</code> as a startup task' : 'edited in <code>.env</code> (<code>KEY=VALUE</code>, no quotes, no inline comments) then <code>./run.sh --install</code> and <code>./run.sh --status</code>')+'; checked with <code>curl -H \"x-api-key: …\" http://&lt;imaging-public-URL&gt;:8090/rest/ready</code> (expects <code>true</code>) and <code>/mcp/status</code>; add <code>CONTROL_PANEL_SSL_ENABLED=true</code> when the Control Panel is served over HTTPS (not in the file by default) <span class=\"hint\">(per CAST\'s MCP 3.1 Docker and Windows pages; the Neo4j port example differs between them)</span>'));
     if(a.mcp) coreNode.push(item('mcp'+(isK8s ? ':k8s' : ''), (isK8s ? 'MCP Server 3.1 deployed (CAST\'s Helm chart ships no Gatekeeper MCP)' : 'MCP Server 3.1 + Gatekeeper MCP deployed')+', and the client authentication method chosen: API key, or OAuth with one Keycloak client profile and policy per AI client (profile linked to the policy)'));
-    if(a.highlight) coreNode.push(item('highlight', 'CAST Highlight FQDNs allowlisted (rpa.casthighlight.com, cloud.casthighlight.com and auth.casthighlight.com)'));
-    if(a.email) coreNode.push(item('smtp', 'SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3)'));
+    if(a.highlight) coreNode.push(item('highlight:v2', 'CAST Highlight FQDNs allowlisted (rpa.casthighlight.com, cloud.casthighlight.com and auth.casthighlight.com) and the settings gathered — <i>Highlight URL</i>, <i>Company ID</i>, an optional <i>Client ID</i> (without it CAST Imaging cannot detect token expiry) and a <i>Token</i> that <b>CAST Highlight Support must enable manually</b> and that expires; tokens up to 1024 characters need CAST Imaging 3.6.7 or later (255 before — a longer one cannot be saved and fails the analysis), the new token format needs <code>highlight2mri</code> 1.1.5 or later, and old-format tokens stay valid until 5 November 2026 <span class="hint">(per CAST\'s Highlight settings page; it names no port and does not say which component makes the call)</span>'));
+    if(a.email) coreNode.push(item('smtp:v2', 'SMTP relay reachable for notification emails (port matching your relay\'s configuration — see Section 3) and the Control Panel configured for it (CAST Imaging 3.5.4 or later): '+(a.platform === 'windows' ? '<code>spring.mail.host</code>, <code>port</code>, <code>username</code> / <code>password</code> (plain or encrypted with <code>imaging-encryption-tool.bat</code>), <code>sender</code>, <code>properties.mail.smtp.auth</code> and <code>…starttls.enable</code> (both default <code>true</code>) in <code>%PROGRAMFILES%\\CAST\\Imaging\\CAST-Imaging-Control-Panel\\application-default.yml</code> (3.6.2 or later; <code>application.yml</code> is overwritten by updates), then the Control Panel service restarted' : isK8s ? 'the same <code>SPRING_MAIL_*</code> settings on the control-panel pod — CAST\'s e-mail page documents only Windows and Docker/Podman, so confirm how with CAST' : '<code>SPRING_MAIL_HOST</code>, <code>_PORT</code>, <code>_USERNAME</code>, <code>_PASSWORD</code>, <code>_SENDER</code>, <code>SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH</code> and <code>…_STARTTLS_ENABLE</code> under <code>services: control-panel: environment</code> of <code>docker-compose.override.yml</code> (encrypt the password with <code>cast-imaging-encryption-tool.sh</code>), then <code>docker compose down</code> and <code>up -d</code> in <code>imaging-services</code>')+'; each recipient (Administrator or Application Owner) ticks the option in their profile <span class="hint">(per CAST\'s e-mail notifications page, which does not document implicit TLS on connect or a default port)</span>'));
+    if(a.egress === 'proxy') coreNode.push(item('proxy-settings', 'Proxy configured in the System Settings (it covers CAST Imaging and all nodes): <i>Excluded Address</i> (semicolon-separated, <code>*</code> wildcard) lists the Extend Local Server machine, the imaging-services machine in a distributed installation and your internal Maven repositories; the <i>Test Proxy Settings</i> button (3.5.4 or later) proves imaging-services reaches CAST Extend; a proxy that intercepts HTTPS has its certificate imported into the Java <code>cacerts</code> of every node (<code>keytool -importcert -trustcacerts</code>); if uploads or application creation fail afterwards, add the analysis-node to the exclusions and restart it <span class="hint">(per CAST\'s proxy settings page; Maven is all-or-nothing — if the primary repository needs the proxy only proxied repositories are used)</span>'));
+    if(hasAnalysis(a) && (a.repoHttps || a.repoSmb)) coreNode.push(item('source-folder:'+(a.platform === 'windows' ? 'win' : isK8s ? 'k8s' : 'vm'), 'Source folder location prepared (CAST Imaging reads raw source from a folder, in addition to ZIP uploads): the folder exists, is <b>not</b> under the deploy or delivery folders, and <b>every analysis-node can read it</b> — '+(a.platform === 'windows' ? 'the account running the Windows services needs read access (UNC path, or <code>map-drives.bat</code> in <code>%PROGRAMFILES%\\CAST\\Imaging\\CAST-Imaging-Analysis-Node\\tools</code> for a mapped or <code>subst</code> drive, then imaging-services restarted)' : isK8s ? 'it must be reachable from the analysis-node pods as a volume' : 'the analysis node runs in a container, so put it under <code>/opt/cast/shared/common-data/</code> with suitable ownership')+'; CAST\'s pages describe the folder only — cloning a Git or SVN repository into it is your own tooling <span class="hint">(per CAST\'s source folder location page)</span>'));
     if(isK8s){
       var k8sPrep = [isOcp(a) ? 'OpenShift project' : 'Cluster namespace', 'RBAC'];
       if(a.reverseProxy === 'ingress') k8sPrep.push('ingress-nginx controller installed'+(a.platform === 'kubernetes' && a.k8sProvider === 'eks' ? ' (CAST\'s EKS page sets <code>service.beta.kubernetes.io/aws-load-balancer-type=nlb</code> on its Service)' : a.platform === 'kubernetes' && a.k8sProvider === 'aks' ? ' (CAST\'s AKS page sets <code>service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path=/healthz</code> on its Service)' : '')+(a.certSource !== 'none' ? ', and the Ingress TLS secret <code>tls-secret-cast</code> (plus <code>tls-secret-cast-extend</code> for a separate Extend Local Server host) in the CAST namespace' : ''));
@@ -2110,6 +2119,7 @@
       (isK8s ? '<b>'+k8sMinNodes+'</b> cluster node(s) minimum' : '<b>'+serverMachineCount+'</b> server machine(s)')+' and <b>'+workstationRoleCount+'</b> workstation role(s); <b>'+portRows.filter(function(row){ return row.tag === 'mandatory'; }).length+'</b> mandatory network flows out of '+portRows.length+'; checklist: <b>'+glance.decide+'</b> to decide, <b>'+glance.prepare+'</b> to prepare, <b>'+glance.install+'</b> for the install day, <b>'+glance.after+'</b> after the installation.</div>';
     allHtml = glanceHtml + pointsToConfirm(allHtml) + pagesDisagree(a) + allHtml;
     document.getElementById('results-content').innerHTML = allHtml;
+    makeSectionsCollapsible();
     applyPortsFilter();
     document.getElementById('export-values').hidden = !isKube(a);
     document.getElementById('export-conf').hidden = isKube(a);
@@ -2120,9 +2130,9 @@
   // Checklist phases (a second way to read the same items; ticks are keyed by item id, so both views share them).
   var CHECKLIST_PHASES = [
     {key:'decide', title:'1 · Decide with your teams', ids:['server-sizing','pg-hosting','pg-ha','pg-version','pg-config','k8s-extdb','k8s-provider','rp-deployed','rp-tls','rp-extend-local','self-signed-trust','saml-sp','saml-needs-https','ldap-bind','ldaps-ca','oidc-register','oidc-claims','oidc-clock','oidc-network','oidc-needs-https','mcp','mcp-llm','license-key','extend-api-key','extend-local','ctx-url','db-tls','neo4j-dedicated','win-readonly-source','win-multi-install','install-fixed']},
-    {key:'prepare', title:'2 · Prepare before install day', ids:['firewall-rules','fw-docker-nat','win-firewall','shared-storage','dk-nfs','win-shared-folders','win-jdk','win-imaging-core','win-full-control','win-prechecks','dk-prechecks','curl','sudoers','podman-compose','podman-linger','tmp-exec','docker-hub','images-loaded','images-mirrored','extend-outbound','neo4j-connectivity','analysis-connectivity','analysis-db-path','smtp','highlight','k8s-storage','k8s-prep','k8s-cluster-rights','k8s-loadbalancer','k8s-telemetry','k8s-tls-key-unencrypted','k8s-etc-cast-imaging','k8s-install-time','helm-chart-clone','browser','report-generator','delivery-workstation','audit-tools']},
+    {key:'prepare', title:'2 · Prepare before install day', ids:['firewall-rules','fw-docker-nat','win-firewall','shared-storage','dk-nfs','win-shared-folders','win-jdk','win-imaging-core','win-full-control','win-prechecks','dk-prechecks','curl','sudoers','podman-compose','podman-linger','tmp-exec','docker-hub','images-loaded','images-mirrored','extend-outbound','neo4j-connectivity','analysis-connectivity','analysis-db-path','smtp','highlight','k8s-storage','k8s-prep','k8s-cluster-rights','k8s-loadbalancer','k8s-telemetry','k8s-tls-key-unencrypted','k8s-etc-cast-imaging','k8s-install-time','helm-chart-clone','source-folder','browser','report-generator','delivery-workstation','audit-tools']},
     {key:'install', title:'3 · Install day', ids:['mcp-install','win-install-media','win-config-variables','dk-config','dk-install-plan','dk-dashboards-standalone','win-dashboards-standalone']},
-    {key:'after', title:'4 · After the installation', ids:['win-services','win-startup-checker','win-https','appgw-saml-rewrite','oidc-keycloak','oidc-admin','oidc-disable-local','kc-accounts','kc-redirect-uris','k8s-backup']}
+    {key:'after', title:'4 · After the installation', ids:['proxy-settings','win-services','win-startup-checker','win-https','appgw-saml-rewrite','oidc-keycloak','oidc-admin','oidc-disable-local','kc-accounts','kc-redirect-uris','k8s-backup']}
   ];
   function checklistPhaseOf(id){
     var base = String(id).split(':')[0];
@@ -2130,6 +2140,33 @@
     return 'prepare';   // an item not listed yet is something to arrange before the install
   }
   var checklistByPhase = false;
+
+  // Collapsible sections: each results section (h3) becomes a <details>; folded state survives re-rendering, printing and exports open them all.
+  var collapsedSections = {};
+  function makeSectionsCollapsible(){
+    var root = document.getElementById('results-content');
+    Array.prototype.slice.call(root.querySelectorAll('h3')).forEach(function(h){
+      var parent = h.parentNode;
+      var m = h.textContent.match(/^\s*(\d+)\./);
+      var key = m ? m[1] : h.textContent.slice(0, 24);
+      var det = document.createElement('details');
+      det.className = 'section-box';
+      det.setAttribute('data-sec', key);
+      if(!collapsedSections[key]) det.open = true;
+      var sum = document.createElement('summary');
+      parent.insertBefore(det, h);
+      sum.appendChild(h);
+      det.appendChild(sum);
+      var n = det.nextSibling;
+      while(n && !(n.nodeType === 1 && (n.tagName === 'H3' || n.id === 'checklist-section'))){ var nx = n.nextSibling; det.appendChild(n); n = nx; }
+      det.addEventListener('toggle', function(){ collapsedSections[key] = !det.open; });
+    });
+  }
+  function setAllSections(open){
+    document.querySelectorAll('#results-content details.section-box').forEach(function(d){ d.open = open; collapsedSections[d.getAttribute('data-sec')] = !open; });
+  }
+  document.getElementById('collapse-all').addEventListener('click', function(){ setAllSections(false); });
+  document.getElementById('expand-all').addEventListener('click', function(){ setAllSections(true); });
 
   var lastPortRows = [], lastState = null, portsMandatoryOnly = false;
   // "Show mandatory rows only" on the ports table (screen only; the checkbox lives in the regenerated results).
@@ -2235,6 +2272,7 @@
       el.textContent = 'Boxes ticked at export time are shown checked; ticks made in this file are not saved — re-export from the tool to keep them.' + (checklistOnly ? ' References to other Sections point to the full requirements report (Print / Save as PDF in the tool).' : '');
     });
     pane.querySelectorAll('.export-hide').forEach(function(el){ el.remove(); });   // interactive view / filter controls
+    pane.querySelectorAll('details.section-box').forEach(function(d){ d.setAttribute('open', ''); });   // exports show every section
     pane.querySelectorAll('input[type=checkbox]').forEach(function(box){
       var key = box.getAttribute('data-check-key');
       var src = key ? Array.prototype.filter.call(document.querySelectorAll('main.results-pane input[type=checkbox][data-check-key]'), function(b){ return b.getAttribute('data-check-key') === key; })[0] : null;
@@ -2252,7 +2290,7 @@
     var link = document.createElement('a');
     var d = new Date();
     link.href = url;
-    link.download = (checklistOnly ? 'cast-imaging-checklist-' : 'cast-imaging-requirements-') + (projName && slugify(projName) ? slugify(projName) + '-' : '') + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.html';
+    link.download = (checklistOnly ? 'cast-imaging-checklist-' : 'cast-imaging-requirements-') + (projName && slugify(projName) ? slugify(projName) + '-' : '') + profileSlug() + '-' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.html';
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -2298,7 +2336,7 @@
     var blob = new Blob([JSON.stringify(payload, null, 2) + '\n'], {type:'application/json;charset=utf-8'});
     var url = URL.createObjectURL(blob), link = document.createElement('a'), d = new Date();
     link.href = url;
-    link.download = 'cast-imaging-answers-' + (name && slugify(name) ? slugify(name) + '-' : '') + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.json';
+    link.download = 'cast-imaging-answers-' + (name && slugify(name) ? slugify(name) + '-' : '') + profileSlug() + '-' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.json';
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     ioStatus('Answers saved (' + Object.keys(payload.answers).length + ' answers, ' + payload.checklistTicks.length + ' ticked checklist items).', false);
@@ -2357,7 +2395,7 @@
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
   }
-  function exportBaseName(){ var n = clientProjectName(); return (n && slugify(n) ? slugify(n) + '-' : '') + new Date().toISOString().slice(0, 10); }
+  function exportBaseName(){ var n = clientProjectName(); return (n && slugify(n) ? slugify(n) + '-' : '') + profileSlug() + '-' + new Date().toISOString().slice(0, 10); }
 
   // Network ports / FQDN matrix as CSV (Windows port values applied, like the page).
   document.getElementById('export-ports-csv').addEventListener('click', function(){
@@ -2544,8 +2582,11 @@
   });
 
   // The "points to confirm" list is collapsed on screen; open it for the printout.
-  window.addEventListener('beforeprint', function(){ document.querySelectorAll('details.confirm-box').forEach(function(d){ d.setAttribute('open', ''); }); });
-  window.addEventListener('afterprint', function(){ document.querySelectorAll('details.confirm-box').forEach(function(d){ d.removeAttribute('open'); }); });
+  window.addEventListener('beforeprint', function(){ document.querySelectorAll('details.confirm-box, details.section-box').forEach(function(d){ d.setAttribute('open', ''); }); });
+  window.addEventListener('afterprint', function(){
+    document.querySelectorAll('details.confirm-box').forEach(function(d){ d.removeAttribute('open'); });
+    document.querySelectorAll('details.section-box').forEach(function(d){ if(collapsedSections[d.getAttribute('data-sec')]) d.removeAttribute('open'); });
+  });
 
   document.getElementById('save-json').addEventListener('click', saveAnswers);
   document.getElementById('import-json').addEventListener('click', function(){ document.getElementById('import-json-file').click(); });

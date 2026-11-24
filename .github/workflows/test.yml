@@ -18,5 +18,6 @@ jobs:
       - run: node tests/facts.js
       - run: node tests/features.js
       - run: node tests/consistency.js --quick
+      - run: node tests/profiles.js
       - run: node tests/diagram.js --quick
       - run: node tests/a11y.js

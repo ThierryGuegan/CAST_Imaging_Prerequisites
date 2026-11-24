@@ -1,0 +1,202 @@
+At a glance — Docker · Full (analysis + Viewer + Dashboards) · Single machine: 1 server machine(s) and 2 workstation role(s); 10 mandatory network flows out of 17; checklist: 8 to decide, 11 to prepare, 2 for the install day, 2 after the installation.
+Points to confirm with CAST (2) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
+1. Hardware sizing for your profile
+Project scale profile: < 50 applications, 10–50 concurrent users — drives the sizing baseline below.
+Minimum footprint: 2 machines — 1 server machine (see Section 1's Server components table) + 1 workstation covering 2 roles (end-user + delivery/analyst — can be the same machine, or split across more if your team prefers) (see Workstation components table).
+Server components
+Component	vCPU	RAM	Disk
+Single machine (imaging-services + analysis-node + imaging-viewer + dashboards + PostgreSQL + Neo4j)	8	64 GB	1024 GB
+PostgreSQL is co-located, so its own CPU/RAM/disk are already included in the single machine row above.
+CAST's hard floors — already respected above: Disk: 256 GB min/node (SSD or equivalent high-IOPS) · RAM: 32 GB min standalone, 16 GB min/node distributed (32 GB recommended) · Neo4j: 16 GB min, 32 GB recommended (12 GB JVM heap default, tunable via imaging-viewer/.env).
+Workstation components
+Component	Operating system	Hardware	Software
+End-user workstation (10–50 users)	Windows, macOS, or Linux — any current browser works. Windows specifically required for: CAST Report Generator's interactive UI (a Linux-capable CLI-only variant, "Report Generator for Dashboards", exists as an alternative).	8 GB RAM, 1920×1080 recommended for architecture/dependency graphs	Chrome (latest), Edge ≥ 44, Firefox ≥ 95, Safari ≥ 12; CAST Report Generator (optional — see note below)
+Delivery / analyst workstation	Windows, macOS, or Linux — any current browser works	8 GB RAM minimum, plus local disk for source checkouts	Browser (ZIP uploads go through the Console) + SCM client tools (optional — only if staff prepare source checkouts themselves; see question 9 for how source reaches the analysis-node). No JDK needed here — CAST requires it on Windows servers only
+CAST Report Generator — a standalone tool, not bundled with CAST Imaging, for exporting Word/Excel/PowerPoint deliverables: requires Microsoft .NET 8 SDK (its installer offers to install this automatically); requires an API key generated from the CAST Imaging user profile (see Section 3's network row for the path it uses). Microsoft Office itself is not required to generate reports — only to open/edit the generated files or customize templates. Source: doc.castsoftware.com/imaging/install/report-generator, doc.castsoftware.com/export-v2/doccom/cast-report-generator.
+Named components (architecture overview)
+
+All components below other than Gateway communicate over CAST's internal container network and are not individually customer-firewall-configurable in a single- or co-located multi-machine topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j machines) where a real firewall path is required. Source: CAST's architecture reference diagram and doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports).
+
+1 server machine(s) required + 2 workstation role(s) — boxes below marked "own machine" run apart from the rest
+HTTPS :443
+HTTP :8090
+:8090
+:8096 · :8098–2381
+HTTPS :443
+:8089
+http :8082
+REST :8070
+machine :2285
+SSO, Auth, Console, Control Panel, Dashboards → PostgreSQL :2285
+writes :2285
+reads :2285
+loads :7687
+Bolt :7687
+extend.castsoftware.com
+direct outbound · :443
+machine :443
+analysis-node :443
+Browser
+end user
+CAST Report Generator
+reporting workstation
+Tester / admin workstation
+setup/testing phase only
+Reverse proxy
+External reverse proxy
+Gateway
+:8090 — sole entry point
+Console
+/console · :8091
+Auth service
+/oauth2 · :8092
+SSO Service
+/auth · :8096
+Control Panel
+/admin · :8098–2381
+Viewer
+/imaging · :8083
+Dashboards
+/dashboards · :8097
+Analysis-node(s)
+:8089
+AI-service
+ai-manager · :8082
+Viewer-APIs
+imaging-apis · :8070
+PostgreSQL
+default :2285
+ETL service
+:9001
+Neo4j
+Bolt :7687 · :7474 · :6362
+1 server machine(s) + 2 workstation role(s) (see sizing table above) — boxes labeled "own machine" run apart; everything else shares the core/all-in-one machine. Gateway (:8090) is the only component reachable from outside CAST Imaging, and only through the reverse proxy. The amber paths from the tester/admin workstation are setup/testing-only bypasses to Gateway, SSO Service, and Control Panel — close them before go-live. CAST Report Generator reaches Gateway the same way as the browser. The single machine and the analysis-node(s) reach extend.castsoftware.com directly — the CAST Extend path; image pulls and any other outbound flows you selected are listed in Section 3.
+Direct internal call
+Gateway path-routing
+Setup/testing-only bypass
+Component	Port(s)	Role
+Gateway	8090	Single entry point behind the reverse proxy — routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards) to every other service below. This is the only CAST Imaging port the reverse proxy needs to reach.
+Console	8091	Delivery/administration console (path /console)
+Auth service	8092	OAuth2 token endpoint (path /oauth2)
+SSO Service	8096	Sign-in / SSO broker (Keycloak, realm aip-realm) for Local, SAML, OpenID Connect and LDAP identity sources (path /auth)
+Control Panel (admin-center)	8098–2381	Administration UI (path /admin)
+Analysis-node(s)	8089	Runs analyses; registers against the core services
+Viewer	8083	Architecture/dependency graph UI (path /imaging)
+Viewer — other services	8084 / 8286 / 9000 / 9980	Login (8084), GraphRAG (8286), Viewer (9000) and Source code (9980) services of imaging-viewer, per CAST's hardware page
+Viewer-APIs (imaging-apis)	8070	REST API layer backing the Viewer
+ETL service	9001	Loads analysis results from PostgreSQL into Neo4j for the Viewer
+AI-service (ai-manager)	8082	Part of imaging-viewer, serving the Viewer/Viewer-APIs — per CAST's architecture diagram it is a distinct component unrelated to the MCP/AI integration (question 8) despite the similar naming
+Dashboards	8097	KPI dashboards UI (path /dashboards)
+Neo4j	7687 / 7474 / 7473 / 6362	Graph database for the Viewer (Bolt / HTTP browser / HTTPS browser / backup)
+PostgreSQL	2285 (default, configurable)	Relational database used directly by Control Panel, SSO Service, Auth Service, Console, Dashboards, analysis-node and imaging-viewer (per CAST) — not by Gateway, the Extend Local Server or the MCP servers
+Operating system / runtime versions
+Item	Requirement
+Host OS	Linux, 64-bit (x64) only, glibc ≥ 2.28 — Server Core / non-glibc distros not supported
+curl	Required by CAST's installer (its prechecks use it) — install it before running the installer (CAST's software requirements page)
+Supported distributions	RHEL-family: RHEL 8, RHEL 9, RHEL 10, Rocky Linux 8, Rocky Linux 9 · Debian-family: Debian 11, Debian 12, Debian 13, Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Ubuntu 26.04 LTS — Docker Engine ≥ 20.10. ARM64/AArch64 is not supported (CAST's software requirements page)
+Docker Engine / Compose	Docker Engine ≥ 20.10; Docker Compose v2.x+ (the version embedded in current Docker Engine) — the installer runs "docker compose" (no hyphen); the legacy standalone "docker-compose" v1.x is not compatible
+Installing user	Must be in the sudoers list — the Docker installer requires sudo privileges
+/tmp requirement	The installer uses /tmp during installation and needs it mounted with exec permission — if your hardening baseline mounts /tmp noexec (common on RHEL/CIS-hardened images), remount it exec or point the installer at an alternate temp dir with exec allowed
+SELinux	Treat enforcing mode on RHEL/Rocky as a risk for bind-mounted volumes (missing :z/:Z context) — verify against requirements/software
+Storage locations
+
+CAST Imaging uses five main storage folders per its documented model (deploy, delivery, common-data, plus database/graph data). On Docker/Podman, the confirmed defaults are:
+
+/opt/cast/shared/delivery — reference information about applications and their source-code deliveries
+/opt/cast/shared/common-data/<custom-folder> — recommended location if you point analysis at a source-code folder directly; the analysis-node container already has access here
+
+Full paths for every folder, plus Windows- and cloud-specific storage layouts, are at CAST's reference pages: storage-locations, .../docker.
+
+2. Database requirements
+PostgreSQL (RDBMS)
+Item	Your configuration
+Connected components	Directly connected to PostgreSQL (per CAST): Control Panel, SSO Service, Auth Service, Console, Dashboards, analysis-node, imaging-viewer. Not connected: Gateway, the Extend Local Server, the MCP servers. Make sure each of these hosts can reach the database host and port, and that pg_hba.conf allows them — see Configure network access via pg_hba.conf. For certificate-based database connections CAST lists analysis-node, imaging-services, imaging-viewer and dashboards as the connected components (encrypted connections).
+Engine	PostgreSQL — port 2285 by default (configurable), not the PostgreSQL community default of 5432 — the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data.
+Version	CAST's installer deploys an embedded postgres:15 container (embedded database mode) — pinned by CAST, nothing for you to choose. 16.x needs com.castsoftware.imaging.core 8.4.1 or later and 17.x / 18.x 8.4.8 or later (per a summary of CAST's database requirements page); CAST Imaging 3.6.9 upgraded its SSO (Keycloak 26.8.1), which requires PostgreSQL 15 or above for the keycloak schema — an older instance, such as a legacy CAST Storage Service 4 on PostgreSQL 13, makes the SSO step fail (per CAST's 3.6.9 release notes). Confirm the full supported/minimum version range against doc.castsoftware.com/imaging/install/requirements/db before provisioning.
+Hosting	Co-located
+Character set	UTF-8 required; case-sensitive collation as specified by CAST for your CAST Imaging release
+High availability	Optional — plan regular automated backups regardless
+Neo4j (graph store)
+Item	Your configuration
+Requirement	Bundled with imaging-viewer — not a user-selectable engine; an ETL loads analysis results from PostgreSQL into Neo4j for the Viewer
+Ports	7687 (Bolt, used by imaging-viewer) / 6362 (backup) / 7474 (Neo4j's own HTTP browser/admin interface, optional) / 7473 (its HTTPS counterpart)
+Hosting	Co-located with imaging-viewer.
+Memory	16 GB RAM minimum, 32 GB recommended — defaults to a 12 GB initial/maximum JVM heap, tunable via imaging-viewer/.env
+3. Network ports & FQDN allowlist — tailored to your answers
+
+Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.
+
+ Show mandatory rows only
+
+Source	Destination	Port	Protocol	Reason
+End-user browser	Reverse proxy (External reverse proxy)	443	HTTPS	Console / Viewer / Dashboards UI access — the mandatory reverse proxy is the only customer-facing endpoint; it forwards to Gateway, which path-routes internally to every other UI service — HTTPS per your certificate answer	Mandatory
+Reverse proxy (External reverse proxy)	Gateway	8090	HTTP	The reverse proxy's upstream — Gateway listens on 8090 (not 80) and is CAST Imaging's single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below)	Mandatory
+Administrator workstation	CAST Imaging host (Linux)	22	SSH	Server administration	Mandatory
+imaging-services	PostgreSQL (co-located on the single machine)	2285 (default, configurable)	TCP	Application access to the PostgreSQL database	Mandatory
+Tester / administrator workstation	Gateway	8090	HTTP/HTTPS	Validate Gateway directly, bypassing the reverse proxy, before it's fully configured (Section 4) — Setup/testing only — close once your reverse proxy is validated	Optional
+Tester / administrator workstation	SSO Service	8096	HTTP/HTTPS	Validate sign-in (Local/SAML/OIDC/LDAP, Section 5) directly, bypassing Gateway's /auth routing — Setup/testing only — SSO Service is otherwise internal-only; close before go-live	Optional
+CAST Report Generator (client workstation)	Reverse proxy (External reverse proxy)	443	HTTPS	Pulls data via CAST Dashboards' RestAPI (/dashboards/rest), authenticated with an API key, not a browser session — Only if you use CAST Report Generator — same entry point as the End-user browser row above	Conditional
+Tester / administrator workstation	Control Panel (admin-center)	8098–2381	HTTP/HTTPS	Validate admin/configuration directly, bypassing Gateway's /admin routing — Setup/testing only — Control Panel is otherwise internal-only; close before go-live	Optional
+SSO Service (single machine)	PostgreSQL (co-located on the single machine)	2285 (default, configurable)	TCP	The SSO Service connects directly to PostgreSQL — it keeps its data in a dedicated "keycloak" database on the same instance — Confirmed by CAST (directly connected). Same network path as imaging-services' row above	Mandatory
+Auth Service, Console, Control Panel, Dashboards (single machine)	PostgreSQL (co-located on the single machine)	2285 (default, configurable)	TCP	These containers connect directly to PostgreSQL — Confirmed by CAST (directly connected). They share the single machine with imaging-services, so no firewall rule beyond that path — but pg_hba.conf must allow them. Gateway, the Extend Local Server and the MCP servers do not connect to PostgreSQL	Mandatory
+imaging-viewer (containers, incl. ETL service)	PostgreSQL (co-located on the single machine)	2285 (default, configurable)	TCP	imaging-viewer is documented as a directly connected component (the ETL service reads the analysis data from PostgreSQL to load Neo4j) — Confirmed by CAST at component level — which of its containers connect isn't itemised; same host as the single machine unless you split it	Mandatory
+imaging-services	extend.castsoftware.com	443	HTTPS	Product updates and licensing artifacts	Mandatory
+analysis-node(s)	extend.castsoftware.com	443	HTTPS	Extensions catalog — technology analyzers used during analysis	Mandatory
+Every CAST Imaging machine	registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com	443	HTTPS	Pull CAST's Docker Hub images at install/update time — Exact hostnames per Docker's documented pull path	Mandatory
+analysis-node(s)	Your private Maven repository (e.g. Nexus / Artifactory)	443 (per your repository)	HTTPS	Dependency resolution for analyses that use a private Maven repository — Per customer — host, port and credentials are yours; CAST names no fixed endpoint. Only if your analysed applications resolve Maven dependencies from a private repository	Conditional
+Administrator / delivery workstation	castsoftware.zendesk.com	443	HTTPS	CAST Support portal (tickets, downloads) — Browser access from the workstations (e.g. the operator machine), not from the CAST Imaging servers	Optional
+Administrator / delivery workstation	doc.castsoftware.com	443	HTTPS	CAST online documentation — Browser access from the workstations, not from the CAST Imaging servers	Optional
+4. Reverse Proxy & HTTPS / TLS
+A reverse proxy is a mandatory prerequisite. A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is required for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing.
+HTTPS/SSL itself is not mandatory, but highly recommended. CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment — which in practice means almost every deployment beyond a fully offline POC.
+Reverse proxy: External reverse proxy.
+Certificate source: Self-signed.
+You must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.
+Once HTTPS is confirmed working, disable the reverse proxy's own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway's 8090 stays the proxy's internal upstream — keep it reachable only from the reverse proxy, not from users.
+On Docker/Podman CAST's HTTPS page has NGINX terminate TLS on 443 (listen 443 ssl, ssl_protocols TLSv1.2 in its example) with a PEM key pair whose private key is unencrypted (openssl req -nodes), proxying to imaging-services on 8090; it states that CAST highly recommends not using self-signed certificates and gives no trust-store guidance (per a summary of the page).
+NGINX settings in CAST's reverse-proxy examples (per a summary of its Docker and Windows reverse-proxy pages): a single location block with proxy_pass http://<imaging-services-host>:8090/;, the headers Host, X-Forwarded-Proto, X-Real-IP, X-Forwarded-For, X-Forwarded-Host and X-Forwarded-Port, proxy_buffering off, proxy_cache off, proxy_http_version 1.1 with an empty Connection header, client_max_body_size 100M (it limits ZIP uploads at onboarding — raise it if needed) and, for CAST Imaging ≥ 3.4.0 only, proxy_cookie_flags ~.* secure samesite=None;. CAST runs Keycloak behind it with KC_PROXY: edge / KC_PROXY_HEADERS: xforwarded (Docker) or proxy=edge / proxy-headers=xforwarded (Windows). The pages state no proxy timeouts and no /.well-known route (the MCP security page says CAST Imaging handles /.well-known/oauth-protected-resource/mcp itself).
+Self-signed certificates (or their issuing CA) must be installed/trusted on every workstation that accesses CAST Imaging, or users will see browser warnings.
+CAST's documented approach is a dedicated Nginx vHost .conf file with ssl_certificate / ssl_certificate_key directives, ssl_protocols TLSv1.2 or higher, and server cipher preference enabled — not a CAST-specific certificate variable.
+Use an unencrypted private key ("BEGIN ENCRYPTED PRIVATE KEY" won't load as-is) — strip the passphrase, or supply it to Nginx via ssl_password_file.
+Serving CAST Imaging under a URL path prefix (e.g. https://host/imaging) additionally requires setting APP_CONTEXT and editing cast_imaging_services/docker-compose.override.yml — see CAST's reverse-proxy-with-context-URL reference.
+5. User authentication prerequisites
+No external identity provider required.
+Plan manual account lifecycle management and a break-glass local admin account — recommended even alongside SSO.
+6. CAST Extend access & licensing
+Allow outbound HTTPS (443) from imaging-services and every analysis-node to extend.castsoftware.com.
+Generate an API key from the CAST Extend website and configure it in CAST Imaging / CAST Extend client to authenticate extension downloads.
+Obtain a valid CAST Imaging license key from your CAST account team; confirm it covers the modules you selected (MCP/AI: no; Highlight integration: no).
+7. Pre-installation checklist for your profile
+Minimum footprint: 2 machines — 1 server machine (see Section 1's Server components table) + 1 workstation covering 2 roles (end-user + delivery/analyst — can be the same machine, or split across more if your team prefers) (see Workstation components table).
+
+ Group by machine / role    Group by phase (decide, prepare, install, after)
+
+Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers — or, with the phase view, in the order you will work through them. Checked boxes are remembered in your browser as you tweak answers or reload the page.
+
+Single machine (imaging-services + imaging-viewer + dashboards + analysis-node)
+curl installed — required for the installer's own service health checks (CAST requirements precheck)
+Installing user confirmed in the sudoers list
+/tmp confirmed mounted with exec permission (remount or redirect if your hardening baseline sets noexec)
+Published container ports are not protected by ufw or firewalld (Docker and Podman publish them through NAT rules): restrict every CAST port except 8090 with an nftables table hooked to prerouting at a priority below -100 (CAST's sample uses -150) or with CAST's cast-imaging-firewall.sh (dryrun, apply, status, remove; rules in /etc/cast-imaging/firewall.nft, reloaded at boot by cast-imaging-firewall.service); the embedded PostgreSQL (2285) is restricted too; then check from a non-CAST machine that only 8090 answers (per CAST's network-access page)
+Install plan: package com.castsoftware.imaging.all.docker downloaded from CAST Extend and unzipped, then chmod +x cast-imaging-install.sh and, in this order — ./cast-imaging-install.sh all — expect 13 containers (12 with an external PostgreSQL); the *_HOSTNAME variables in configuration.conf are an FQDN or static IP, never localhost or a short hostname; Docker on WSL 2 is for testing only; from 3.6.8 the service logs are on the host (/opt/cast/imaging-services/logs, /opt/cast/imaging-dashboards/logs) (per CAST's Docker scenario pages and 3.6.8 release notes; the order differs between multi-machine scenarios)
+configuration.conf decided — DB_MODE embedded (default; data in the Docker volume cast-imaging-db-data, path CAST_IMAGING_DB_DATA_VOLUME_PATH from 3.6.4); NEO4J_INSTALLATION_MODE (3.6.6 or later) embedded or external — identical on every machine, with IMAGING_NEO4J_HOSTNAME when external; Neo4j heap and transaction memory default to 12 GB each (cast-imaging-viewer/.env, 3.5.4 or later); IMAGING_DOMAIN_SYNCHRO_ENABLED set before onboarding applications (enabling it later loses customizations); the Keycloak service account password (KEYCLOAK_SERVICE_ACCOUNT_PASSWORD) is random from 3.6.6 on a fresh install, admin before — change it at first login (per CAST's Docker variables page)
+Installer prechecks (3.6.6 or later) expected to pass — blocking: x86_64 (no ARM64), a running container engine usable by your user with the Compose v2 plugin (docker-compose 1.x is not supported; Podman needs a compose provider), curl, INSTALL_DIR writable and not noexec, an empty installation folder, free ports, memory and disk minimums, shared folders that exist with enough free space, reachable CAST Extend; warnings: fs.file-max below 65536, tar / unzip / ss missing, Docker Hub and public Maven reachability; --skip-precheck exists from 3.6.9 but only hides problems (per CAST's prechecks page)
+Server(s) provisioned meeting the sizing in Section 1 (Docker, Full (analysis + Viewer + Dashboards), Single machine)
+PostgreSQL deployed by CAST's installer (embedded database) — nothing to provision
+All firewall rules from Section 3 opened before install day
+Outbound access to extend.castsoftware.com confirmed
+Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST's images
+CAST Extend API key generated and stored securely
+CAST Imaging license key obtained, covering the selected modules; a key longer than 1023 characters is rejected as invalid (3.6.8 or later)
+Values that an update cannot change, decided now: the TCP port of every service and every *HOSTNAME_* variable; from 3.6.7 the container subnets are fixed (172.20.238.0/24, 172.22.238.0/28, 172.22.239.0/28) and must be free on every machine; a distributed installation is updated component by component but all on the same release; keep the Keycloak service-account password variable (KEYCLOAK_SERVICE_ACCOUNT_PASSWORD) if you ever change it in the Keycloak UI — blank, an update resets it to admin (per CAST's Docker and Windows update pages)
+Keycloak accounts planned — the UI administrator kcadmin (3.6.0 or later; its name is set at a fresh install with KEYCLOAK_LOGIN_ADMIN_USER) has the temporary password admin, to be changed at first login; the internal service account admin must not be changed in the Keycloak UI alone (login then fails with a Whitelabel error) — its initial password is random from 3.6.6 on this platform (read it in the installation .env); the CAST local user admin / admin must change its password at first login (3.6.5 or later); avoid passwords that are fully quoted, contain a space followed by #, or contain a backslash or slash (per CAST's accounts and passwords page)
+Keycloak client redirect URIs restricted once access works — by default they accept any URI (*, an open-redirect risk): Valid redirect URIs <base>/login/oauth2/code/<client-id> (client aip-console-client behind a reverse proxy, <hostname>-client-aip-realm for direct access), Valid post logout redirect URIs <base>, Web origins +; MCP clients need nothing (per CAST's redirect-URIs page)
+Reverse proxy
+Reverse proxy deployed in front of Gateway — mandatory prerequisite (External reverse proxy)
+TLS certificate obtained (Self-signed) and configured on the reverse proxy
+Self-signed certificate (or its CA) trusted on every workstation that accesses CAST Imaging
+End-user workstation
+Browser (Chrome latest, Edge ≥ 44, Firefox ≥ 95 or Safari ≥ 12), 8 GB RAM, and 1920×1080 resolution requirements communicated to end users
+CAST Report Generator installed (Windows, .NET 8 SDK, API key from CAST Imaging user profile) on workstations that need Word/Excel/PowerPoint report exports — see install/report-generator / export-v2/doccom/cast-report-generator
+Delivery / analyst workstation
+Browser access to the Console communicated to delivery/analyst staff; SCM client tools only if they prepare source checkouts themselves — see question 9 for how source reaches the analysis-node

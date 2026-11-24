@@ -1,0 +1,211 @@
+At a glance — OpenShift · Viewer + Dashboards, read-only · Single node pool: 6 cluster node(s) minimum and 1 workstation role(s); 12 mandatory network flows out of 21; checklist: 8 to decide, 9 to prepare, 0 for the install day, 6 after the installation.
+Points to confirm with CAST (4) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
+1. Hardware sizing for your profile
+Project scale profile: 150–500 applications, 10–50 concurrent users — drives the sizing baseline below.
+1 pod resource request(s) to fit on your cluster, requiring 6 cluster nodes minimum (4 vCPU / 32 GB RAM per node minimum, per CAST's Kubernetes hardware doc — see the callout below), plus 1 end-user workstation to access it.
+On Kubernetes these figures are pod resource requests, not separate VMs — sum them (plus cluster/system overhead) to size your node pool, and treat "Disk" as PersistentVolumeClaim storage-class capacity rather than local disk (the Disk column shows the chart's default PVC sizes for what each row hosts, with CAST's sizing guidance beside it — raise the size_* values, mainly size_db_data, size_neo4jdata and size_castdir, toward that guidance as your data grows; volumes can be increased but not reduced). "Single node pool" vs. one pod per row below mirrors the topology answer (question 1), not a hard requirement — the scheduler places pods across whatever nodes you give it.
+Cluster requirements per CAST's Kubernetes hardware doc (applied to OpenShift — this tool found no separate OpenShift hardware page; the OpenShift chart has no EnforceAnalysisNodeIsolation/EnforceNeo4jIsolation/EnforcePostgresIsolation settings: only EnforceBalancedAffinity (true by default), which already keeps Neo4j and the analysis-nodes on different nodes and never puts two analysis-nodes on one node — so the base 2 nodes and +1 per extra analysis-node replica apply, with no isolation node. Its templates also read EnforceNodeAffinity, which its values.yaml does not list): 2 nodes minimum, 4 vCPU per node minimum, 32 GB RAM per node minimum (64 GB recommended; 128 GB for multiple complex/large applications). Your profile above needs 6 nodes minimum: the base 2, no analysis-node in this scenario; but the pod requests below total 24 vCPU / 160 GB, which need at least 6 nodes at the 4 vCPU / 32 GB per-node minimum — use larger nodes to need fewer. All cluster nodes (and any managed PostgreSQL instance) should sit in the same Availability Zone.
+Helm chart 3.6.9 defaults (values.yaml) — Neo4j requests 1 CPU / 16 GB, limits 2 CPU / 32 GB with a 12 GB heap (NEO4J_server_memory_heap_*) and 10 GB transaction memory; embedded PostgreSQL requests 1 CPU / 8 GB, limits 2 CPU / 16 GB; viewer-server and ETL limit 0.5 CPU / 8 GB each; the other services stay at or under 4 GB. The PostgreSQL and Neo4j pods carry cluster-autoscaler.kubernetes.io/safe-to-evict: "false" and karpenter.sh/do-not-disrupt: "true", so a cluster autoscaler or Karpenter never removes the nodes hosting them. These are chart defaults, not CAST's sizing guidance — Section 1's figures remain the baseline.
+Server components
+Component	vCPU	RAM	Disk (chart default PVCs)
+All pods (imaging-services + imaging-viewer + dashboards + PostgreSQL + Neo4j) (not recommended for production — prefer multi-pod)	24	160 GB	365 GB · CAST guidance 10240 GB
+PostgreSQL is co-located, so its own CPU/RAM/disk are already included in the all pods row above.
+Sizing scales with the number of applications delivered, retained snapshot history, and concurrent analyses/users. Re-validate after a pilot batch of real deliveries.
+CAST's hard floors — already respected above: Disk: 256 GB min per cluster node (the node's own SSD or high-IOPS disk — separate from the PVC sizes above) · RAM: 32 GB min per cluster node (64 GB recommended — see the cluster requirements above) · Neo4j: 16 GB min, 32 GB recommended (12 GB JVM heap default).
+Workstation components
+Component	Operating system	Hardware	Software
+End-user workstation (10–50 users)	Windows, macOS, or Linux — any current browser works. Windows specifically required for: CAST Report Generator's interactive UI (a Linux-capable CLI-only variant, "Report Generator for Dashboards", exists as an alternative).	8 GB RAM, 1920×1080 recommended for architecture/dependency graphs	Chrome (latest), Edge ≥ 44, Firefox ≥ 95, Safari ≥ 12; CAST Report Generator (optional — see note below)
+CAST Report Generator — a standalone tool, not bundled with CAST Imaging, for exporting Word/Excel/PowerPoint deliverables: requires Microsoft .NET 8 SDK (its installer offers to install this automatically); requires an API key generated from the CAST Imaging user profile (see Section 3's network row for the path it uses). Microsoft Office itself is not required to generate reports — only to open/edit the generated files or customize templates. Source: doc.castsoftware.com/imaging/install/report-generator, doc.castsoftware.com/export-v2/doccom/cast-report-generator.
+Named components (architecture overview)
+
+All components below other than Gateway communicate over CAST's internal container network and are not individually customer-firewall-configurable in a single- or co-located multi-pod topology — see Section 3 for the specific cases (dedicated analysis-node or Neo4j pods) where a real firewall path is required. Source: CAST's architecture reference diagram and doc.castsoftware.com/imaging/install/requirements/hardware (TCP ports).
+
+1 pod resource request(s) on your node pool + 1 workstation role(s)
+HTTPS :443
+HTTP :8090
+:8090
+:8096 · :8098–2381
+HTTPS :443
+http :8082
+REST :8070
+core pods :2285
+SSO, Auth, Console, Control Panel, Dashboards → PostgreSQL :2285
+reads :2285
+loads :7687
+Bolt :7687
+extend.castsoftware.com
+direct outbound · :443
+core pods :443
+Shared storage
+shared-access (RWX) PersistentVolume / StorageClass
+core pods
+Browser
+end user
+CAST Report Generator
+reporting workstation
+Tester / admin workstation
+setup/testing phase only
+Reverse proxy
+OpenShift Route
+Gateway
+:8090 — sole entry point
+Console
+/console · :8091
+Auth service
+/oauth2 · :8092
+SSO Service
+/auth · :8096
+Control Panel
+/admin · :8098–2381
+Viewer
+/imaging · :8083
+Dashboards
+/dashboards · :8097
+AI-service
+ai-manager · :8082
+Viewer-APIs
+imaging-apis · :8070
+PostgreSQL
+default :2285
+ETL service
+:9001
+Neo4j
+Bolt :7687 · :7474
+1 pod resource request(s) + 1 workstation role(s) (see sizing table above) . Gateway (:8090) is the only component reachable from outside CAST Imaging, and only through the reverse proxy. The amber paths from the tester/admin workstation are setup/testing-only bypasses to Gateway, SSO Service, and Control Panel — close them before go-live. CAST Report Generator reaches Gateway the same way as the browser. The core pods reach extend.castsoftware.com directly — the CAST Extend path; image pulls and any other outbound flows you selected are listed in Section 3. In CAST's Helm chart this shared RWX volume is mounted by the console service and the control panel — only representative lines are drawn.
+Direct internal call
+Gateway path-routing
+Setup/testing-only bypass
+Shared-storage read/write
+Component	Port(s)	Role
+Gateway	8090	Single entry point behind the reverse proxy — routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards) to every other service below. This is the only CAST Imaging port the reverse proxy needs to reach.
+Console	8091	Delivery/administration console (path /console)
+Auth service	8092	OAuth2 token endpoint (path /oauth2)
+SSO Service	8096	Sign-in / SSO broker (Keycloak, realm aip-realm) for Local, SAML, OpenID Connect and LDAP identity sources (path /auth)
+Control Panel (admin-center)	8098–2381	Administration UI (path /admin)
+Viewer	8083	Architecture/dependency graph UI (path /imaging)
+Viewer-APIs (imaging-apis)	8070	REST API layer backing the Viewer
+ETL service	9001	Loads analysis results from PostgreSQL into Neo4j for the Viewer
+AI-service (ai-manager)	8082	Part of imaging-viewer, serving the Viewer/Viewer-APIs — per CAST's architecture diagram it is a distinct component unrelated to the MCP/AI integration (question 8) despite the similar naming
+Dashboards	8097	KPI dashboards UI (path /dashboards)
+Neo4j	7687 / 7474	Graph database for the Viewer (Bolt / HTTP browser interface) — CAST's Helm chart exposes 7474, 7687, 7473 and 8888 on the Neo4j Service
+PostgreSQL	2285 (default, configurable)	Relational database used directly by Control Panel, SSO Service, Auth Service, Console, Dashboards and imaging-viewer (per CAST) — not by Gateway, the Extend Local Server or the MCP servers
+Operating system / runtime versions
+Item	Requirement
+Cluster tooling	A running OpenShift cluster with helm and oc available — CAST installs via its OpenShift Helm chart (castimaging-v3.openshiftsetup); the chart relies on the restricted-v2 SCC's fsGroup for volume write access (no fixed fsGroup) — when a policy engine rejects the IDs OpenShift assigns, 3.6.9 adds podSecurityContext/containerSecurityContext/componentSecurityContext settings (grant a matching SCC such as nonroot-v2; do not set runAsGroup — images such as console-postgres and console-analysis-node need GID 0, otherwise add supplementalGroups: [0]); ServiceAccountName runs all pods with an existing ServiceAccount; confirm your OpenShift version against CAST's current release notes (not pinned down by this tool)
+Storage locations
+
+On OpenShift, storage is provisioned as persistent volumes/StorageClasses rather than host paths — block volumes for the databases and logs, plus a shared-access (RWX) volume that CAST's chart always requires. See CAST's cloud reference: storage-locations/cloud.
+
+What CAST's Helm chart 3.6.9 itself creates (storage.yaml, values.yaml):
+
+Always a shared pvc-shared-datadir (100 Gi by default), ReadWriteMany, on the FileClassName StorageClass — mounted by the console service and the control panel. An RWX-capable file StorageClass is therefore always required (CAST's chart templates).
+Block volumes (DiskClassName, ReadWriteOnce): db-data 128 Gi (embedded PostgreSQL), Neo4j data 100 Gi, ETL logs and CSV archive 10 Gi each, 1–2 Gi log volumes per service. The log/audit volumes are kept on uninstall (helm.sh/resource-policy: keep).
+OpenShift: the chart does not create StorageClasses (CreateStorageClass: false) and its default DiskClassName/FileClassName is crc-csi-hostpath-provisioner — the OpenShift Local (CRC) development provisioner. Set both to your cluster's block and RWX file classes. AnalysisNodeFS.enable must not be changed once CAST Imaging is deployed.
+2. Database requirements
+PostgreSQL (RDBMS)
+Item	Your configuration
+Connected components	Directly connected to PostgreSQL (per CAST): Control Panel, SSO Service, Auth Service, Console, Dashboards, imaging-viewer. Not connected: Gateway, the Extend Local Server, the MCP servers. Make sure each of these pods can reach the database endpoint and port, and that pg_hba.conf allows them — see Configure network access via pg_hba.conf. For certificate-based database connections CAST lists analysis-node, imaging-services, imaging-viewer and dashboards as the connected components (encrypted connections).
+Engine	PostgreSQL — port 2285 by default (configurable), not the PostgreSQL community default of 5432 — the only RDBMS engine supported by CAST Imaging; stores analysis and persistence data.
+Version	CAST's Helm chart deploys PostgreSQL as an in-cluster pod: image registry.redhat.io/rhel8/postgresql-15:latest in chart 3.6.9 (ConsolePostgresImage), service port 2285. CastStorageService.ssl: true enforces SSL (TLS ≥ 1.2, self-signed certificate generated by the chart). 16.x needs com.castsoftware.imaging.core 8.4.1 or later and 17.x / 18.x 8.4.8 or later (per a summary of CAST's database requirements page); CAST Imaging 3.6.9 upgraded its SSO (Keycloak 26.8.1), which requires PostgreSQL 15 or above for the keycloak schema — an older instance, such as a legacy CAST Storage Service 4 on PostgreSQL 13, makes the SSO step fail (per CAST's 3.6.9 release notes). Confirm the full supported/minimum version range against doc.castsoftware.com/imaging/install/requirements/db before provisioning.
+Hosting	Co-located — not recommended at this scale; move to a dedicated or managed instance
+Character set	UTF-8 required; case-sensitive collation as specified by CAST for your CAST Imaging release
+High availability	Optional — plan regular automated backups regardless
+Neo4j (graph store)
+Item	Your configuration
+Requirement	Bundled with imaging-viewer — not a user-selectable engine; an ETL loads analysis results from PostgreSQL into Neo4j for the Viewer
+Ports	7687 (Bolt, used by imaging-viewer) / 7474 (Neo4j's own HTTP browser/admin interface, optional) — CAST's Helm chart exposes 7474, 7687, 7473 and 8888 on the Neo4j Service, not 6362
+Hosting	Co-located with imaging-viewer.
+Memory	16 GB RAM minimum, 32 GB recommended — defaults to a 12 GB initial/maximum JVM heap
+3. Network ports & FQDN allowlist — tailored to your answers
+
+Only the flows relevant to the platform, integrations, and access methods you selected are listed — no wildcards, no unused rows.
+
+ Show mandatory rows only
+
+Source	Destination	Port	Protocol	Reason
+End-user browser	Reverse proxy (OpenShift Route)	443	HTTPS	Console / Viewer / Dashboards UI access — the mandatory reverse proxy is the only customer-facing endpoint; it forwards to Gateway, which path-routes internally to every other UI service — HTTPS per your certificate answer	Mandatory
+Reverse proxy (OpenShift Route)	Gateway	8090	HTTP	The reverse proxy's upstream — Gateway listens on 8090 (not 80) and is CAST Imaging's single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below)	Mandatory
+oc / helm / CI pipelines	OpenShift API server	6443	TCP	Cluster administration and CAST deployment/upgrade via Helm — 6443 is the default for self-managed clusters and OpenShift — reasonable inference, not CAST-documented	Mandatory
+imaging-services	PostgreSQL (co-located with all pods)	2285 (default, configurable)	TCP	Application access to the PostgreSQL database	Mandatory
+Tester / administrator workstation	Gateway	8090	HTTP/HTTPS	Validate Gateway directly, bypassing the reverse proxy, before it's fully configured (Section 4) — Setup/testing only — close once your reverse proxy is validated — Gateway's Service is a LoadBalancer when the chart's CreateLoadBalancer is true (the Kubernetes default), otherwise ClusterIP — then use oc port-forward	Optional
+Tester / administrator workstation	SSO Service	8096	HTTP/HTTPS	Validate sign-in (Local/SAML/OIDC/LDAP, Section 5) directly, bypassing Gateway's /auth routing — Setup/testing only — SSO Service is otherwise internal-only; close before go-live — in CAST's Helm chart this service is ClusterIP-only (NodePort only if its *NodePort values are set); reach it with oc port-forward, not a firewall rule	Optional
+CAST Report Generator (client workstation)	Reverse proxy (OpenShift Route)	443	HTTPS	Pulls data via CAST Dashboards' RestAPI (/dashboards/rest), authenticated with an API key, not a browser session — Only if you use CAST Report Generator — same entry point as the End-user browser row above	Conditional
+Tester / administrator workstation	Control Panel (admin-center)	8098–2381	HTTP/HTTPS	Validate admin/configuration directly, bypassing Gateway's /admin routing — Setup/testing only — Control Panel is otherwise internal-only; close before go-live — in CAST's Helm chart this service is ClusterIP-only (NodePort only if its *NodePort values are set); reach it with oc port-forward, not a firewall rule	Optional
+SSO Service (core pods)	PostgreSQL (co-located with all pods)	2285 (default, configurable)	TCP	The SSO Service connects directly to PostgreSQL — it keeps its data in a dedicated "keycloak" database on the same instance — Confirmed by CAST (directly connected). Same network path as imaging-services' row above	Mandatory
+Auth Service, Console, Control Panel, Dashboards (core pods)	PostgreSQL (co-located with all pods)	2285 (default, configurable)	TCP	These containers connect directly to PostgreSQL — Confirmed by CAST (directly connected). They share the core pods with imaging-services, so no firewall rule beyond that path — but pg_hba.conf must allow them. Gateway, the Extend Local Server and the MCP servers do not connect to PostgreSQL	Mandatory
+imaging-viewer (pods, incl. ETL service)	PostgreSQL (co-located with all pods)	2285 (default, configurable)	TCP	imaging-viewer is documented as a directly connected component (the ETL service reads the analysis data from PostgreSQL to load Neo4j) — Confirmed by CAST at component level — which of its containers connect isn't itemised; same node pool as the core pods unless you split it	Mandatory
+Every cluster worker node	RWX file storage backend of your FileClassName (NFS, CephFS…)	Per your storage (NFS: 2049)	TCP	The shared pvc-shared-datadir volume needs a ReadWriteMany StorageClass; whatever backs it must be reachable from every worker node — Per customer — CAST names no storage backend for OpenShift or self-managed clusters	Conditional
+Worker nodes / kubelets	Control plane (API server, etcd, scheduler)	Per your cluster's own network policy	TCP	Standard Kubernetes control-plane/data-plane communication — provisioning and securing the cluster network is your Kubernetes administrator's responsibility, not a CAST-specific requirement — Not a CAST-documented port — generic Kubernetes cluster networking, out of scope for this tool	Conditional
+imaging-services	extend.castsoftware.com	443	HTTPS	Product updates and licensing artifacts	Mandatory
+Every cluster worker node (container runtime)	registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com	443	HTTPS	Pull CAST's Docker Hub images at install/update time — Exact hostnames per Docker's documented pull path	Mandatory
+Every cluster worker node (container runtime)	registry.redhat.io	443	HTTPS	Pull the embedded PostgreSQL image — CAST's OpenShift chart 3.6.9 uses registry.redhat.io/rhel8/postgresql-15 — Image name per the chart's values.yaml; the registry normally needs a Red Hat pull secret (inference — standard for registry.redhat.io, usually already in the cluster's global pull secret)	Mandatory
+Administrator / CI host running Helm (or ArgoCD repo-server)	github.com (CAST-Extend/com.castsoftware.castimaging-v3.openshiftsetup)	443	HTTPS	Clone the CAST Imaging Helm chart repository (latest release branch, or an older one with -b x.x.x) — Needed at install and at every chart upgrade; a mirror of the repository inside your network works as well	Mandatory
+Administrator / delivery workstation	castsoftware.zendesk.com	443	HTTPS	CAST Support portal (tickets, downloads) — Browser access from the workstations (e.g. the operator machine), not from the CAST Imaging servers	Optional
+Administrator / delivery workstation	doc.castsoftware.com	443	HTTPS	CAST online documentation — Browser access from the workstations, not from the CAST Imaging servers	Optional
+SSO Service (Keycloak, core pods)	OIDC identity provider — discovery (.well-known/openid-configuration), token, UserInfo and JWKS endpoints	443	HTTPS	Keycloak contacts these endpoints directly, server to server — the token exchange is not a browser redirect — to fetch the discovery document and signing keys and to validate tokens — Per CAST's OpenID Connect page; a failure usually means a firewall or proxy blocks the host	Mandatory
+End-user browser	OIDC identity provider — authorization endpoint	443	HTTPS	The user is redirected to the provider to sign in and back to the redirect URI (https://<imaging-fqdn>/auth/realms/aip-realm/broker/<idp-alias>/endpoint, through the reverse proxy) — Reasonable inference from the redirect flow — CAST's page states only that the token exchange is server to server	Conditional
+4. Reverse Proxy & HTTPS / TLS
+A reverse proxy is a mandatory prerequisite. A reverse proxy (or equivalent load balancer/Ingress) in front of Gateway is required for installation, independent of whether HTTPS is enabled — CAST Imaging is not intended to be run with Gateway directly internet-facing.
+HTTPS/SSL itself is not mandatory, but highly recommended — except with OpenID Connect (Section 5), where it is mandatory. CAST Imaging can be served over plain HTTP through that reverse proxy; enable HTTPS whenever the deployment is reachable beyond a fully trusted, isolated network segment — which in practice means almost every deployment beyond a fully offline POC. OpenID Connect is the other exception: CAST's OpenID Connect page lists access to CAST Imaging via HTTPS, already set up and configured, as a requirement before you register the client application.
+OpenShift networking (CAST's chart 3.6.9): Routes.enable: true creates castimaging-route (host from FrontEndHost, target console-gateway-service:8090) and, with the Extend proxy enabled, extendproxy-route (:8085). With Routes.tls: true the routes use edge termination with the certificate and key you pass at install (--set-file tls.certificate=… --set-file tls.key=…), plain HTTP is not redirected. Request timeouts are set with haproxy.router.openshift.io/timeout from NetworkTimeoutSeconds (300 s) and ExtendProxy.timeoutSeconds (3600 s; the router default is 30 s when unset) — any reverse proxy or DMZ in front of the router must allow at least as long. CreateLoadBalancer is the alternative entry point. Since 3.6.9 the gateway only forwards X-Forwarded-* headers when GATEWAYSERVICE.SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_TRUSTEDPROXIES is set (default ".*", a regex on the calling IP — restrict it to the router pod network if you wish); without it the OAuth2 login callback is built as http://. The OpenShift router sets X-Forwarded-Proto/-Host; a reverse proxy, load balancer or DMZ in front of the router must forward the original ones.
+Reverse proxy: OpenShift Route.
+Certificate source: CA-issued.
+You must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.
+Once HTTPS is confirmed working, disable the reverse proxy's own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway's 8090 stays the proxy's internal upstream — keep it reachable only from the reverse proxy, not from users.
+5. User authentication prerequisites
+
+CAST Imaging authenticates users through an OpenID Connect-compliant identity provider (Microsoft Entra ID, Okta, Auth0…). The setup is done in parallel on two sides: at your identity provider, where CAST Imaging is registered as a client application, and in the Keycloak authentication system provided with CAST Imaging (realm aip-realm), where the provider is declared and its claims are mapped onto CAST Imaging groups. The Keycloak side is identical whichever provider you use. Source: CAST's Authentication – OpenID Connect page (install/authentication).
+
+Prerequisites
+Access to CAST Imaging via HTTPS already set up and configured (Section 4).
+Administrator access to your identity provider (to register a client application) and to Keycloak, using the kcadmin account.
+The clock of the cluster nodes running imaging-services must be accurate and synchronized (NTP): token validation is time sensitive, and the token exchange between Keycloak and your provider is a direct server-to-server call, not a browser redirect.
+Network: the SSO Service pod must reach the provider's discovery, token, UserInfo and JWKS endpoints server to server (see Section 3); a failure to retrieve the discovery document or signing keys usually means a firewall or proxy, not wrong URLs.
+Configuration steps
+Alias and redirect URI. Choose a short, lowercase, hyphenated alias (e.g. my-idp, no spaces or special characters); it forms the redirect URI your provider needs: https://<imaging-fqdn>/auth/realms/aip-realm/broker/<idp-alias>/endpoint.
+Register CAST Imaging at your provider as a confidential / web application (not public or single-page), entering the redirect URI character for character, and generate a client secret (often shown only once). Collect the Client ID, the Client secret and the discovery endpoint (.well-known/openid-configuration) — or, where none is published, the authorization, token, UserInfo and JWKS URLs.
+Claims. CAST Imaging requires email, given_name and family_name (emitted by most providers once the profile and email scopes are enabled; Keycloak imports them automatically — no mapper needed, unlike SAML). For group-based permissions (recommended) your provider must also emit a role/group claim (e.g. roles, groups, memberOf): confirm its exact name, the values it carries and any extra scope it needs.
+Declare the provider in Keycloak (aip-realm → Identity providers → OpenID Connect v1.0): alias, discovery endpoint, Client ID and secret, a client authentication method (Client secret sent as post is the most widely supported and the default when your provider's docs say nothing; also basic, JWT with the secret, or JWT with a private key), and scopes openid email profile plus any scope the role/group claim needs. Optionally enable Trust Email and set Allowed clock skew to a few seconds. Then check that the Redirect URI Keycloak shows is identical to the one registered.
+Groups and mappers. Group import is not supported: create each group in Keycloak (its name = the exact claim value) and add a Claim to Group mapper per group (sync mode Force recommended; use Regex Attribute Values such as ^architect$ when the claim is an array). Don't add mappers for email, given_name or family_name.
+Permissions. By default OIDC users have none: grant the ADMIN profile to at least one OIDC user — CAST recommends doing it with local authentication (admin / admin) and User Permissions — then assign profiles to the synchronized groups in CAST Imaging (User permissions → Users → Refresh).
+Test the login in a private browsing window. A prompt for first/last name means the standard claims aren't arriving.
+Disable the existing authentication methods. CAST highly recommends disabling or deleting the Local Authentication users/groups (temporarily switch OIDC off so they become visible, then re-enable it) so nobody can use a back-door login.
+
+Troubleshooting (per CAST): if the provider isn't offered at login, set the realm's Login theme to keycloak; decode the ID token (browser DevTools → Network → Preserve log) to check the claims; invalid/expired-token errors are often clock drift; the user is authenticated but in no group when the mapper's claim name or value (case included) doesn't match the token.
+
+6. CAST Extend access & licensing
+Allow outbound HTTPS (443) from imaging-services to extend.castsoftware.com.
+Generate an API key from the CAST Extend website and configure it in CAST Imaging / CAST Extend client to authenticate extension downloads.
+Obtain a valid CAST Imaging license key from your CAST account team; confirm it covers the modules you selected (MCP/AI: no; Highlight integration: no).
+7. Pre-installation checklist for your profile
+1 pod resource request(s) to fit on your cluster, requiring 6 cluster nodes minimum (4 vCPU / 32 GB RAM per node minimum, per CAST's Kubernetes hardware doc — see the callout below), plus 1 end-user workstation to access it.
+
+ Group by machine / role    Group by phase (decide, prepare, install, after)
+
+Grouped by the machine/role responsible for each item, so nothing gets forgotten when different teams own different servers — or, with the phase view, in the order you will work through them. Checked boxes are remembered in your browser as you tweak answers or reload the page.
+
+Single node pool (imaging-services + imaging-viewer + dashboards)
+Installing user/service account confirmed to have sufficient cluster rights (project creation, Helm release management) — separate from the CAST-service RBAC below
+Node pool capacity provisioned meeting the sizing in Section 1 (OpenShift, Viewer + Dashboards, read-only, Single node pool)
+PostgreSQL deployed by CAST's Helm chart (embedded database) — nothing to provision
+All firewall rules from Section 3 opened before install day
+Outbound access to extend.castsoftware.com confirmed
+Access to Docker Hub confirmed (registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com) for pulling CAST's images, and to registry.redhat.io for the embedded PostgreSQL image
+CAST Extend API key generated and stored securely
+CAST Imaging license key obtained, covering the selected modules; a key longer than 1023 characters is rejected as invalid (3.6.8 or later)
+OIDC client registered at the identity provider as a confidential/web application, with the redirect URI https://<imaging-fqdn>/auth/realms/aip-realm/broker/<idp-alias>/endpoint; Client ID, Client secret and discovery endpoint (or the four endpoint URLs) obtained
+Identity provider emits email, given_name, family_name and — for group-based permissions — a role/group claim whose exact name and values are confirmed
+Clock of the imaging-services cluster node(s) synchronized (NTP) — token validation is time sensitive
+SSO Service pod can reach the provider's discovery, token, UserInfo and JWKS endpoints server to server (Section 3)
+Identity provider declared in Keycloak (aip-realm), with a group and a Claim to Group mapper created for each entitlement level
+ADMIN profile granted to at least one OIDC user (via local authentication and User Permissions) and the OIDC login tested in a private browsing window
+Existing authentication methods (Local Authentication users/groups) disabled or deleted once OIDC works — CAST highly recommends it
+Keycloak accounts planned — the UI administrator kcadmin (3.6.0 or later; its name is set at a fresh install with KCADMIN_USERNAME) has the temporary password admin, to be changed at first login; the internal service account admin must not be changed in the Keycloak UI alone (login then fails with a Whitelabel error) — its initial password is random from 3.6.6 on this platform (read it in the installation .env); the CAST local user admin / admin must change its password at first login (3.6.5 or later); avoid passwords that are fully quoted, contain a space followed by #, or contain a backslash or slash (per CAST's accounts and passwords page)
+Keycloak client redirect URIs restricted once access works — by default they accept any URI (*, an open-redirect risk): Valid redirect URIs <base>/login/oauth2/code/<client-id> (client aip-console-client behind a reverse proxy, <hostname>-client-aip-realm for direct access), Valid post logout redirect URIs <base>, Web origins +; MCP clients need nothing (per CAST's redirect-URIs page)
+Storage ready: a block StorageClass (DiskClassName, ReadWriteOnce) and a shared-file StorageClass (FileClassName, ReadWriteMany — mandatory for pvc-shared-datadir), CSI drivers installed by the cluster administrator (CAST does not depend on a particular driver); both class names set to your cluster's own classes (the chart's default is the OpenShift Local provisioner)
+OpenShift project; RBAC; Route TLS certificate and key (--set-file tls.certificate / tls.key) — prepared
+Backup and restore planned with the chart's scripts ImagingBackup / ImagingRestore (.sh or .bat, run as <script> <namespace> <backup_dir> from a machine with oc connected to the cluster): an online backup of the shared directory (pvc-shared-datadir), the Neo4j graph databases and the embedded PostgreSQL (pg_dumpall); at least one analysis-node pod must be running (the script stops otherwise); OPENSHIFT_CHECK=y set; not covered: Helm values, Kubernetes secrets and other objects, the Extend Proxy volume and the logs (per the chart repository's ImagingBackupRestore.md)
+Access to github.com confirmed to clone the Helm chart repository (CAST-Extend/com.castsoftware.castimaging-v3.openshiftsetup, latest release branch — or -b x.x.x for an older release)
+End-user workstation
+Browser (Chrome latest, Edge ≥ 44, Firefox ≥ 95 or Safari ≥ 12), 8 GB RAM, and 1920×1080 resolution requirements communicated to end users
+CAST Report Generator installed (Windows, .NET 8 SDK, API key from CAST Imaging user profile) on workstations that need Word/Excel/PowerPoint report exports — see install/report-generator / export-v2/doccom/cast-report-generator

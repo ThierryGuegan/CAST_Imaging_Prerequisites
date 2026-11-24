@@ -28,5 +28,8 @@ One line per CAST documentation page read for this tool. **V** = body read verba
 | Release notes | Windows installer 3.6 | 2026-11-24 | P (3.6.9 and most of 3.6.8 only — the source truncates the page; no per-version subpages) | — |
 | Release notes | Linux / Windows 3.5 | 2026-11-24 | P (3.5.9–3.5.6 V, rest S) | — |
 
+| Administration | `imaging/administer/system-settings/` (index, `highlight/`, `proxy/`), `administer/manage-access/profile/email-notifications/` | 2026-11-24 | V | 14 Sep – 30 Oct 2026 |
+| Source code | `imaging/onboard/register-deliver-source-code/`, `administer/global-configuration/source-folder-location/`, `…/maven-repos/` | 2026-11-24 | V | 8 Jul – 30 Oct 2026 |
+
 ## Not read (yet)
-Windows release notes 3.6.7–3.6.0; MCP Podman and air-gapped pages (documented for 3.0.x only); `imaging/install/requirements/hardware/sizing-calculator/`; Highlight, e-mail and source-code access pages (the tool's sections rest on older reads); Docker `dedicated-neo4j` Podman page; the security-fix subpages of the release notes.
+Windows release notes 3.6.7–3.6.0; MCP Podman and air-gapped pages (documented for 3.0.x only); `imaging/install/requirements/hardware/sizing-calculator/`; the `highlight2mri` extension page itself (its body was never reached); Docker `dedicated-neo4j` Podman page; the security-fix subpages of the release notes.
