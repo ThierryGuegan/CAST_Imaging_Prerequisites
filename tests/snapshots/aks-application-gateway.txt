@@ -1,4 +1,5 @@
 At a glance — Kubernetes (Microsoft Azure — AKS) · Analysis + Dashboards (no Viewer) · Single node pool: 6 cluster node(s) minimum and 2 workstation role(s); 11 mandatory network flows out of 22; checklist: 6 to decide, 12 to prepare, 0 for the install day, 4 after the installation.
+How to read this document
 Points to confirm with CAST (6) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
 Where CAST's own pages disagree (1) — the tool states both and does not pick one
 1. Hardware sizing for your profile

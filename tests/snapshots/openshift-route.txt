@@ -1,4 +1,5 @@
 At a glance — OpenShift · Viewer + Dashboards, read-only · Single node pool: 6 cluster node(s) minimum and 1 workstation role(s); 12 mandatory network flows out of 21; checklist: 8 to decide, 9 to prepare, 0 for the install day, 6 after the installation.
+How to read this document
 Points to confirm with CAST (4) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
 1. Hardware sizing for your profile
 Project scale profile: 150–500 applications, 10–50 concurrent users — drives the sizing baseline below.

@@ -1,0 +1,16 @@
+name: documentation-links
+# Monthly check that the CAST documentation links written into the tool still answer. Never blocks a merge:
+# the site may refuse GitHub's runners, so a failure here is a prompt to look, not proof of a broken link.
+on:
+  schedule:
+    - cron: '17 6 3 * *'
+  workflow_dispatch:
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node tests/links.js --check

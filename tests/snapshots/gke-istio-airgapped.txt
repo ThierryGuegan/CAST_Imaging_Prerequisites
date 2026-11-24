@@ -1,4 +1,5 @@
 At a glance — Kubernetes (Google Cloud Platform — GKE) · Full (analysis + Viewer + Dashboards) · Isolated nodes: 8 cluster node(s) minimum and 2 workstation role(s); 13 mandatory network flows out of 25; checklist: 8 to decide, 15 to prepare, 0 for the install day, 3 after the installation.
+How to read this document
 Points to confirm with CAST (6) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
 Where CAST's own pages disagree (1) — the tool states both and does not pick one
 1. Hardware sizing for your profile

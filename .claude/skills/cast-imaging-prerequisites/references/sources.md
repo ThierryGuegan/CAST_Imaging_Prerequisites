@@ -31,5 +31,9 @@ One line per CAST documentation page read for this tool. **V** = body read verba
 | Administration | `imaging/administer/system-settings/` (index, `highlight/`, `proxy/`), `administer/manage-access/profile/email-notifications/` | 2026-11-24 | V | 14 Sep – 30 Oct 2026 |
 | Source code | `imaging/onboard/register-deliver-source-code/`, `administer/global-configuration/source-folder-location/`, `…/maven-repos/` | 2026-11-24 | V | 8 Jul – 30 Oct 2026 |
 
+| Sizing | `imaging/install/requirements/hardware/` (parent page, **V**, 17 Nov 2026), `…/sizing-calculator/` and `…/how-it-works/` (**V**, beta, 16 Oct / 4 Nov 2026) | 2026-11-24 | V | — |
+
+The sizing calculator pages contain **no usable formula, table or example** (the widget did not render; the method page gives no numbers); per-component figures exist only as the fixed tables of the parent hardware page, which the tool follows (VM floors 1 CPU / 2 cores minimum, 16 GB distributed / 32 GB single machine, 256 GB disk; Kubernetes 2 nodes minimum, 4 vCPU and 32 GB per node, +1 node per extra analysis-node; isolation examples 2 / 3 / 4 / 6 nodes). Nothing to compare the tool's sizing against.
+
 ## Not read (yet)
-Windows release notes 3.6.7–3.6.0; MCP Podman and air-gapped pages (documented for 3.0.x only); `imaging/install/requirements/hardware/sizing-calculator/`; the `highlight2mri` extension page itself (its body was never reached); Docker `dedicated-neo4j` Podman page; the security-fix subpages of the release notes.
+Windows release notes 3.6.7–3.6.0; MCP Podman and air-gapped pages (documented for 3.0.x only); the `highlight2mri` extension page itself (its body was never reached); Docker `dedicated-neo4j` Podman page; the security-fix subpages of the release notes.

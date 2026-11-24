@@ -1,4 +1,5 @@
 At a glance — Docker · Full (analysis + Viewer + Dashboards) · Single machine: 1 server machine(s) and 2 workstation role(s); 10 mandatory network flows out of 17; checklist: 8 to decide, 11 to prepare, 2 for the install day, 2 after the installation.
+How to read this document
 Points to confirm with CAST (2) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
 1. Hardware sizing for your profile
 Project scale profile: < 50 applications, 10–50 concurrent users — drives the sizing baseline below.

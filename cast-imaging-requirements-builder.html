@@ -539,6 +539,7 @@
   var TOOL_VERSION = '2026-11-24';
   var CHANGELOG = [
     ['2026-11-24', 'Entry options for Kubernetes: Istio, Amazon CloudFront (EKS) and Azure Application Gateway (AKS, from CAST\'s chart PDF)'],
+    ['2026-11-24', 'A short "How to read this document" box at the top of the results'],
     ['2026-11-24', 'Collapsible sections; export file names carry the platform and scenario; Highlight, SMTP, proxy and source-folder items from CAST\'s administration pages'],
     ['2026-11-24', 'At a glance summary; list of conflicts between CAST pages; MCP installation settings; values an update cannot change; license and DB_DATABASE notes from the 3.6 release notes'],
     ['2026-11-24', 'Checklist can be read by phase (decide, prepare, install, after); the checklist export keeps its ticks by item id'],
@@ -2117,7 +2118,12 @@
     groups.forEach(function(g){ g.items.forEach(function(it){ glance[checklistPhaseOf(it.id)]++; }); });
     var glanceHtml = '<div class="callout info" id="at-a-glance"><b>At a glance</b> — '+esc(LABELS.platform[a.platform])+(isK8s && a.platform === 'kubernetes' ? ' ('+esc(LABELS.k8sProvider[a.k8sProvider])+')' : '')+' · '+esc(LABELS.scenario[a.scenario])+' · '+esc(topologyLabel(a))+': '+
       (isK8s ? '<b>'+k8sMinNodes+'</b> cluster node(s) minimum' : '<b>'+serverMachineCount+'</b> server machine(s)')+' and <b>'+workstationRoleCount+'</b> workstation role(s); <b>'+portRows.filter(function(row){ return row.tag === 'mandatory'; }).length+'</b> mandatory network flows out of '+portRows.length+'; checklist: <b>'+glance.decide+'</b> to decide, <b>'+glance.prepare+'</b> to prepare, <b>'+glance.install+'</b> for the install day, <b>'+glance.after+'</b> after the installation.</div>';
-    allHtml = glanceHtml + pointsToConfirm(allHtml) + pagesDisagree(a) + allHtml;
+    var howToRead = '<details class="callout info confirm-box" id="how-to-read"><summary><b>How to read this document</b></summary><ul>' +
+      '<li><b>At a glance</b> gives the size of the installation and how much there is to do; each numbered section below can be folded.</li>' +
+      '<li><b>Points to confirm with CAST</b> are statements this tool infers or takes from a summary of a CAST page — check them before relying on them. <b>Where CAST\'s own pages disagree</b> names the contradictions your answers run into; the tool shows both values and does not choose.</li>' +
+      '<li>The <b>checklist</b> at the end can be read by machine / role or by phase (decide, prepare, install day, after); ticks are kept in your browser and survive changes of answers.</li>' +
+      '<li>Every fact comes from CAST\'s documentation, the chart repositories or a clearly labelled inference; the tool\'s footer gives the date of its last content update.</li></ul></details>';
+    allHtml = glanceHtml + howToRead + pointsToConfirm(allHtml) + pagesDisagree(a) + allHtml;
     document.getElementById('results-content').innerHTML = allHtml;
     makeSectionsCollapsible();
     applyPortsFilter();

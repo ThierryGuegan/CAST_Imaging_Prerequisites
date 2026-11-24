@@ -1,4 +1,5 @@
 At a glance — Windows Server · Dashboards only, read-only · Single machine: 2 server machine(s) and 1 workstation role(s); 7 mandatory network flows out of 13; checklist: 9 to decide, 9 to prepare, 3 for the install day, 4 after the installation.
+How to read this document
 Points to confirm with CAST (1) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
 1. Hardware sizing for your profile
 Project scale profile: 150–500 applications, 10–50 concurrent users — drives the sizing baseline below.
