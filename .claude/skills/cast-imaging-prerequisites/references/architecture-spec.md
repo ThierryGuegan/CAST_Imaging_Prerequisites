@@ -614,7 +614,7 @@ own.
    subsection is omitted otherwise — an earlier "Not required" row was noise). The Version row branches: embedded
    `postgres:15` container (Docker/Podman co-located only), Helm-chart pod (Kubernetes co-located,
    version "not confirmed here"), self-installed EnterpriseDB (Windows co-located), a managed
-   DBaaS pick, or a self-provisioned instance — always with the supported 14.x–18.x range (18.x
+   DBaaS pick, or a self-provisioned instance — always with the supported 15.x–18.x range (18.x
    recommended). High availability at enterprise scale is labelled as this tool's heuristic, not a
    CAST rule.
 3. **Network ports & FQDN allowlist** (`netHtml`) — the full `buildPortRows(a)` table. This is
