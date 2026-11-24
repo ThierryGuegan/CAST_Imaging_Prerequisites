@@ -29,8 +29,8 @@ document states has to earn that sentence — see the Goal section of `SKILL.md`
   - `.form-pane` (fixed width, sticky, scrolls independently) — the questionnaire, organized into
     numbered `<fieldset>` sections (see below).
   - `.results-pane` (flex:1, scrolls independently) — a "Generated {date} at {time}" timestamp,
-    profile chips, a `.toolbar` with two buttons (**Print / Save as PDF** and **Export checklist as
-    HTML** — see "Checklist HTML export" below), a validation-notice callout, a `#results-content`
+    profile chips, a `.toolbar` with five buttons (**Print / Save as PDF**, **Save as HTML**, **Export checklist as
+    HTML**, **Save answers (JSON)** and **Import answers (JSON)** — see "Checklist HTML export" below), a validation-notice callout, a `#results-content`
     div that `render()` overwrites wholesale on every change, and a footer. The timestamp is set from inside `render()`
     (see Content freshness marker below), not just once at load — it exists to tell the reader when
     the *currently-displayed* content was produced, which is only true if it updates every time the
@@ -43,7 +43,7 @@ document states has to earn that sentence — see the Goal section of `SKILL.md`
   keeps headings from being orphaned at the bottom of a printed page. (The validation notice is
   `.callout.warn.no-print`, but the print block only hides the header/toolbar/form pane, so it does
   still print — an open choice, not an accident to "fix" silently.) It also redefines the same `:root` custom properties to
-  a light palette (see below) — print is this tool's only non-dark rendering context, and it went
+  a light palette (see below) — print is the second non-dark rendering context besides the light-theme toggle, and it went
   a long time silently broken: the print block only ever set `body{background:#fff}`, leaving
   every fieldset/callout/table/chip/diagram box on its own dark `var(--panel*)` background with
   hardcoded `color:#fff` text sitting on top — readable on screen, largely invisible once the page
@@ -176,7 +176,7 @@ be a search-and-fix pass, not a rename in isolation.
    the HTTPS section shows a warning callout (`proxyMismatchHtml`) and the checklist item says
    "incompatible with your platform".
 6. **HTTPS / TLS certificate** (legend renamed from the bare "HTTPS", which didn't say what was being asked) — certificate source and TLS termination point. Kept separate from egress (question 4)
-   and from Reverse proxy (Section 5) because all three are orthogonal decisions a reader might
+   and from Reverse proxy (question 5) because all three are orthogonal decisions a reader might
    answer differently. The certificate-source choice includes a real "no HTTPS — serve over plain
    HTTP" option, not just CA-issued/self-signed — HTTPS itself is highly recommended but not
    mandatory (unlike the reverse proxy). The one hard exception: **SAML SSO and OpenID Connect require HTTPS** (SAML: inference from the
@@ -190,7 +190,7 @@ be a search-and-fix pass, not a rename in isolation.
    architecture diagram confirmed the real component names. Don't build rows that bypass Gateway's
    `/auth`/`/oauth2` routing to reach these directly (a past bug: a headless API-client row sent
    traffic straight to "Auth service" on its own port instead of through Gateway).
-8. **Optional integrations** — MCP/AI (with LLM provider sub-select), CAST Highlight, email
+8. **Optional integrations** — (on Kubernetes/OpenShift the MCP checkbox is hidden and ignored when the scenario has no Viewer — `mcpBlocked()`, `#mcp-blocked-note`; every radio group carries `role=radiogroup` + `aria-labelledby` wired at load) MCP/AI (with LLM provider sub-select), CAST Highlight, email
    notifications. Each is a checkbox that adds rows/sections conditionally rather than replacing
    anything.
 9. **Source code access** — how source reaches the analysis-nodes. CAST Imaging v3 takes source as
@@ -722,7 +722,7 @@ section. Group titles follow the same wording rules as the rest of the file ("Cl
 ### Save / import answers (JSON)
 
 `#save-json` / `#import-json` (toolbar) round-trip the whole configuration. The file is
-`{format:'cast-imaging-requirements-builder/answers', schema:1, toolVersion, savedAt, answers, reverseProxyChosenByUser, checklistTicks}`.
+`{format:'cast-imaging-requirements-builder/answers', schema:2 (2 = OpenShift is the `k8sProvider` value; a schema-1 `platform:'openshift'` is mapped on import), toolVersion, savedAt, answers, reverseProxyChosenByUser, checklistTicks}`.
 `answers` is **read from the form pane's own controls** (checked radios by group name, checkboxes by id,
 text inputs by id), so a new questionnaire control is saved and restored with no extra code — keep new
 controls inside `#form-pane` with a `name`/`id`. `checklistTicks` are the ids ticked in
