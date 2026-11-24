@@ -44,6 +44,7 @@ const LEAKS = {
       if (m) fails.push('provider leak (' + m[0] + ': …' + t.slice(Math.max(0, m.index - 60), m.index + 60).replace(/\s+/g, ' ') + '…) on ' + tag);
     }
     if ((pl === 'kubernetes' || pl === 'openshift') && /Imaging MCP \+ Gatekeeper MCP\)/.test(t)) fails.push('Gatekeeper counted on Kubernetes: ' + tag);
+    if (/14\.x[–-]18\.x/.test(t)) fails.push('stale PostgreSQL range 14.x–18.x: ' + tag);
     if (pl !== 'windows' && /\b2284\b/.test(t)) fails.push('Windows port 2284 leaked: ' + tag);
     if (pl === 'windows' && /\b8089\b/.test(t) && !/Docker\/Podman/.test(t)) fails.push('Docker port 8089 on Windows: ' + tag);
   }
