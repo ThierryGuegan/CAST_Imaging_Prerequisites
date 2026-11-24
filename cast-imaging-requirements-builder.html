@@ -498,7 +498,7 @@
   // label changes — not a pure refactor). This is the tool's own "last verified" marker,
   // distinct from the live "Generated <timestamp>" line, which just reflects the viewer's
   // clock and tells you nothing about how fresh the underlying content is.
-  var TOOL_VERSION = '2026-11-23';
+  var TOOL_VERSION = '2026-11-24';
 
   var LABELS = {
     scale:{poc:'< 50 applications', small:'50–150 applications', standard:'150–500 applications', enterprise:'500+ applications'},
@@ -676,6 +676,7 @@
     var isK8sDiagram = isKube(a);
     var machineWord = isK8sDiagram ? 'pod' : 'machine';
     var coreWordDiagram = isK8sDiagram ? 'core pods' : (a.topology === 'single' ? 'single machine' : 'core node');
+    var coreLblWord = isK8sDiagram ? 'core pods' : (a.topology === 'single' ? 'machine' : 'core node');   // short form for the lane labels
     var W = 1260, boxH = 60, gapY = 34, headerH = 30;
 
     function layoutRow(items, w){
@@ -852,7 +853,7 @@
 
     var pgBox = byKey(dataRow, 'pg'), etlBox = byKey(dataRow, 'etl'), neo4jBox = byKey(dataRow, 'neo4j');
     svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L40,'+(yGateway+boxH/2)+' L40,'+(yData+boxH/2)+' L'+pgBox.x+','+(yData+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
-    svg += label(85, yData+boxH/2-8, coreWordDiagram+' :2285', FLOW);
+    svg += label(85, yData+boxH/2-8, coreLblWord+' :2285', FLOW);
     // Which core-node containers connect to PostgreSQL — confirmed by CAST (2026-10-09): Control Panel, SSO
     // Service, Auth Service, Console, Dashboards (plus analysis-node and imaging-viewer, drawn separately).
     // Gateway, Extend Local Server and the MCP servers do not. The bus tees into the core-node lane (x=40),
@@ -900,7 +901,7 @@
       svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
       svg += line(extendBox.x+extendBox.w, yExtendRow+boxH/2, extendTargetBox.x, yExtendRow+boxH/2, FLOW, 'ah-flow', true);
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-flow)"/>';
-      svg += label(60, yExtendRow+boxH/2-8, coreWordDiagram+' :8085', FLOW);
+      svg += label(60, yExtendRow+boxH/2-8, coreLblWord+' :8085', FLOW);
       if(analysisBox){
         var dropX = extendBox.x+extendBox.w-30, aboveY = yExtendRow-14;
         svg += '<path d="M'+(analysisBox.cx+20)+','+(ySupport+boxH)+' L'+(analysisBox.cx+20)+','+(ySupport+boxH+12)+' L'+(laneR-14)+','+(ySupport+boxH+12)+' L'+(laneR-14)+','+aboveY+' L'+dropX+','+aboveY+' L'+dropX+','+yExtendRow+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
@@ -918,7 +919,7 @@
       var extendTargetBox = extendRow[0];
       svg += box(extendTargetBox, yExtendRow, {fill:'var(--code-bg)', dash:true});
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L20,'+(yGateway+boxH/2)+' L20,'+(yExtendRow+boxH/2)+' L'+extendTargetBox.x+','+(yExtendRow+boxH/2)+'" fill="none" stroke="'+FLOW+'" stroke-width="1.5" marker-end="url(#ah-flow)"/>';
-      svg += label(60, yExtendRow+boxH/2-8, coreWordDiagram+' :443', FLOW);
+      svg += label(60, yExtendRow+boxH/2-8, coreLblWord+' :443', FLOW);
       if(analysisBox){
         svg += bottomLane(analysisBox.cx+20, ySupport+boxH, ySupport+boxH+12, laneR-14, yExtendRow+boxH/2, extendTargetBox.x+extendTargetBox.w, FLOW, 'ah-flow');
         svg += label(laneR-60, yExtendRow+boxH/2-8, 'analysis-node :443', FLOW);
@@ -932,7 +933,7 @@
       var marginX = 20;
       svg += '<path d="M'+gatewayRow[0].x+','+(yGateway+boxH/2)+' L'+marginX+','+(yGateway+boxH/2)+' L'+marginX+','+(ySharedRow+boxH/2)+' L'+sharedRow[0].x+','+(ySharedRow+boxH/2)+'" fill="none" stroke="'+SHARED+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-shared)"/>';
       var sharedProto = a.platform === 'kubernetes' ? (a.k8sProvider === 'eks' ? ' · NFS :2049' : a.k8sProvider === 'aks' ? ' · SMB :445' : '') : '';
-      svg += label(marginX+52+(coreWordDiagram+sharedProto).length*0.9, ySharedRow+boxH/2-8, coreWordDiagram+sharedProto, SHARED);   // labels are centred on x
+      svg += label(marginX+52+(coreLblWord+sharedProto).length*0.9, ySharedRow+boxH/2-8, coreLblWord+sharedProto, SHARED);   // labels are centred on x
       if(analysisBox) svg += bottomLane(analysisBox.cx-20, ySupport+boxH, ySupport+boxH+22, laneR-28, ySharedRow+boxH/2, sharedRow[0].x+sharedRow[0].w, SHARED, 'ah-shared', true);
       if(neo4jBox && a.topology === 'multi' && a.neo4jDedicated) svg += '<path d="M'+(neo4jBox.x+neo4jBox.w)+','+(yData+boxH/2+14)+' L'+(laneR-42)+','+(yData+boxH/2+14)+' L'+(laneR-42)+','+(ySharedRow+boxH/2+12)+' L'+(sharedRow[0].x+sharedRow[0].w)+','+(ySharedRow+boxH/2+12)+'" fill="none" stroke="'+SHARED+'" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-shared)"/>';
       sharedNote = isK8sDiagram ? ' In CAST\'s Helm chart this shared RWX volume is mounted by the console service, the control panel and the analysis-node pods — only representative lines are drawn.' : ' Every CAST Imaging '+machineWord+' uses this shared storage read/write (including the core node) — only representative lines are drawn.';
@@ -993,7 +994,7 @@
        a.topology === 'multi' ? 'co-located with the ' + coreWord : (isK8s ? 'co-located with all pods' : 'co-located on the single machine')) + ')';
     var adminRows;
     if(isK8s){
-      adminRows = [{src:(isOcp(a) ? 'oc / helm / CI pipelines' : 'kubectl / CI pipelines'), dst:(isOcp(a) ? 'OpenShift API server' : 'Kubernetes API server'), port:'6443', proto:'TCP', purpose:'Cluster administration and CAST deployment/upgrade via Helm', tag:'mandatory', note:'6443 is the default for self-managed clusters and OpenShift; managed services (EKS, AKS, GKE) usually expose the API server on 443 — reasonable inference, not CAST-documented'}];
+      adminRows = [{src:(isOcp(a) ? 'oc / helm / CI pipelines' : 'kubectl / CI pipelines'), dst:(isOcp(a) ? 'OpenShift API server' : 'Kubernetes API server'), port:(a.platform === 'kubernetes' && a.k8sProvider !== 'other' ? '443 (managed endpoint, usually) or 6443' : '6443'), proto:'TCP', purpose:'Cluster administration and CAST deployment/upgrade via Helm', tag:'mandatory', note:'6443 is the default for self-managed clusters and OpenShift; managed services (EKS, AKS, GKE) usually expose the API server on 443 — reasonable inference, not CAST-documented'}];
     } else if(a.platform === 'windows'){
       adminRows = [{src:'Administrator workstation', dst:(hasDistributedNodes(a) ? 'Every CAST Imaging machine (Windows)' : 'CAST Imaging host (Windows)'), port:'3389', proto:'RDP', purpose:'Server administration', tag:'mandatory'}];
     } else {
@@ -1033,9 +1034,9 @@
     // Core-node containers that use PostgreSQL. imaging-services' own row above already covers the
     // network path (they share the core node); these rows say *who* uses it, with honest confidence.
     rows.push({src:'SSO Service ('+coreWord+')', dst:dbDest, port:dbPort, proto:'TCP', purpose:'The SSO Service connects directly to PostgreSQL — it keeps its data in a dedicated "keycloak" database on the same instance', tag:'mandatory', note:'Confirmed by CAST (directly connected). Same network path as imaging-services\' row above'+(a.dbHosting !== 'colocated' ? ' — the dedicated/managed database must also host this database and its user' : '')});
-    rows.push({src:'Auth Service, Console, Control Panel'+(hasDashboards(a) ? ', Dashboards' : '')+' ('+coreWord+')', dst:dbDest, port:dbPort, proto:'TCP', purpose:'These containers connect directly to PostgreSQL', tag:'mandatory', note:'Confirmed by CAST (directly connected). They share the '+coreWord+' with imaging-services, so no firewall rule beyond that path — but pg_hba.conf must allow them. Gateway, the Extend Local Server and the MCP servers do not connect to PostgreSQL'});
+    rows.push({src:'Auth Service, Console, Control Panel'+(hasDashboards(a) ? ', Dashboards' : '')+' ('+coreWord+')', dst:dbDest, port:dbPort, proto:'TCP', purpose:'These '+(a.platform === 'windows' ? 'services' : 'containers')+' connect directly to PostgreSQL', tag:'mandatory', note:'Confirmed by CAST (directly connected). They share the '+coreWord+' with imaging-services, so no firewall rule beyond that path — but pg_hba.conf must allow them. Gateway, the Extend Local Server and the MCP servers do not connect to PostgreSQL'});
     if(hasViewer(a)){
-      rows.push({src:'imaging-viewer ('+(isK8s ? 'pods' : 'containers')+', incl. ETL service)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'imaging-viewer is documented as a directly connected component (the ETL service reads the analysis data from PostgreSQL to load Neo4j)', tag:'mandatory', note:'Confirmed by CAST at component level — which of its containers connect isn\'t itemised; same '+(isK8s ? 'node pool' : 'host')+' as the '+coreWord+' unless you split it'});
+      rows.push({src:'imaging-viewer ('+(isK8s ? 'pods' : 'containers')+', incl. ETL service)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'imaging-viewer is documented as a directly connected component (the ETL service reads the analysis data from PostgreSQL to load Neo4j)', tag:'mandatory', note:'Confirmed by CAST at component level — which of its '+(a.platform === 'windows' ? 'services' : 'containers')+' connect isn\'t itemised; same '+(isK8s ? 'node pool' : 'host')+' as the '+coreWord+' unless you split it'});
     }
     var interNodeNote = isK8s ? 'in-cluster pod-to-pod traffic — allow it in your NetworkPolicy if you enforce one' : 'a real firewall path must be opened';
     if(a.topology === 'multi' && hasAnalysis(a)){
@@ -1429,9 +1430,9 @@
     if(hasNeo4j(a)) componentRows.push(['ETL service', '9001', 'Loads analysis results from PostgreSQL into Neo4j for the Viewer']);
     if(hasViewer(a)) componentRows.push(['AI-service (ai-manager)', '8082', 'Part of imaging-viewer, serving the Viewer/Viewer-APIs — per CAST\'s architecture diagram it is a distinct component unrelated to the MCP/AI integration (question 8) despite the similar naming']);
     if(a.mcp) componentRows.push(['MCP Server (Aggregator Gateway)', '8285', 'CAST Imaging MCP Server 3.1 — the only MCP port clients reach, routed from Gateway (any <code>/mcp</code> route; admin routes <code>/mcp/healthcheck</code>, <code>/mcp/status</code>, <code>/mcp/servers</code>, <code>/mcp/tools</code>); '+(isK8s ? 'the <code>mcp-server</code> pod\'s only exposed port; ' : 'published on the host by the installer; ')+'the bundled Structural (8282, CAST Imaging REST API), Semantic search (8287, Neo4j) and Text2Cypher (8289, Neo4j) MCP servers listen on the '+(a.platform === 'windows' ? 'machine' : 'container')+' loopback']);
-    if(a.mcp) componentRows.push(['Gatekeeper MCP', '8283', 'Standalone '+(a.platform === 'windows' ? 'service (<code>Gatekeeper-MCP-Server</code>, TCP 8283)' : 'container (<code>castimaging/gatekeeper-mcp-server</code>, TCP 8283)')+' connecting AI clients to CAST Imaging\'s Dashboard REST API (<code>/dashboards/rest</code> on imaging-services), routed from Gateway (path /mcp/gatekeeper); installed alongside the MCP Server, not part of its 3.1 container'+(isK8s ? ' — <b>not deployed by CAST\'s Helm chart 3.6.9</b> (it ships only <code>mcp-server</code>, the 3.1 aggregator on port 8285); confirm in CAST\'s docs how Gatekeeper is deployed on '+esc(LABELS.platform[a.platform]) : '')]);
+    if(a.mcp) componentRows.push(['Gatekeeper MCP', '8283', 'Standalone '+(a.platform === 'windows' ? 'service (<code>Gatekeeper-MCP-Server</code>, TCP 8283)' : 'container (<code>castimaging/gatekeeper-mcp-server</code>, TCP 8283)')+' connecting AI clients to CAST Imaging\'s Dashboard REST API (<code>/dashboards/rest</code> on imaging-services), routed from Gateway (path /mcp/gatekeeper); installed alongside the MCP Server, not part of its 3.1 '+(a.platform === 'windows' ? 'service' : 'container')+''+(isK8s ? ' — <b>not deployed by CAST\'s Helm chart 3.6.9</b> (it ships only <code>mcp-server</code>, the 3.1 aggregator on port 8285); confirm in CAST\'s docs how Gatekeeper is deployed on '+esc(LABELS.platform[a.platform]) : '')]);
     if(hasDashboards(a)) componentRows.push(['Dashboards', '8097', 'KPI dashboards UI (path /dashboards)']);
-    if(hasNeo4j(a)) componentRows.push(['Neo4j', '7687 / 7474 / '+(isK8s ? '' : '7473 / ')+'6362', 'Graph database for the Viewer (Bolt / HTTP browser interface / backup)'+(isK8s ? ' — CAST\'s Helm chart exposes 7474, 7687, 7473 and 8888 on the Neo4j Service, not 6362' : '')]);
+    if(hasNeo4j(a)) componentRows.push(['Neo4j', '7687 / 7474 / '+(isK8s ? '' : '7473 / ')+'6362', 'Graph database for the Viewer (Bolt / HTTP browser'+(isK8s ? ' interface' : ' / HTTPS browser')+' / backup)'+(isK8s ? ' — CAST\'s Helm chart exposes 7474, 7687, 7473 and 8888 on the Neo4j Service, not 6362' : '')]);
     componentRows.push(['PostgreSQL', '2285 (default, configurable)', 'Relational database used directly by Control Panel, SSO Service, Auth Service, Console, Dashboards, analysis-node and imaging-viewer (per CAST) — not by Gateway, the Extend Local Server or the MCP servers']);
     if(a.egress === 'airgapped') componentRows.push(['Extend Local Server (' + (a.platform === 'windows' ? 'CAST_ExtendProxy service' : isK8s ? 'extendproxy pod' : 'extend-proxy') + ')', '8085', 'On-premises mirror of extend.castsoftware.com for air-gapped installs']);
 
@@ -1455,23 +1456,30 @@
       storageHtml = '<h4>Storage locations</h4><p>CAST does not ship a PostgreSQL installer for Windows — you install an official EnterpriseDB PostgreSQL release yourself and accept its defaults: <code>%PROGRAMFILES%\\PostgreSQL\\&lt;version&gt;</code> for the install directory, <code>%PROGRAMFILES%\\PostgreSQL\\&lt;version&gt;\\data</code> for the data directory (a Windows Service named <code>postgresql-x64-&lt;version&gt;</code> is created and set to auto-start). The older <code>%PROGRAMFILES%\\CAST\\CASTStorageService&lt;version&gt;</code> path (with a <code>DBDATADIR</code> installer variable) belongs to the legacy, end-of-life <b>CAST Storage Service</b> installer — not the current PostgreSQL-based install. Full per-folder paths are at CAST\'s reference: ' +
         '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/windows/" target="_blank" rel="noopener">storage-locations/windows</a> and <a href="https://doc.castsoftware.com/imaging/install/db/windows/" target="_blank" rel="noopener">install/db/windows</a>.</p>';
     } else if(isK8s){
-      storageHtml = '<h4>Storage locations</h4><p>On '+esc(LABELS.platform[a.platform])+', storage is provisioned as persistent volumes/StorageClasses rather than host paths — block volumes'+(isOcp(a) ? '' : ' (e.g. Azure Disks on AKS)')+' for the databases and logs, plus a shared-access (RWX) volume'+(isOcp(a) ? '' : ' (e.g. Azure Files)')+' that CAST\'s chart always requires. See CAST\'s cloud reference: ' +
+      storageHtml = '<h4>Storage locations</h4><p>On '+esc(LABELS.platform[a.platform])+', storage is provisioned as persistent volumes/StorageClasses rather than host paths — block volumes'+(isOcp(a) || a.k8sProvider === 'other' ? '' : a.k8sProvider === 'eks' ? ' (Amazon EBS)' : a.k8sProvider === 'aks' ? ' (Azure Disks)' : ' (Persistent Disk)')+' for the databases and logs, plus a shared-access (RWX) volume'+(isOcp(a) || a.k8sProvider === 'other' ? '' : a.k8sProvider === 'eks' ? ' (Amazon EFS)' : a.k8sProvider === 'aks' ? ' (Azure Files)' : ' (Filestore)')+' that CAST\'s chart always requires. See CAST\'s cloud reference: ' +
         '<a href="https://doc.castsoftware.com/imaging/install/requirements/disk/storage-locations/cloud/" target="_blank" rel="noopener">storage-locations/cloud</a>.</p>' +
         '<p><b>What CAST\'s Helm chart 3.6.9 itself creates</b> (<code>storage.yaml</code>, <code>values.yaml</code>):</p><ul>' +
         '<li><b>Always a shared <code>pvc-shared-datadir</code></b> (100 Gi by default), <b>ReadWriteMany</b>, on the <code>FileClassName</code> StorageClass — mounted by the console service, the control panel and the analysis-node (<code>/opt/cast/shared</code>: deploy, delivery, common-data). An RWX-capable file StorageClass is therefore <b>always required</b>, even with a single analysis-node pod (confirmed by the tool\'s maintainer, 2026-10-28).</li>' +
-        '<li>Block volumes (<code>DiskClassName</code>, ReadWriteOnce): <code>db-data</code> 128 Gi (embedded PostgreSQL), <code>castdir</code> 100 Gi (<code>/usr/share/CAST</code> — extensions, logs), Neo4j data 100 Gi, ETL logs and CSV archive 10 Gi each, Extend proxy data 10 Gi, and 1–2 Gi log volumes per service. The log/audit volumes are kept on uninstall (<code>helm.sh/resource-policy: keep</code>).</li>' +
+        '<li>Block volumes (<code>DiskClassName</code>, ReadWriteOnce): ' + [
+          a.dbHosting === 'colocated' ? '<code>db-data</code> 128 Gi (embedded PostgreSQL)' : '',
+          hasAnalysis(a) ? '<code>castdir</code> 100 Gi (<code>/usr/share/CAST</code> — extensions, logs)' : '',
+          hasNeo4j(a) ? 'Neo4j data 100 Gi' : '',
+          hasViewer(a) ? 'ETL logs and CSV archive 10 Gi each' : '',
+          a.egress === 'airgapped' ? 'Extend proxy data 10 Gi' : '',
+          '1–2 Gi log volumes per service'
+        ].filter(function(x){ return x; }).join(', ') + '. The log/audit volumes are kept on uninstall (<code>helm.sh/resource-policy: keep</code>).</li>' +
         (isOcp(a)
           ? '<li><b>OpenShift:</b> the chart does not create StorageClasses (<code>CreateStorageClass: false</code>) and its default <code>DiskClassName</code>/<code>FileClassName</code> is <code>crc-csi-hostpath-provisioner</code> — the OpenShift Local (CRC) development provisioner. Set both to your cluster\'s block and RWX file classes. <code>AnalysisNodeFS.enable</code> must not be changed once CAST Imaging is deployed.</li>'
           : kubeProviderStorage(a)) +
         '</ul>' + (a.platform === 'kubernetes' && a.k8sProvider === 'other'
           ? '<p><b>Volume owners (UID:GID)</b> the chart\'s pods use — a hand-made or NFS-exported volume must be writable by them <span class="hint">(CAST\'s on-premises page; do not make the folders world-writable, e.g. chmod 777)</span>:</p><div class="tbl-wrap"><table><thead><tr><th>UID:GID</th><th>Volumes</th></tr></thead><tbody>' +
-            '<tr><td>10001</td><td>shared datadir (<code>/opt/cast/shared</code>), <code>castdir</code>, console and control-panel logs</td></tr>' +
+            '<tr><td>10001</td><td>shared datadir (<code>/opt/cast/shared</code>), '+(hasAnalysis(a) ? '<code>castdir</code>, ' : '')+'console and control-panel logs</td></tr>' +
             '<tr><td>65532</td><td>authentication, gateway and SSO logs</td></tr>' +
-            '<tr><td>65534</td><td>dashboards logs</td></tr>' +
-            '<tr><td>999</td><td><code>db-data</code> (embedded PostgreSQL)</td></tr>' +
-            '<tr><td>7474</td><td>Neo4j data</td></tr>' +
-            '<tr><td>1001</td><td>Extend proxy data</td></tr>' +
-            '<tr><td>1000</td><td>viewer and MCP volumes</td></tr>' +
+            (hasDashboards(a) ? '<tr><td>65534</td><td>dashboards logs</td></tr>' : '') +
+            (a.dbHosting === 'colocated' ? '<tr><td>999</td><td><code>db-data</code> (embedded PostgreSQL)</td></tr>' : '') +
+            (hasNeo4j(a) ? '<tr><td>7474</td><td>Neo4j data</td></tr>' : '') +
+            (a.egress === 'airgapped' ? '<tr><td>1001</td><td>Extend proxy data</td></tr>' : '') +
+            (hasViewer(a) ? '<tr><td>1000</td><td>viewer'+(a.mcp ? ' and MCP' : '')+' volumes</td></tr>' : '') +
             '</tbody></table></div><p>Example for an NFS-backed shared datadir: export <code>/exports/castimaging/shared-datadir</code> with <code>chown 10001:10001</code> and <code>chmod 2770</code>.</p>'
           : '') ;
     }
@@ -1508,7 +1516,7 @@
     } else if(isK8s){
       osRows.push(['Cluster tooling', isOcp(a)
         ? 'A running OpenShift cluster with <code>helm</code> and <code>oc</code> available — CAST installs via its OpenShift Helm chart (<a href="https://github.com/CAST-Extend/com.castsoftware.castimaging-v3.openshiftsetup" target="_blank" rel="noopener">castimaging-v3.openshiftsetup</a>); the chart relies on the <code>restricted-v2</code> SCC\'s <code>fsGroup</code> for volume write access (no fixed <code>fsGroup</code>) — when a policy engine rejects the IDs OpenShift assigns, 3.6.9 adds <code>podSecurityContext</code>/<code>containerSecurityContext</code>/<code>componentSecurityContext</code> settings (grant a matching SCC such as <code>nonroot-v2</code>; <b>do not set <code>runAsGroup</code></b> — images such as console-postgres and console-analysis-node need GID 0, otherwise add <code>supplementalGroups: [0]</code>); <code>ServiceAccountName</code> runs all pods with an existing ServiceAccount; confirm your OpenShift version against CAST\'s current release notes (not pinned down by this tool)'
-        : 'A running Kubernetes cluster with <code>helm</code> and <code>kubectl</code> available — CAST installs via its Helm chart (<a href="https://github.com/CAST-Extend/com.castsoftware.castimaging-v3.kubernetessetup" target="_blank" rel="noopener">castimaging-v3.kubernetessetup</a>; <code>K8SProvider</code> AKS, EKS or GKE; optional <code>ServiceAccountName</code> to run all pods with an existing ServiceAccount, e.g. one carrying <code>imagePullSecrets</code>); '+(a.k8sProvider === 'other' ? 'Kubernetes <b>1.31 or higher</b> (CAST\'s on-premises page)' : 'use the latest Kubernetes version your cloud provider offers (CAST\'s software requirements page)')+'']);
+        : 'A running Kubernetes cluster with <code>helm</code> and <code>kubectl</code> available — CAST installs via its Helm chart (<a href="https://github.com/CAST-Extend/com.castsoftware.castimaging-v3.kubernetessetup" target="_blank" rel="noopener">castimaging-v3.kubernetessetup</a>; <code>K8SProvider</code> '+(a.k8sProvider === 'other' ? 'K8S' : 'AKS, EKS or GKE')+'; optional <code>ServiceAccountName</code> to run all pods with an existing ServiceAccount, e.g. one carrying <code>imagePullSecrets</code>); '+(a.k8sProvider === 'other' ? 'Kubernetes <b>1.31 or higher</b> (CAST\'s on-premises page)' : 'use the latest Kubernetes version your cloud provider offers (CAST\'s software requirements page)')+'']);
       if(a.platform === 'kubernetes') osRows.push(['Restricted clusters', 'Set <code>RestrictedSecurityMode: true</code> in <code>values.yaml</code> if restricted security (read-only root filesystem, Restricted Pod Security Standard) is enforced — CAST notes it <b>cannot be changed after Imaging is deployed</b>']);
     }
     var osHtml = osRows.length ? ('<h4>Operating system / runtime versions</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Requirement</th></tr></thead><tbody>' +
@@ -1542,7 +1550,7 @@
       '</tbody></table></div>' +
       (hasNeo4j(a) ? '<h4>Neo4j (graph store)</h4><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Your configuration</th></tr></thead><tbody>' +
         '<tr><td>Requirement</td><td>Bundled with imaging-viewer — not a user-selectable engine; an ETL loads analysis results from PostgreSQL into Neo4j for the Viewer</td></tr>' +
-        '<tr><td>Ports</td><td>7687 (Bolt, used by imaging-viewer) / 6362 (backup) / 7474 (Neo4j\'s own HTTP browser/admin interface, optional)'+(isK8s ? ' — CAST\'s Helm chart exposes 7474, 7687, 7473 and 8888 on the Neo4j Service, not 6362' : '')+'</td></tr>' +
+        '<tr><td>Ports</td><td>7687 (Bolt, used by imaging-viewer) / 6362 (backup) / 7474 (Neo4j\'s own HTTP browser/admin interface, optional)'+(isK8s ? '' : ' / 7473 (its HTTPS counterpart)')+(isK8s ? ' — CAST\'s Helm chart exposes 7474, 7687, 7473 and 8888 on the Neo4j Service, not 6362' : '')+'</td></tr>' +
         '<tr><td>Hosting</td><td>' + (a.topology==='multi' && a.neo4jDedicated ? '<b>'+(isK8s ? 'Isolated on its own dedicated cluster node</b> ('+(isOcp(a) ? 'not a setting of CAST\'s OpenShift chart — <code>EnforceBalancedAffinity</code> already keeps it off the analysis-nodes\' nodes' : 'CAST\'s <code>EnforceNeo4jIsolation</code> Helm setting')+')' : 'Deployed on its own dedicated machine</b>')+' per your topology answer.' : 'Co-located with imaging-viewer.') + '</td></tr>' +
         '<tr><td>Memory</td><td><b>16 GB RAM minimum, 32 GB recommended</b> — defaults to a 12 GB initial/maximum JVM heap'+((a.platform==='docker'||a.platform==='podman') ? ', tunable via <code>imaging-viewer/.env</code>' : '')+'</td></tr>' +
         '</tbody></table></div>' : '');
@@ -1588,7 +1596,7 @@
           : '<li>Once HTTPS is confirmed working, disable the reverse proxy\'s own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway\'s 8090 stays the proxy\'s internal upstream — keep it reachable only from the reverse proxy, not from users.</li>')
         : '') +
       (a.platform === 'windows' && a.certSource !== 'none' ?
-        '<li><b>HTTPS on Windows — CAST\'s procedure</b> (CAST Imaging 3.6.2 or later; local administrator; read verbatim from CAST\'s Windows HTTPS page): ' +
+        '<li><b>HTTPS on Windows — CAST\'s procedure</b> (local administrator; commands differ by release — before 3.6.2, 3.6.4 and 3.6.9 are noted; read verbatim from CAST\'s Windows HTTPS page): ' +
         '<ol>' +
         '<li><b>Key pair</b> (OpenSSL isn\'t shipped — use <code>%PROGRAMFILES%\\Git\\usr\\bin</code> if Git is installed): <code>openssl req -new -newkey rsa:2048 -nodes -keyout private_key.key -out csr.csr</code>; send <code>csr.csr</code> to your CA for <code>public_key.crt</code>. Common Name <b>and</b> a SAN entry must be the public FQDN. CAST highly recommends CA-signed certificates.</li>' +
         '<li><b>SSO Service</b>: from 3.6.9 it needs <b>no certificate</b> — in <code>%PROGRAMFILES%\\CAST\\Imaging\\CAST-Imaging-SSO\\conf\\keycloak.conf</code> set <code>hostname=https://&lt;FQDN&gt;/auth</code> and add <code>proxy-headers=xforwarded</code>; in 3.6.8 and earlier copy the PEM pair into that <code>conf</code> folder, change <code>http-port=8096</code> to <code>https-port=8096</code> and set <code>https-certificate-file</code> / <code>https-certificate-key-file</code>.</li>' +
@@ -1608,8 +1616,8 @@
         '<li>Self-signed certificates (or their issuing CA) must be installed/trusted on every workstation that accesses CAST Imaging, or users will see browser warnings.</li>'
         : '') +
       ((a.platform === 'docker' || a.platform === 'podman' || a.platform === 'windows') && a.reverseProxy === 'nginx' && a.certSource !== 'none' ?
-        '<li>CAST\'s documented approach is a dedicated Nginx vHost <code>.conf</code> file with <code>ssl_certificate</code> / <code>ssl_certificate_key</code> directives, <code>ssl_protocols TLSv1.2</code> or higher, and server cipher preference enabled — not a CAST-specific certificate variable.</li>' +
-        '<li><b>Use an unencrypted private key</b> ("BEGIN ENCRYPTED PRIVATE KEY" won\'t load as-is) — strip the passphrase, or supply it to Nginx via <code>ssl_password_file</code>.</li>'
+        '<li>'+(a.platform === 'windows' ? 'Only if you terminate TLS on NGINX instead of at the Gateway (CAST\'s Windows procedure above does it at the Gateway): ' : '')+'CAST\'s documented approach is a dedicated Nginx vHost <code>.conf</code> file with <code>ssl_certificate</code> / <code>ssl_certificate_key</code> directives, <code>ssl_protocols TLSv1.2</code> or higher, and server cipher preference enabled — not a CAST-specific certificate variable.</li>' +
+        '<li>'+(a.platform === 'windows' ? 'On NGINX: ' : '')+'<b>Use an unencrypted private key</b> ("BEGIN ENCRYPTED PRIVATE KEY" won\'t load as-is) — strip the passphrase, or supply it to Nginx via <code>ssl_password_file</code>.</li>'
         : '') +
       (a.egress === 'airgapped' ?
         (isK8s ? '<li><b>Extend Local Server:</b> in CAST\'s Helm chart 3.6.9 it is the <code>extendproxy</code> pod (<code>ExtendProxy.enable: true</code>, port 8085; in-cluster components reach it as <code>extendproxy:8085</code>), published through your networking option on <code>ExtendProxy.exthostname</code>: '+(isOcp(a) ? 'a dedicated Route <code>extendproxy-route</code> on that hostname (timeout <code>ExtendProxy.timeoutSeconds</code>, 3600 s by default)' : 'under the <code>/extendproxy</code> path of the shared host when it equals the <code>FrontEndHost</code> host (Ingress / Gateway API / Istio; request body limit 3072m, timeout 3600 s), or on its own hostname with the <code>tls-secret-cast-extend</code> secret; with <code>CreateLoadBalancer</code> it is a LoadBalancer/NodePort Service on <code>ExtendProxy.port</code>')+'. Plan that hostname, its DNS record and certificate with the rest of Section 4.</li>' : '<li><b>Extend Local Server:</b> CAST documents no reverse-proxy path or Gateway route for it — it is not one of Gateway\'s path-routed services. Imaging components and administrators reach it directly on <code>host:8085</code> (its upload feed included), so no URI needs adding to your reverse proxy. If your standards require it behind the proxy anyway, publish it on a dedicated hostname or port rather than a Gateway path, and raise the proxy\'s request-body limit for bundle uploads (not CAST-documented).</li>')
@@ -1740,7 +1748,7 @@
         '<li><b>Client authentication</b> (CAST\'s MCP security page): an API key sent in the <code>x-api-key</code> header (still supported), or an <b>OAuth browser sign-in</b> for Claude Code and VS Code — one or the other per client. The identity provider is CAST Imaging\'s own <b>Keycloak</b> (realm <code>aip-realm</code>, <code>kcadmin</code>), not an external one: the page mentions no external OAuth2/OIDC provider. OAuth needs CAST Imaging 3.6.6 or later, MCP Server 3.0.4 or later and Gatekeeper 3.0.1 or later. In Keycloak (Realm settings → Client policies) create, per AI client, a profile with the <code>client-id-metadata-document</code> executor and a policy, and <b>link the profile to the policy</b> (CAST calls a missing link the most common mistake): Claude Code — <code>cimd-profile-claude</code> / <code>cimd-policy-claude</code>, trusted domains <code>claude.ai</code>, <code>localhost</code>, <code>127.0.0.1</code>; VS Code — <code>cimd-profile-vscode</code> / <code>cimd-policy-vscode</code>, trusted domains <code>vscode.dev</code>, <code>code.visualstudio.com</code>, <code>127.0.0.1</code>. Clients reach only the Gateway (<code>/mcp</code>, <code>/mcp/gatekeeper</code>, and <code>/.well-known/oauth-protected-resource/mcp</code>, which CAST Imaging redirects to Keycloak\'s discovery endpoint) — never expose the MCP Server or Keycloak directly. '+(a.platform === 'windows' && a.certSource === 'none' ? 'Windows over plain HTTP: set the system environment variable <code>PUBLIC_URL=http://&lt;imaging-services-fqdn&gt;:8090</code> and restart imaging-services. ' : '')+'HTTPS is highly recommended; plain HTTP is acceptable only on a trusted local or CI host not reachable from the internet. Check: an unauthenticated POST to <code>/mcp</code> must answer with a <code>WWW-Authenticate: Bearer resource_metadata=…</code> header.</li>' +
         '<li>LLM provider selected: <b>'+esc(LABELS.llmProvider[a.llmProvider])+'</b> — allowlist exact FQDN <code>'+esc(LLM_FQDN[a.llmProvider])+'</code> on the MCP client hosts, not the CAST Imaging servers (no wildcards).</li>' +
         (isK8s ? '' : '<li>Update and logs (per a summary of CAST\'s MCP update page): '+(a.platform === 'windows' ? 'run <code>mcp-server-installer.bat --update</code> from an elevated prompt after setting <code>SERVICE_HOST</code> and <code>NEO4J_URL</code> in <code>configuration.conf</code>; logs in <code>%CONFIG_DIR%\\logs\\mcp_server.log</code>' : 'run <code>./run.sh --update &lt;old installer path&gt;</code> from the new installer folder (it archives the old compose, <code>.env</code> and <code>app.config</code> under <code>backups/</code> and drops some settings you may have to set again); logs with <code>./run.sh --logs</code>')+'. The tool-surface profiles reset to <code>intents</code> on update.</li>') +
-        '<li>Sizing: CAST\'s MCP pages give only <b>at least 2 GB of free disk</b> (CPU and RAM: the general hardware requirements) and don\'t say whether the MCP servers can share a machine with other CAST Imaging components; the MCP servers have their own installers. The ~2 vCPU / 4 GB RAM / 20 GB disk added to the '+(a.topology==='single' ? 'all-in-one' : 'core')+' row in Section 1 (Imaging MCP + Gatekeeper MCP combined) is <b>this tool\'s estimate, not a CAST figure</b> — split it out yourself if you need per-container limits.</li>' +
+        '<li>Sizing: CAST\'s MCP pages give only <b>at least 2 GB of free disk</b> (CPU and RAM: the general hardware requirements) and don\'t say whether the MCP servers can share a machine with other CAST Imaging components; the MCP servers have their own installers. The ~2 vCPU / 4 GB RAM / 20 GB disk added to the '+(a.topology==='single' ? 'all-in-one' : 'core')+' row in Section 1 (Imaging MCP + Gatekeeper MCP combined) is <b>this tool\'s estimate, not a CAST figure</b> — split it out yourself if you need per-'+(a.platform === 'windows' ? 'service' : 'container')+' limits.</li>' +
         '</ul>';
     }
 
@@ -1774,7 +1782,7 @@
 
     var coreNode = separateEveryMachineGroup ? [] : everyMachine.slice();
     coreNode.push(item('server-sizing', (isK8s ? 'Node pool capacity' : 'Server(s)') + ' provisioned meeting the sizing in Section 1 ('+esc(LABELS.platform[a.platform])+', '+esc(LABELS.scenario[a.scenario])+', '+esc(topologyLabel(a))+')'));
-    if(isK8s && a.dbHosting !== 'colocated') coreNode.push(item('k8s-extdb', 'External PostgreSQL (CAST\'s supported 14.x–18.x; 8 GB RAM minimum recommended on its EKS/GKE pages) in the same VPC/VNet and the same zone as the cluster nodes, and <code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>) set in <code>values.yaml</code> <span class="hint">(per CAST\'s EKS / GKE install pages)</span>'));
+    if(isK8s && a.dbHosting !== 'colocated') coreNode.push(item('k8s-extdb', 'External PostgreSQL (CAST\'s supported 14.x–18.x; 8 GB RAM minimum recommended on its EKS/GKE pages) '+(a.platform === 'kubernetes' && a.k8sProvider !== 'other' ? 'in the same VPC/VNet and the same zone as the cluster nodes' : 'on the same network and in the same data center as the cluster nodes, reachable from every node')+', and <code>CastStorageService.enable: false</code>, <code>CustomPostgres.enable: true</code> (host, port 2285 by default, admin login, <code>PostgresDbPassword</code>) set in <code>values.yaml</code> <span class="hint">(per CAST\'s '+(a.platform === 'kubernetes' && a.k8sProvider !== 'other' ? 'EKS / GKE install pages' : 'on-premises page')+')</span>'));
     coreNode.push(item('pg-hosting:'+a.dbHosting, 'PostgreSQL provisioned as: '+esc(LABELS.dbHosting[a.dbHosting])));
     var pgEmbedded = a.dbHosting === 'colocated' && (a.platform === 'docker' || a.platform === 'podman' || isK8s);
     if(!pgEmbedded) coreNode.push(item('pg-version', 'PostgreSQL 14.x–18.x (64-bit, 18.x recommended) with UTF-8 and the collation CAST specifies (see Section 2)'));
@@ -1819,7 +1827,7 @@
       if(a.platform === 'kubernetes' && a.k8sProvider === 'gke') stoParts.push('Persistent Disk and Filestore CSI drivers available (<code>GKE_DSdriver</code>, <code>GKE_FSdriver</code>); consider a regional Persistent Disk for <code>castdir</code> if you need zone redundancy');
       coreNode.push(item('k8s-storage:'+(isOcp(a) ? 'openshift' : a.k8sProvider), 'Storage ready: '+stoParts.join('; ')));
       coreNode.push(item('k8s-prep:'+a.reverseProxy+':'+(a.certSource !== 'none' ? 'tls' : 'plain')+(isOcp(a) ? ':ocp' : ''), k8sPrep.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' prepared'));
-      if(!isOcp(a)) coreNode.push(item('k8s-loadbalancer', 'A load-balancer implementation (e.g. MetalLB) available on the cluster — without it the services\' external IP stays <code>&lt;pending&gt;</code>; installed and operated by the cluster administrator'));
+      if(a.platform === 'kubernetes' && a.k8sProvider === 'other') coreNode.push(item('k8s-loadbalancer', 'A load-balancer implementation (e.g. MetalLB) available on the cluster — without it the services\' external IP stays <code>&lt;pending&gt;</code>; installed and operated by the cluster administrator'));
       if(a.platform === 'kubernetes' && a.k8sProvider !== 'other') coreNode.push(item('k8s-provider:'+a.k8sProvider, '<code>K8SProvider: '+a.k8sProvider.toUpperCase()+'</code> set in <code>values.yaml</code> before the first deployment — CAST marks it install-time only'));
       if(isK8s && a.egress === 'airgapped') coreNode.push(item('k8s-telemetry', '<code>TELEMETRY_PUSH_ENABLED: false</code> set for the CAST services — CAST\'s EKS page recommends it when the cluster has no outbound internet access'));
       if(a.platform === 'kubernetes' && a.k8sProvider === 'other') coreNode.push(item('k8s-provider:other', '<code>K8SProvider: K8S</code> set in <code>values.yaml</code> together with <code>CreateStorageClass: false</code> and the names of your existing classes, when the cluster is not a managed cloud one (EKS / AKS / GKE — the providers the chart documents) — a non-managed cluster provides neither managed storage classes nor a load-balancer integration of its own <span class="hint">(per the AIFE requirements document)</span>'));
@@ -1892,7 +1900,7 @@
 
     var allHtml = sizingHtml + dbHtml + netHtml + httpsHtml + authHtml + extendHtml + optionalHtml + checklistHtml;
     // Windows services listen on other ports than the Docker/Podman ones on CAST's hardware page: the text above is
-    // written with the Docker/Podman values, so translate them for Windows (PostgreSQL deliberately stays 2285 — see the
+    // written with the Docker/Podman values, so translate them for Windows (PostgreSQL is translated to 2284 too — see the
     // documentation map), then add the note that lists the differences.
     if(a.platform === 'windows') allHtml = windowsPorts(allHtml);
     allHtml = allHtml.replace('<!--WINPORTS-->', a.platform === 'windows' ? '<div class="callout info"><b>Windows ports.</b> CAST\'s hardware page lists other service ports for Windows than for Docker/Podman, and this document uses the Windows values: analysis-node <b>8099</b> (Docker: 8089); imaging-viewer front-end <b>8093</b> (8083), AI Manager <b>8094</b> (8082), back-end <b>9010</b> (9000), ETL <b>9011</b> (9001); Neo4j <b>7697</b> / <b>7484</b> / <b>7483</b> / <b>6372</b> (7687 / 7474 / 7473 / 6362); the SSO Service also uses <b>9002</b>. <b>PostgreSQL</b> <b>2284</b> (Docker/Podman embedded database: 2285), confirmed by the maintainer and by CAST\'s hardware page.</div>' : '');
