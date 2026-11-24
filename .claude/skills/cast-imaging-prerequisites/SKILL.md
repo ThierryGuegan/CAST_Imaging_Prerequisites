@@ -39,7 +39,7 @@ replace fact-checking the *content* you fill that shape with.
 
 ## 1. Read before you judge
 
-`references/decisions.md` is the short list of maintainer decisions (and the questions still open) — read it first and never re-flag a decision on it.
+`references/sources.md` lists every CAST page read, its status (verbatim or summary) and its "Updated" date. `references/decisions.md` is the short list of maintainer decisions (and the questions still open) — read it first and never re-flag a decision on it.
 
 Find every place in cast-imaging-requirements-builder.html that touches the topic you were asked about — the questionnaire HTML, the relevant part of `render()` or `buildPortRows()`, and any shared helpers it calls (`hasAnalysis`, `hasViewer`, `hasNeo4j`, `coreComponentList`, etc.). Don't just read the one line that looks relevant; read how that value flows in from `state()` and out into the displayed HTML. Most real bugs here are about *wiring*, not facts: a row that's missing a condition it should have, or built from the wrong variable.
 

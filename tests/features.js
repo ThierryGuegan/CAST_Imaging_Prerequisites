@@ -147,6 +147,15 @@ const L = require('./lib');
   ok(await page.evaluate(() => [...document.querySelectorAll('#checklist-section h4')].map(h => h.textContent).join('|').includes('Decide with your teams') && document.querySelector('[data-check-key="tmp-exec"]').checked), 'phase view missing or tick lost');
   await page.check('input[name=checklist-view][value=role]');
 
+  // At a glance, conflicts box, MCP install item, install-fixed item
+  await L.set(page, { platform: 'docker', scenario: 'full', topology: 'multi', ctxUrl: true, mcp: true, certSource: 'ca-issued', reverseProxy: 'nginx' });
+  ok(await page.evaluate(() => !!document.getElementById('at-a-glance') && /to decide/.test(document.getElementById('at-a-glance').textContent)), 'at a glance missing');
+  ok(await page.evaluate(() => !!document.getElementById('disagree-box') && /Shared folder protocol/.test(document.getElementById('disagree-box').textContent)), 'conflicts box missing');
+  keys = await L.checkKeys(page);
+  ok(keys.includes('mcp-install:docker') && keys.includes('install-fixed:docker'), 'MCP install / install-fixed items missing');
+  await L.set(page, { platform: 'docker', ctxUrl: false, mcp: false, topology: 'single' });
+  ok(await page.evaluate(() => !document.getElementById('disagree-box')), 'conflicts box shown without a conflict');
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
