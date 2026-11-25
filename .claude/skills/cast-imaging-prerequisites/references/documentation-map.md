@@ -276,3 +276,7 @@ Settles the "`CreateIstioGateway` vs `UseIstioGateway`" conflict of the EKS / GK
    pull-path hostnames, generic Kubernetes networking, Neo4j's default Bolt port), say so — it's
    fine for a claim's source to be "Docker's own documentation" or "generic technical fact," but
    don't imply it came from `doc.castsoftware.com` when it didn't.
+
+## CAST support answer on CreateLoadBalancer (2026-11-25, relayed by the maintainer)
+- Not part of the "only one networking option" check (CreateIngress, UseIstioGateway, UseGatewayAPI, UseApplicationGateway). Setting it alongside one of them does not fail the installation. Default `true`; if left enabled, CAST Imaging is also exposed through a separate load balancer in addition to the chosen option.
+- Still open: value to use with Application Gateway (values reference says false; PDF uses the gateway service external IP).

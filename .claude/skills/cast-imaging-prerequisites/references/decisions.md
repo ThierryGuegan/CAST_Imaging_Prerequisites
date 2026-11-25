@@ -5,6 +5,8 @@ One line per decision the maintainer made, newest first. **Never re-flag these.*
 ## 2026-11-25
 - **Istio on Kubernetes (answer from CAST support, relayed by the maintainer):** `UseIstioGateway: true` is the right setting for chart 3.6.9; `CreateIstioGateway` (still in the online Option C) is a leftover from chart 3.5.3 and older that the chart **ignores silently** (no error, no gateway); `ExistingIstioGatewayName` is optional (`<namespace>/<gateway-name>`, e.g. `asm-gateways/istio-gateway`; empty = the chart creates `castimaging-gateway` in the Imaging namespace); only one of `CreateIngress`, `UseIstioGateway`, `UseGatewayAPI`, `UseApplicationGateway` may be enabled; `CreateLoadBalancer` is not part of that check, defaults to `true`, and **`false` is recommended for production with Istio**; CAST R&D is correcting the online page.
 
+- **CreateLoadBalancer (answer from CAST support, relayed by the maintainer):** it is **not part of the single-option check** (which covers only `CreateIngress`, `UseIstioGateway`, `UseGatewayAPI`, `UseApplicationGateway`); setting it alongside one of them does not fail the installation; default `true`; left on, CAST Imaging is also exposed through a separate load balancer next to the chosen option. The tool's Kubernetes callout no longer lists it among the exclusive options; values.yaml writes `false` with ingress/Gateway API/Istio. Still open: what to set with Application Gateway (the PDF takes the backend from the `console-gateway-service` external IP).
+
 ## 2026-11-24
 - The Kubernetes topology that distributes nothing is labelled **"Shared nodes"** (was "Single node pool"; the other choice stays "Isolated nodes").
 - No private-registry box in the diagram for air-gapped installs (the Section 6 image list covers it).
