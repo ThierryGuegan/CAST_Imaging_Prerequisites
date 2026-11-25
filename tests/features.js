@@ -183,6 +183,13 @@ const L = require('./lib');
   ok(!(await page.evaluate(() => { const b = document.getElementById('disagree-box'); return b ? /MCP health check/.test(b.textContent) : false; })), 'MCP health-check conflict shown on Docker');
   await L.set(page, { platform: 'docker', mcp: false });
 
+  // Istio: CAST support's answer (UseIstioGateway, CreateIstioGateway ignored, CreateLoadBalancer false for production)
+  await L.set(page, { platform: 'kubernetes', k8sProvider: 'gke', reverseProxy: 'istio', certSource: 'ca-issued' });
+  const ist = await L.resultsText(page);
+  ok(/UseIstioGateway: true/.test(ist) && /ignores silently|ignored silently/.test(ist) && /castimaging-gateway/.test(ist) && /CreateLoadBalancer: false/.test(ist), 'Istio callout does not carry the support answer');
+  ok(!(await page.evaluate(() => { const b = document.getElementById('disagree-box'); return b ? /Istio setting name/.test(b.textContent) : false; })), 'Istio conflict still listed');
+  await L.set(page, { platform: 'docker', reverseProxy: 'nginx' });
+
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));
   ok(/^﻿?"Source","Destination","Port"/.test(d.text), 'CSV header');
