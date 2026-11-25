@@ -175,13 +175,19 @@ const L = require('./lib');
   ok(['highlight:v2', 'smtp:v2', 'proxy-settings', 'source-folder:win'].every(k => keys.includes(k)), 'administration items missing: ' + keys.filter(k => /highlight|smtp|proxy|source-folder/.test(k)).join(','));
   await L.set(page, { platform: 'docker', egress: 'direct', highlight: false, email: false, repoSmb: false });
 
-  // MCP health-check conflict is a Windows-only line (the Neo4j port is not a conflict)
+  // MCP health check and Neo4j port are no longer listed as page conflicts (CAST support: equivalent paths, per-platform default ports)
   await L.set(page, { platform: 'windows', scenario: 'full', topology: 'single', mcp: true, certSource: 'none' });
   const dis = await page.evaluate(() => { const b = document.getElementById('disagree-box'); return b ? b.textContent : ''; });
-  ok(/MCP health check on Windows/.test(dis) && !/7687/.test(dis.replace(/7697/g, '')), 'Windows MCP health-check line missing or still mentions the Neo4j port as a conflict');
+  ok(!/MCP health check|7687|7697/.test(dis), 'MCP health check or Neo4j port still listed as a conflict on Windows');
   await L.set(page, { platform: 'docker', mcp: true });
-  ok(!(await page.evaluate(() => { const b = document.getElementById('disagree-box'); return b ? /MCP health check/.test(b.textContent) : false; })), 'MCP health-check conflict shown on Docker');
-  await L.set(page, { platform: 'docker', mcp: false });
+    await L.set(page, { platform: 'docker', mcp: false });
+
+  // Istio: CAST support's answer (UseIstioGateway, CreateIstioGateway ignored, CreateLoadBalancer false for production)
+  await L.set(page, { platform: 'kubernetes', k8sProvider: 'gke', reverseProxy: 'istio', certSource: 'ca-issued' });
+  const ist = await L.resultsText(page);
+  ok(/UseIstioGateway: true/.test(ist) && /ignores silently|ignored silently/.test(ist) && /castimaging-gateway/.test(ist) && /CreateLoadBalancer: false/.test(ist), 'Istio callout does not carry the support answer');
+  ok(!(await page.evaluate(() => { const b = document.getElementById('disagree-box'); return b ? /Istio setting name/.test(b.textContent) : false; })), 'Istio conflict still listed');
+  await L.set(page, { platform: 'docker', reverseProxy: 'nginx' });
 
   // CSV
   let d = await download(() => page.click('#export-ports-csv'));

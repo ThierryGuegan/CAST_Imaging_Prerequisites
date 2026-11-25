@@ -261,6 +261,9 @@ Not done on purpose: splitting the tool into modules with a build step (CLAUDE.m
 - **Source code**: ZIP upload or a server folder; the folder must exist, not sit under deploy / delivery, and be readable by **every** analysis-node (Windows: service account, `map-drives.bat` for mapped / `subst` drives; Linux: under `/opt/cast/shared/common-data/`); `.git` / `.github` / `.svn` skipped in ZIP extraction from 3.6.8; **no Git/SVN clone by CAST Imaging and no Git, SVN or Maven client listed** (the tool already says cloning is the customer's own tooling). → `source-folder:*`.
 - **Added**: collapsible sections (folded state kept, exports and print open them all), export file names carrying the platform and scenario, `tests/profiles.js` (8 realistic profiles, snapshots in `tests/snapshots/`, refresh with `--update` after reviewing the diff), `tests/links.js` (lists the documentation links, `--check` tests them).
 
+## CAST support answer on Istio (2026-11-25, relayed by the maintainer)
+Settles the "`CreateIstioGateway` vs `UseIstioGateway`" conflict of the EKS / GKE / AKS pages: `UseIstioGateway: true` is correct for chart 3.6.9, `CreateIstioGateway` is a silently ignored leftover (3.5.3 and older), `ExistingIstioGatewayName` is optional (`<namespace>/<gateway-name>`; empty = the chart creates `castimaging-gateway`), only one networking option may be enabled, `CreateLoadBalancer` is outside that check (default `true`; `false` recommended for production with Istio). The Istio callout and the `values.yaml` starting point carry this; the "pages disagree" box no longer lists it. Still open with CAST: SMB vs NFS, the Gateway port on Windows with HTTPS, `CreateLoadBalancer` with Application Gateway (the same support reply suggests `false` is the norm for the other options too, but it was only stated for Istio), the MCP Windows health endpoint, the http / https schemes of the Windows URL-path examples.
+
 ## Using this map
 
 1. Find the row matching the section you're auditing.
@@ -273,3 +276,10 @@ Not done on purpose: splitting the tool into modules with a build step (CLAUDE.m
    pull-path hostnames, generic Kubernetes networking, Neo4j's default Bolt port), say so — it's
    fine for a claim's source to be "Docker's own documentation" or "generic technical fact," but
    don't imply it came from `doc.castsoftware.com` when it didn't.
+
+## CAST support answer on CreateLoadBalancer (2026-11-25, relayed by the maintainer)
+- Not part of the "only one networking option" check (CreateIngress, UseIstioGateway, UseGatewayAPI, UseApplicationGateway). Setting it alongside one of them does not fail the installation. Default `true`; if left enabled, CAST Imaging is also exposed through a separate load balancer in addition to the chosen option.
+- Still open: value to use with Application Gateway (values reference says false; PDF uses the gateway service external IP).
+
+## CAST support answer on Neo4j port and MCP health check (2026-11-25, relayed by the maintainer)
+- Neo4j Bolt: 7697 Windows default, 7687 Docker/Linux default. MCP: `/mcpserver/healthcheck` = `/mcp/healthcheck` (older, supported); `/mcp/status` 200/503. Not defects; no longer listed as page conflicts.
