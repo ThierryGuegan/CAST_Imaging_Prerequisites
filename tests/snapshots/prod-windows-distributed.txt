@@ -1,7 +1,6 @@
 At a glance — Windows Server · Full (analysis + Viewer + Dashboards) · Multi-machine: 3 server machine(s) and 2 workstation role(s); 17 mandatory network flows out of 27; checklist: 14 to decide, 15 to prepare, 3 for the install day, 5 after the installation.
 How to read this document
 Points to confirm with CAST (5) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
-Where CAST's own pages disagree (1) — the tool states both and does not pick one
 1. Hardware sizing for your profile
 Project scale profile: 150–500 applications, 10–50 concurrent users — drives the sizing baseline below.
 Minimum footprint: 4 machines — 3 server machines (see Section 1's Server components table) + 1 workstation covering 2 roles (end-user + delivery/analyst — can be the same machine, or split across more if your team prefers) (see Workstation components table).
@@ -23,8 +22,8 @@ All components below other than Gateway communicate locally between CAST's Windo
 
 3 server machine(s) required + 2 workstation role(s) — boxes below marked "own machine" run apart from the rest
 HTTPS :443
-HTTP :8090
-:8090
+HTTPS :443
+:443
 :8096 · :8098–2381
 HTTPS :443
 MCP, Gatekeeper :8098
@@ -54,7 +53,7 @@ setup/testing phase only
 Reverse proxy
 External reverse proxy
 Gateway
-:8090 — sole entry point
+:443 — sole entry point
 Console
 /console · :8091
 Auth service
@@ -91,7 +90,7 @@ Shared-storage read/write
 Analysis-node machine(s)
 Dedicated database machine
 Component	Port(s)	Role
-Gateway	8090	Single entry point behind the reverse proxy — routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards, /mcp, /mcp/gatekeeper) to every other service below. This is the only CAST Imaging port the reverse proxy needs to reach.
+Gateway	443	Single entry point behind the reverse proxy — routes by URL path (/console, /auth, /oauth2, /admin, /imaging, /dashboards, /mcp, /mcp/gatekeeper) to every other service below. This is the only CAST Imaging port the reverse proxy needs to reach.
 Console	8091	Delivery/administration console (path /console)
 Auth service	8092	OAuth2 token endpoint (path /oauth2)
 SSO Service	8096 / 9002	Sign-in / SSO broker (Keycloak, realm aip-realm) for Local, SAML, OpenID Connect and LDAP identity sources (path /auth)
@@ -144,17 +143,17 @@ Windows ports. CAST's hardware page lists other service ports for Windows than f
 
 Source	Destination	Port	Protocol	Reason
 End-user browser	Reverse proxy (External reverse proxy)	443	HTTPS	Console / Viewer / Dashboards UI access — the mandatory reverse proxy is the only customer-facing endpoint; it forwards to Gateway, which path-routes internally to every other UI service — HTTPS per your certificate answer	Mandatory
-Reverse proxy (External reverse proxy)	Gateway	8090	HTTP	The reverse proxy's upstream — Gateway listens on 8090 (not 80) and is CAST Imaging's single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below) — CAST's Windows HTTPS procedure moves the Gateway itself to port 443 (server.port: 443) while its network-access page still lists 8090 as the public Gateway port — confirm with CAST which port your users and proxy reach.	Mandatory
+Reverse proxy (External reverse proxy)	Gateway	443	HTTPS	The reverse proxy's upstream — Gateway listens on 443 (not 80) and is CAST Imaging's single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below) — With HTTPS on Windows the Gateway itself listens on 443 (CAST's Windows HTTPS procedure, server.port: 443; confirmed by the maintainer) — HTTP-only installations keep 8090.	Mandatory
 Administrator workstation	Every CAST Imaging machine (Windows)	3389	RDP	Server administration	Mandatory
 imaging-services	PostgreSQL (dedicated database server)	2284 (default, configurable)	TCP	Application access to the PostgreSQL database — Not co-located — a real firewall path between imaging-services and the database host/service must be opened	Mandatory
-Tester / administrator workstation	Gateway	8090	HTTP/HTTPS	Validate Gateway directly, bypassing the reverse proxy, before it's fully configured (Section 4) — Setup/testing only — close once your reverse proxy is validated	Optional
+Tester / administrator workstation	Gateway	443	HTTP/HTTPS	Validate Gateway directly, bypassing the reverse proxy, before it's fully configured (Section 4) — Setup/testing only — close once your reverse proxy is validated	Optional
 Tester / administrator workstation	SSO Service	8096	HTTP/HTTPS	Validate sign-in (Local/SAML/OIDC/LDAP, Section 5) directly, bypassing Gateway's /auth routing — Setup/testing only — SSO Service is otherwise internal-only; close before go-live	Optional
 CAST Report Generator (client workstation)	Reverse proxy (External reverse proxy)	443	HTTPS	Pulls data via CAST Dashboards' RestAPI (/dashboards/rest), authenticated with an API key, not a browser session — Only if you use CAST Report Generator — same entry point as the End-user browser row above	Conditional
 Tester / administrator workstation	Control Panel (admin-center)	8098–2381	HTTP/HTTPS	Validate admin/configuration directly, bypassing Gateway's /admin routing — Setup/testing only — Control Panel is otherwise internal-only; close before go-live	Optional
 SSO Service (core node)	PostgreSQL (dedicated database server)	2284 (default, configurable)	TCP	The SSO Service connects directly to PostgreSQL — it keeps its data in a dedicated "keycloak" database on the same instance — Confirmed by CAST (directly connected). Same network path as imaging-services' row above — the dedicated/managed database must also host this database and its user	Mandatory
 Auth Service, Console, Control Panel, Dashboards (core node)	PostgreSQL (dedicated database server)	2284 (default, configurable)	TCP	These services connect directly to PostgreSQL — Confirmed by CAST (directly connected). They share the core node with imaging-services, so no firewall rule beyond that path — but pg_hba.conf must allow them. Gateway, the Extend Local Server and the MCP servers do not connect to PostgreSQL	Mandatory
 imaging-viewer (services, incl. ETL service)	PostgreSQL (dedicated database server)	2284 (default, configurable)	TCP	imaging-viewer is documented as a directly connected component (the ETL service reads the analysis data from PostgreSQL to load Neo4j) — Confirmed by CAST at component level — which of its services connect isn't itemised; same host as the core node unless you split it	Mandatory
-analysis-node machine(s)	imaging-services / Gateway (core node)	8090 (Gateway) and 8098 (Control Panel) — plus the other core ports CAST lists on its hardware page	HTTP/HTTPS	Return path: each analysis-node registers against imaging-services and reports job status and results back to it, so connectivity must work in both directions between every analysis-node machine and the core node — CAST's network-access page (a summary) says 8098 is opened only to the other CAST Imaging machines so analysis nodes, dashboards, viewer and MCP can register, and its hardware page says not all ports are needed on all machines; the exact set isn't itemised — reasonable inference	Mandatory
+analysis-node machine(s)	imaging-services / Gateway (core node)	443 (Gateway) and 8098 (Control Panel) — plus the other core ports CAST lists on its hardware page	HTTP/HTTPS	Return path: each analysis-node registers against imaging-services and reports job status and results back to it, so connectivity must work in both directions between every analysis-node machine and the core node — CAST's network-access page (a summary) says 8098 is opened only to the other CAST Imaging machines so analysis nodes, dashboards, viewer and MCP can register, and its hardware page says not all ports are needed on all machines; the exact set isn't itemised — reasonable inference	Mandatory
 imaging-services (core node)	analysis-node machine(s)	8099	HTTP/HTTPS	Each analysis-node's own listening port (per CAST's architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis machines to communicate — Multi-machine topology — the return path is the row above	Mandatory
 analysis-node machine(s)	PostgreSQL (dedicated database server)	2284 (default, configurable)	TCP	Each analysis-node writes analysis results directly to the PostgreSQL database — per CAST's architecture reference, this port is used by every component that reads/writes the database, not just imaging-services — Multi-machine topology — a real firewall path between every analysis-node machine and the database host/service must be opened, in addition to imaging-services' own path above	Mandatory
 Every CAST Imaging machine	Shared network storage (deploy/delivery/common-data)	445	SMB	Windows file shares for the deploy/delivery/common-data folders, accessed under a service account whose credentials are consistent across every machine (see Section 1's operating system table) — Exact folder layout not verified against CAST's Windows documentation — confirmed concept, not confirmed paths	Mandatory
@@ -176,7 +175,7 @@ HTTPS/SSL itself is not mandatory, but highly recommended. CAST Imaging can be s
 Reverse proxy: External reverse proxy.
 Certificate source: CA-issued.
 You must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.
-CAST's Windows HTTPS procedure (below) terminates TLS at the Gateway itself (server.port: 443), not at a reverse proxy. CAST's Windows reverse-proxy example is HTTP-facing (listen 80, proxy_pass …:8090/) and says nothing about keeping Gateway TLS behind it — if you keep a reverse proxy in front, confirm with CAST which port and protocol it must use towards the Gateway; the 8090 rows of this document are the default HTTP port.
+CAST's Windows HTTPS procedure (below) terminates TLS at the Gateway itself (server.port: 443), not at a reverse proxy. CAST's Windows reverse-proxy example is HTTP-facing (listen 80, proxy_pass …:8090/) and says nothing about keeping Gateway TLS behind it — if you keep a reverse proxy in front, confirm with CAST which port and protocol it must use towards the Gateway; the Gateway rows of this document show 443 with HTTPS (8090 for HTTP only).
 HTTPS on Windows — CAST's procedure (local administrator; commands differ by release — the variants for versions before 3.6.2, 3.6.4 and 3.6.9 are noted; read verbatim from CAST's Windows HTTPS page):
 Key pair (OpenSSL isn't shipped — use %PROGRAMFILES%\Git\usr\bin if Git is installed): openssl req -new -newkey rsa:2048 -nodes -keyout private_key.key -out csr.csr; send csr.csr to your CA for public_key.crt. Common Name and a SAN entry must be the public FQDN. CAST highly recommends CA-signed certificates.
 SSO Service: from 3.6.9 it needs no certificate — in %PROGRAMFILES%\CAST\Imaging\CAST-Imaging-SSO\conf\keycloak.conf set hostname=https://<FQDN>/auth and add proxy-headers=xforwarded; in 3.6.8 and earlier copy the PEM pair into that conf folder, change http-port=8096 to https-port=8096 and set https-certificate-file / https-certificate-key-file.

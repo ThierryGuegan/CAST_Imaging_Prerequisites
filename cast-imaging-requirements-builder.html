@@ -540,6 +540,7 @@
   var CHANGELOG = [
     ['2026-11-24', 'Entry options for Kubernetes: Istio, Amazon CloudFront (EKS) and Azure Application Gateway (AKS, from CAST\'s chart PDF)'],
     ['2026-11-25', 'Istio on Kubernetes: UseIstioGateway confirmed by CAST support (CreateIstioGateway is an ignored leftover); ExistingIstioGatewayName optional; CreateLoadBalancer: false recommended for production'],
+    ['2026-11-25', 'Windows with HTTPS: the Gateway port is 443 everywhere (ports table, diagram, component list) — maintainer decision; 8090 stays for HTTP-only'],
     ['2026-11-25', 'MCP health check: /mcpserver/healthcheck and /mcp/healthcheck are equivalent (CAST support), /mcp/status gives the overall status; Neo4j Bolt port: 7697 is the Windows default, 7687 the Docker/Linux default — both correct'],
     ['2026-11-25', 'CreateLoadBalancer (default true) is outside the single-option check for every entry option (CAST support): left on, it adds a separate load balancer; Kubernetes callout and values.yaml comments corrected'],
     ['2026-11-24', 'Shared-folder protocol on Linux: the "only SMB" statement is attributed to an earlier version of CAST\'s documentation, not to the current hardware page'],
@@ -702,6 +703,9 @@
     return true;
   }
   function clientPort(a){ return a.certSource === 'none' ? '80 (or your proxy\'s HTTP port)' : '443'; }
+  // Windows + HTTPS: CAST's procedure moves the Gateway itself to 443 (maintainer decision 2026-11-25)
+  function gwPort(a){ return (a.platform === 'windows' && a.certSource !== 'none') ? '443' : '8090'; }
+  function gwProto(a){ return gwPort(a) === '443' ? 'HTTPS' : 'HTTP'; }
   function clientProto(a){ return a.certSource === 'none' ? 'HTTP' : 'HTTPS'; }
   // Shared storage across servers: always with distributed VMs; on Kubernetes/OpenShift the Helm chart always
   // creates the shared-access (RWX) pvc-shared-datadir (confirmed by the maintainer, 2026-10-28).
@@ -796,7 +800,7 @@
     reportGenBox.cx = reportGenBox.x + reportGenBox.w/2;
     reportGenBox.label = 'CAST Report Generator'; reportGenBox.sub = 'reporting workstation';
     var proxyRow = layoutRow([{key:'proxy', label:'Reverse proxy', sub:esc(LABELS.reverseProxy[a.reverseProxy]) + (a.platform === 'kubernetes' && a.k8sProvider !== 'other' ? ' · ' + a.k8sProvider.toUpperCase() : '')}]); var yProxy = y; y += boxH+gapY;
-    var gatewayRow = layoutRow([{key:'gw', label:'Gateway', sub:':8090 — sole entry point'}]); var yGateway = y; y += boxH+gapY;
+    var gatewayRow = layoutRow([{key:'gw', label:'Gateway', sub:':'+gwPort(a)+' — sole entry point'}]); var yGateway = y; y += boxH+gapY;
 
     var routedItems = [
       {key:'console', label:'Console', sub:'/console · :8091'},
@@ -883,12 +887,12 @@
     svg += label(browserRow[0].cx+64, yBrowser+boxH+18, a.certSource==='none' ? 'HTTP :80' : 'HTTPS :443', FLOW);
     var clientLbl = a.certSource==='none' ? 'HTTP :80' : 'HTTPS :443';
     svg += line(proxyRow[0].cx, yProxy+boxH, gatewayRow[0].cx, yGateway, FLOW, 'ah-flow');
-    svg += label(gatewayRow[0].cx+58, yProxy+boxH+18, 'HTTP :8090', FLOW);
+    svg += label(gatewayRow[0].cx+58, yProxy+boxH+18, gwProto(a)+' :'+gwPort(a), FLOW);
 
     var ssoBox = byKey(routedRow, 'sso'), adminBox = byKey(routedRow, 'admin');
     var testerHasUi = hasDashboards(a) || hasViewer(a);
     svg += line(testerBox.cx, yBrowser+boxH, gatewayRow[0].cx+40, yGateway, TESTONLY, 'ah-test', true);
-    svg += label(testerBox.cx+10, (yBrowser+boxH+yGateway)/2, ':8090', TESTONLY);
+    svg += label(testerBox.cx+10, (yBrowser+boxH+yGateway)/2, ':'+gwPort(a), TESTONLY);
     // these two lines run down a lane just right of the Gateway/Reverse proxy boxes, then along the gap above
     // the routed row, so they never cross a box
     var testerLaneX = gatewayRow[0].x + gatewayRow[0].w + 22;
@@ -1112,14 +1116,14 @@
     ]).concat(!hasUi ? [
       {src:'End-user browser (Console, Control Panel)', dst:proxyDst, port:cPort, proto:cProto, purpose:'Console (/console — delivery and administration) and Control Panel (/admin) are browser UIs even in a scenario without Viewer or Dashboards', tag:'conditional', note:'Reasonable inference — both are UI services behind Gateway; only needed if staff use them from a browser rather than the APIs'}
     ] : []).concat([
-      {src:proxyDst, dst:'Gateway', port:'8090', proto:'HTTP', purpose:'The reverse proxy\'s upstream — Gateway listens on 8090 (not 80) and is CAST Imaging\'s single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below)', tag:'mandatory', note:(a.platform === 'windows' && a.certSource !== 'none' ? 'CAST\'s Windows HTTPS procedure moves the Gateway itself to port 443 (server.port: 443) while its network-access page still lists 8090 as the public Gateway port — confirm with CAST which port your users and proxy reach. ' : '')+((!rpAvailable(a.reverseProxy, a.platform === 'kubernetes', a.k8sProvider) || (a.reverseProxy === 'ingress' && a.platform !== 'kubernetes') ? undefined : a.reverseProxy === 'ingress' ? 'In-cluster Service traffic from the Ingress controller' : a.reverseProxy === 'istio' ? 'In-cluster Service traffic from the Istio ingress gateway' : a.reverseProxy === 'cloudfront' ? 'CloudFront origin: HTTP only, port 8090, origin domain = the console-gateway-service hostname (CAST\'s EKS page). Reasonable inference: this exposes 8090 to the internet side — restrict its source to CloudFront (e.g. the AWS-managed CloudFront prefix list); CAST\'s page does not cover it' : a.reverseProxy === 'appgw' ? 'Backend setting of the Application Gateway: HTTP, port 8090, towards the external IP of console-gateway-service (CAST\'s Azure-ApplicationGateway PDF); the backend must report Healthy with a 302' : undefined) || '') || undefined}
+      {src:proxyDst, dst:'Gateway', port:gwPort(a), proto:gwProto(a), purpose:'The reverse proxy\'s upstream — Gateway listens on '+gwPort(a)+' (not 80) and is CAST Imaging\'s single entry point; it should be reachable only from the reverse proxy (and the setup-time tester rows below)', tag:'mandatory', note:(a.platform === 'windows' && a.certSource !== 'none' ? 'With HTTPS on Windows the Gateway itself listens on 443 (CAST\'s Windows HTTPS procedure, server.port: 443; confirmed by the maintainer) — HTTP-only installations keep 8090. ' : '')+((!rpAvailable(a.reverseProxy, a.platform === 'kubernetes', a.k8sProvider) || (a.reverseProxy === 'ingress' && a.platform !== 'kubernetes') ? undefined : a.reverseProxy === 'ingress' ? 'In-cluster Service traffic from the Ingress controller' : a.reverseProxy === 'istio' ? 'In-cluster Service traffic from the Istio ingress gateway' : a.reverseProxy === 'cloudfront' ? 'CloudFront origin: HTTP only, port 8090, origin domain = the console-gateway-service hostname (CAST\'s EKS page). Reasonable inference: this exposes 8090 to the internet side — restrict its source to CloudFront (e.g. the AWS-managed CloudFront prefix list); CAST\'s page does not cover it' : a.reverseProxy === 'appgw' ? 'Backend setting of the Application Gateway: HTTP, port 8090, towards the external IP of console-gateway-service (CAST\'s Azure-ApplicationGateway PDF); the backend must report Healthy with a 302' : undefined) || '') || undefined}
     ]).concat(adminRows).concat([
       {src:'imaging-services', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Application access to the '+dbLabel+' database', tag:'mandatory', note:(a.dbHosting !== 'colocated' ? (isK8s && a.dbHosting !== 'managed' ? 'Outside the cluster — egress from the core pods to the database host must be allowed' : 'Not co-located — a real firewall path between imaging-services and the database host/service must be opened') : undefined)}
     ]);
 
     var k8sTestNote = isK8s ? ' — in CAST\'s Helm chart this service is ClusterIP-only (NodePort only if its *NodePort values are set); reach it with '+(isOcp(a) ? 'oc' : 'kubectl')+' port-forward, not a firewall rule' : '';
     var k8sGatewayTestNote = isK8s ? ' — Gateway\'s Service is a LoadBalancer when the chart\'s CreateLoadBalancer is true (the Kubernetes default), otherwise ClusterIP — then use '+(isOcp(a) ? 'oc' : 'kubectl')+' port-forward' : '';
-    rows.push({src:'Tester / administrator workstation', dst:'Gateway', port:'8090', proto:'HTTP/HTTPS', purpose:'Validate Gateway directly, bypassing the reverse proxy, before it\'s fully configured (Section 4)', tag:'optional', note:'Setup/testing only — close once your reverse proxy is validated'+k8sGatewayTestNote});
+    rows.push({src:'Tester / administrator workstation', dst:'Gateway', port:gwPort(a), proto:'HTTP/HTTPS', purpose:'Validate Gateway directly, bypassing the reverse proxy, before it\'s fully configured (Section 4)', tag:'optional', note:'Setup/testing only — close once your reverse proxy is validated'+k8sGatewayTestNote});
     if(hasUi){
       rows.push({src:'Tester / administrator workstation', dst:'SSO Service', port:'8096', proto:'HTTP/HTTPS', purpose:'Validate sign-in (Local/SAML/OIDC/LDAP, Section 5) directly, bypassing Gateway\'s /auth routing', tag:'optional', note:'Setup/testing only — SSO Service is otherwise internal-only; close before go-live'+k8sTestNote});
     }
@@ -1137,7 +1141,7 @@
     }
     var interNodeNote = isK8s ? 'in-cluster pod-to-pod traffic — allow it in your NetworkPolicy if you enforce one' : 'a real firewall path must be opened';
     if(a.topology === 'multi' && hasAnalysis(a)){
-      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services / Gateway (' + coreWord + ')', port:'8090 (Gateway) and 8098 (Control Panel) — plus the other core ports CAST lists on its hardware page', proto:'HTTP/HTTPS', purpose:'Return path: each analysis-node registers against imaging-services and reports job status and results back to it, so connectivity must work in both directions between every analysis-node '+unitWord+' and the '+coreWord, tag:'mandatory', note:'CAST\'s network-access page (a summary) says 8098 is opened only to the other CAST Imaging machines so analysis nodes, dashboards, viewer and MCP can register, and its hardware page says not all ports are needed on all machines; the exact set isn\'t itemised — reasonable inference'});
+      rows.push({src:'analysis-node ' + unitWord + '(s)', dst:'imaging-services / Gateway (' + coreWord + ')', port:gwPort(a)+' (Gateway) and 8098 (Control Panel) — plus the other core ports CAST lists on its hardware page', proto:'HTTP/HTTPS', purpose:'Return path: each analysis-node registers against imaging-services and reports job status and results back to it, so connectivity must work in both directions between every analysis-node '+unitWord+' and the '+coreWord, tag:'mandatory', note:'CAST\'s network-access page (a summary) says 8098 is opened only to the other CAST Imaging machines so analysis nodes, dashboards, viewer and MCP can register, and its hardware page says not all ports are needed on all machines; the exact set isn\'t itemised — reasonable inference'});
       rows.push({src:'imaging-services (' + coreWord + ')', dst:'analysis-node ' + unitWord + '(s)', port:'8089', proto:'HTTP/HTTPS', purpose:'Each analysis-node\'s own listening port (per CAST\'s architecture reference) — analysis-nodes register against imaging-services and exchange analysis jobs/results, required for the core and analysis '+unitWord+'s to communicate', tag:'mandatory', note:'Multi-'+unitWord+' topology — the return path is the row above'});
       rows.push({src:'analysis-node ' + unitWord + '(s)', dst:dbDest, port:dbPort, proto:'TCP', purpose:'Each analysis-node writes analysis results directly to the '+dbLabel+' database — per CAST\'s architecture reference, this port is used by every component that reads/writes the database, not just imaging-services', tag:'mandatory', note:'Multi-'+unitWord+' topology — '+(a.dbHosting === 'colocated' ? interNodeNote : 'a real firewall path between every analysis-node '+unitWord+' and the database host/service must be opened')+', in addition to imaging-services\' own path above'});
     }
@@ -1535,7 +1539,7 @@
     if(hasDashboards(a)) gatewayPaths.push('/dashboards');
     if(a.mcp){ gatewayPaths.push('/mcp'); if(!isK8s) gatewayPaths.push('/mcp/gatekeeper'); }
     var componentRows = [
-      ['Gateway', '8090', 'Single entry point behind the reverse proxy — routes by URL path ('+gatewayPaths.join(', ')+') to every other service below. This is the only CAST Imaging port the reverse proxy needs to reach.']
+      ['Gateway', gwPort(a), 'Single entry point behind the reverse proxy — routes by URL path ('+gatewayPaths.join(', ')+') to every other service below. This is the only CAST Imaging port the reverse proxy needs to reach.']
     ];
     componentRows.push(['Console', '8091', 'Delivery/administration console (path /console)']);
     componentRows.push(['Auth service', '8092', 'OAuth2 token endpoint (path /oauth2)']);
@@ -1735,7 +1739,7 @@
       (a.certSource !== 'none' ?
         '<li>You must provide the certificate and private key — CAST Imaging does not issue public TLS certificates.</li>' +
         (a.platform === 'windows'
-          ? '<li>CAST\'s Windows HTTPS procedure (below) terminates TLS <b>at the Gateway itself</b> (<code>server.port: 443</code>), not at a reverse proxy. CAST\'s Windows reverse-proxy example is HTTP-facing (<code>listen 80</code>, <code>proxy_pass …:8090/</code>) and says nothing about keeping Gateway TLS behind it — if you keep a reverse proxy in front, confirm with CAST which port and protocol it must use towards the Gateway; the 8090 rows of this document are the default HTTP port.</li>'
+          ? '<li>CAST\'s Windows HTTPS procedure (below) terminates TLS <b>at the Gateway itself</b> (<code>server.port: 443</code>), not at a reverse proxy. CAST\'s Windows reverse-proxy example is HTTP-facing (<code>listen 80</code>, <code>proxy_pass …:8090/</code>) and says nothing about keeping Gateway TLS behind it — if you keep a reverse proxy in front, confirm with CAST which port and protocol it must use towards the Gateway; the Gateway rows of this document show 443 with HTTPS (8090 for HTTP only).</li>'
           : (a.reverseProxy === 'cloudfront' || a.reverseProxy === 'appgw' ? '' : '<li>Once HTTPS is confirmed working, disable the reverse proxy\'s own plain-HTTP listener (port 80) or keep only an HTTP→HTTPS redirect on it. Gateway\'s 8090 stays the proxy\'s internal upstream — keep it reachable only from the reverse proxy, not from users.</li>'))
         : '') +
       (a.platform === 'windows' && a.certSource !== 'none' ?
@@ -2214,7 +2218,6 @@
   function pagesDisagree(a){
     var o = [];
     if(!isKube(a) && a.platform !== 'windows' && needsSharedStorage(a)) o.push('<b>Shared folder protocol on Linux:</b> an earlier version of CAST\'s documentation said only SMB is supported (we could not find that on the current hardware page), while its Docker multi-machine pages offer a NAS/SAN mount or an NFS export (with an NFS guide). The NFS guide does not mention the analysis-node container user 10001.');
-    if(a.platform === 'windows' && a.certSource !== 'none') o.push('<b>Gateway port with HTTPS on Windows:</b> CAST\'s Windows HTTPS procedure moves the Gateway to port 443, while its network-access page still lists 8090 as the public Gateway port and does not say what changes.');
     if(a.platform === 'kubernetes' && a.reverseProxy === 'appgw') o.push('<b>CreateLoadBalancer with Application Gateway:</b> CAST support says it is outside the single-option check (on does not fail, but adds a separate load balancer) and the values reference says it should be <code>false</code>, but the Application Gateway PDF takes the backend from the <code>console-gateway-service</code> external IP — which to set is not stated.');
     if(a.ctxUrl && a.platform === 'windows') o.push('<b>URL path on Windows:</b> the examples use <code>https</code> for <code>PUBLIC_URL</code> but <code>http</code> for the two database updates — check the scheme with CAST.');
     if(a.ctxUrl && (a.platform === 'docker' || a.platform === 'podman') && a.certSource !== 'none') o.push('<b>Forwarded headers on Docker / Podman:</b> the HTTPS page and the context-URL page differ (<code>X-Forwarded-For $proxy_protocol_addr</code> vs <code>$proxy_add_x_forwarded_for</code>, <code>KC_HOSTNAME_STRICT_HTTPS</code> true vs false).');

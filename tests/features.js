@@ -84,7 +84,11 @@ const L = require('./lib');
   await L.set(page, { platform: 'docker', scenario: 'full' });
   ok((await L.checkKeys(page)).includes('fw-docker-nat'), 'Docker NAT firewall item missing');
   await L.set(page, { platform: 'windows', certSource: 'ca-issued', reverseProxy: 'nginx' });
-  ok(/moves the Gateway itself to port 443/.test(await L.resultsText(page)) && !/undefined/.test(await L.resultsText(page)), 'Windows HTTPS Gateway-port note');
+  const winTxt = await L.resultsText(page);
+  ok(/Gateway itself listens on 443/.test(winTxt) && /Gateway\s+443/.test(winTxt) && !/Gateway\s+8090/.test(winTxt) && !/undefined/.test(winTxt), 'Windows HTTPS: Gateway port should be 443 everywhere');
+  await L.set(page, { platform: 'windows', certSource: 'none' });
+  ok(/Gateway\s+8090/.test(await L.resultsText(page)), 'Windows plain HTTP: Gateway port should stay 8090');
+  await L.set(page, { certSource: 'ca-issued' });
   ok(/CAST-Imaging-sync-all-services-on-startup\.bat/.test(await L.resultsText(page)), 'startup checker path');
   await L.set(page, { platform: 'docker', scenario: 'full', auth: 'local', reverseProxy: 'nginx' });
 

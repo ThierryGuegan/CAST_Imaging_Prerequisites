@@ -9,6 +9,8 @@ One line per decision the maintainer made, newest first. **Never re-flag these.*
 
 - **Neo4j port and MCP health check (answer from CAST support, relayed by the maintainer — "expected behavior, not a defect"):** Neo4j Bolt default is **7697 on Windows** and **7687 on Docker/Linux** (use the port of the instance you run; the pages do not explain it). `/mcpserver/healthcheck` (current) and `/mcp/healthcheck` (older, still supported) are equivalent on any platform; `GET /mcp/status` returns 200 when all enabled MCP servers are healthy, 503 if one is degraded. Both removed from the "pages disagree" box and from the open questions.
 
+- **Windows + HTTPS: the Gateway port is 443** (maintainer decision). Ports table, diagram, component list and tester row show 443/HTTPS when `platform = windows` and HTTPS is on (`gwPort(a)`); 8090/HTTP stays for plain HTTP. No longer listed in the "pages disagree" box or as an open question.
+
 ## 2026-11-24
 - The Kubernetes topology that distributes nothing is labelled **"Shared nodes"** (was "Single node pool"; the other choice stays "Isolated nodes").
 - No private-registry box in the diagram for air-gapped installs (the Section 6 image list covers it).
@@ -29,5 +31,4 @@ One line per decision the maintainer made, newest first. **Never re-flag these.*
 - The shared-folder "only SMB" statement is attributed to *an earlier version* of CAST's documentation (not found on the current hardware page) until CAST answers; Windows stays SMB only.
 
 ## Still open
-- Windows + HTTPS: does "Gateway :8090" become 443? (the tool states both CAST sources and asks to confirm)
 - Shared folder on Linux: SMB only (an earlier version of the documentation) or NAS/SAN / NFS (current Docker pages)? (the tool shows both)
