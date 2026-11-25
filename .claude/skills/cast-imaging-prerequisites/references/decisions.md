@@ -30,5 +30,7 @@ One line per decision the maintainer made, newest first. **Never re-flag these.*
 
 - The shared-folder "only SMB" statement is attributed to *an earlier version* of CAST's documentation (not found on the current hardware page) until CAST answers; Windows stays SMB only.
 
-## Still open
-- Shared folder on Linux: SMB only (an earlier version of the documentation) or NAS/SAN / NFS (current Docker pages)? (the tool shows both)
+## Still open (message to CAST support drafted 2026-11-25)
+- Shared folder on Linux: SMB only (an earlier version of the documentation) or NAS/SAN / NFS (current Docker pages)? Does the NFS export need write access for the analysis-node container user 10001? (the tool shows both)
+- `CreateLoadBalancer` with `UseApplicationGateway` (AKS): the values reference says `false`, the Application Gateway PDF takes the backend from the `console-gateway-service` external IP (needs a LoadBalancer Service, i.e. `true`); if `true`, should it be an internal Azure load balancer? (the tool leaves the value open)
+- Windows URL path: the examples use `https` for `PUBLIC_URL` but `http` for the two database updates — intended? (the tool flags it)

@@ -35,5 +35,15 @@ One line per CAST documentation page read for this tool. **V** = body read verba
 
 The sizing calculator pages contain **no usable formula, table or example** (the widget did not render; the method page gives no numbers); per-component figures exist only as the fixed tables of the parent hardware page, which the tool follows (VM floors 1 CPU / 2 cores minimum, 16 GB distributed / 32 GB single machine, 256 GB disk; Kubernetes 2 nodes minimum, 4 vCPU and 32 GB per node, +1 node per extra analysis-node; isolation examples 2 / 3 / 4 / 6 nodes). Nothing to compare the tool's sizing against.
 
+## CAST support answers (relayed by the maintainer — not pages)
+| Topic | Date | What it settles |
+|---|---|---|
+| Istio on Kubernetes | 2026-11-25 | `UseIstioGateway: true`; `CreateIstioGateway` ignored silently (≤ 3.5.3 leftover); `ExistingIstioGatewayName` optional; `CreateLoadBalancer: false` recommended for production with Istio |
+| `CreateLoadBalancer` | 2026-11-25 | Outside the single-option check (`CreateIngress`, `UseIstioGateway`, `UseGatewayAPI`, `UseApplicationGateway`); default `true`; left on = a separate load balancer next to the chosen option |
+| Neo4j Bolt port | 2026-11-25 | 7697 = Windows default, 7687 = Docker/Linux default; both correct |
+| MCP health check | 2026-11-25 | `/mcpserver/healthcheck` (current) = `/mcp/healthcheck` (older, supported) on every platform; `GET /mcp/status` 200 healthy / 503 degraded |
+
+These count as **Confirmed** (the maintainer pasted the answer); quote them as "CAST support", never as a page.
+
 ## Not read (yet)
 Windows release notes 3.6.7–3.6.0; MCP Podman and air-gapped pages (documented for 3.0.x only); the `highlight2mri` extension page itself (its body was never reached); Docker `dedicated-neo4j` Podman page; the security-fix subpages of the release notes.

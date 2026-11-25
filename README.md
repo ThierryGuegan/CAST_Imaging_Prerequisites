@@ -90,8 +90,8 @@ Concretely, the skill:
   references, snapshots of eight realistic profiles (`tests/snapshots/`, refreshed with `node tests/profiles.js --update`
   after reviewing the diff), an axe-core accessibility scan and a diagram geometry check — run by the GitHub Action on every
   PR; and reconciles with `origin/main` before opening a PR, since PRs on this repo tend to merge fast.
-- **Remembers decisions and sources.** Choices the maintainer made and the questions still open (e.g. the Gateway port
-  on Windows with HTTPS, SMB versus NFS for the Linux shared folder) are in
+- **Remembers decisions and sources.** Choices the maintainer made and the questions still open (e.g. SMB versus NFS for the Linux
+  shared folder, `CreateLoadBalancer` with Azure Application Gateway) and the answers relayed from CAST support are in
   [`references/decisions.md`](.claude/skills/cast-imaging-prerequisites/references/decisions.md); every CAST page read, whether it
   was read verbatim, and its "Updated" date are in `references/sources.md`; the facts and findings of each reading pass are in
   `references/documentation-map.md` — so the next audit doesn't re-ask or silently "fix" them. A scheduled task re-reads those

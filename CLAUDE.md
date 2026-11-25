@@ -14,7 +14,7 @@ left regenerates a sizing / ports / checklist document on the right. See `README
   `references/documentation-map.md` = which CAST doc page backs which section, the facts and findings of each reading pass.
   `references/sources.md` = every CAST page read, its status (verbatim / summary) and its "Updated" date.
   `references/architecture-spec.md` = how the file is built (predicates, sizing, diagram, ports matrix, checklist, phases, exports, tests).
-- Every fact the tool states must be **Confirmed** (a page read verbatim, listed in `sources.md`), a labelled **inference**, or flagged as **unconfirmed** — never an invented port, image name or path, and never a statement credited to a page you can't re-find ("an earlier version of CAST's documentation said…").
+- Every fact the tool states must be **Confirmed** (a page read verbatim, listed in `sources.md`, or a CAST-support answer pasted by the maintainer, listed in its support table), a labelled **inference**, or flagged as **unconfirmed** — never an invented port, image name or path, and never a statement credited to a page you can't re-find ("an earlier version of CAST's documentation said…").
 - `doc.castsoftware.com` is read through the **`web-fetch` agent** (`offset=80000`, raw text, full report in the agent's final message, one agent per area); a direct `WebFetch` from the main session may be refused. Pages the site truncates or doesn't serve (Windows 3.6.7–3.6.0 release notes, the `highlight2mri` page) must be pasted by the maintainer.
 
 ## Conventions that were learned the hard way

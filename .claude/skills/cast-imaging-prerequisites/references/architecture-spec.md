@@ -172,7 +172,7 @@ be a search-and-fix pass, not a rename in isolation.
    platform's natural choice** — Kubernetes Gateway API on Kubernetes, an OpenShift Route on OpenShift, an external reverse proxy
    elsewhere — via `syncReverseProxyDefault()`, which keeps following the platform until the user
    changes the choice themselves (`reverseProxyTouched`), after which their choice is never
-   overwritten. Options on Kubernetes: Ingress controller (NGINX Ingress — legacy, but the Helm chart still carries it for existing customers) and Gateway API (the non-legacy route); plus `istio` (plain Kubernetes, secrets in `istio-system`), `cloudfront` (EKS only: HTTP origin on 8090, no cluster TLS secret) and `appgw` (AKS only, `UseApplicationGateway`, details in CAST's PDF — unconfirmed). Those cards carry `data-rp`, are shown by `rpAvailable(value, isPlainKube, provider)`, and an unavailable choice resets to the platform default; imported ones off their provider get the mismatch callout. Selecting Ingress shows an info callout. Impossible pairs (IIS + ARR off Windows, Ingress/Gateway API off Kubernetes) aren't blocked;
+   overwritten. Options on Kubernetes: Ingress controller (NGINX Ingress — legacy, but the Helm chart still carries it for existing customers) and Gateway API (the non-legacy route); plus `istio` (plain Kubernetes, secrets in `istio-system`), `cloudfront` (EKS only: HTTP origin on 8090, no cluster TLS secret) and `appgw` (AKS only, `UseApplicationGateway`, details in CAST's PDF — unconfirmed). Networking rule (chart 3.6.9, CAST support): exactly one of `CreateIngress`, `UseIstioGateway`, `UseGatewayAPI`, `UseApplicationGateway`; `CreateLoadBalancer` (default `true`) is outside that check and, left on, adds a separate load balancer — `buildValuesYaml` writes `false` with Ingress / Gateway API / Istio, `true` (chart default) when no entry option is chosen, and leaves it open with Application Gateway. Those cards carry `data-rp`, are shown by `rpAvailable(value, isPlainKube, provider)`, and an unavailable choice resets to the platform default; imported ones off their provider get the mismatch callout. Selecting Ingress shows an info callout. Impossible pairs (IIS + ARR off Windows, Ingress/Gateway API off Kubernetes) aren't blocked;
    the HTTPS section shows a warning callout (`proxyMismatchHtml`) and the checklist item says
    "incompatible with your platform".
 6. **HTTPS / TLS certificate** (legend renamed from the bare "HTTPS", which didn't say what was being asked) — certificate source and TLS termination point. Kept separate from egress (question 4)
@@ -457,7 +457,7 @@ what already happens to be drawn.
   a separate machine that, per the user's own answers, doesn't exist. Match every connection's
   condition to the same predicate that gates the fact it represents, not just to "does this box
   exist."
-- **The Tester/admin workstation box and its three bypass lines** (Gateway `:8090` always —
+- **The Tester/admin workstation box and its three bypass lines** (Gateway on `gwPort(a)` — 8090, or 443 on Windows with HTTPS — always —
   including headless scenarios —, Control Panel `:8098–2381` always, SSO Service `:8096` only when
   `hasUiScenario(a)`) must mirror `buildPortRows()`'s own tester rows exactly, including the gate on
   the SSO Service line. (A fix PR once moved the Gateway line inside the UI gate and made the
@@ -526,7 +526,7 @@ box under the Local Server (air-gapped only) and the table an "Admin / feed host
 
 The matrix models the **mandatory reverse proxy** explicitly: every client flow (End-user browser,
 API client, CAST Report Generator, MCP client) targets *"Reverse proxy (<chosen kind>)"* on
-`clientPort(a)`, followed by one mandatory **reverse proxy → Gateway :8090** row — Gateway never
+`clientPort(a)`, followed by one mandatory **reverse proxy → Gateway** row on `gwPort(a)`/`gwProto(a)` (8090/HTTP, or 443/HTTPS on Windows with HTTPS — maintainer, 2026-11-25) — Gateway never
 appears as the destination of a client flow. (An early version listed `443` and `8090` as two
 browser alternatives straight to Gateway, which skipped the proxy the tool itself calls mandatory.)
 Other conventions worth keeping: the **return path** analysis-node → imaging-services/Gateway is its
@@ -796,7 +796,7 @@ combinations just because the file is new.
 
 **Windows ports** — the generated HTML is written with the Docker/Podman port values and `windowsPorts(html)` translates a fixed set for Windows right before it is inserted (8089→8099, 8083→8093, 8082→8094, 9001→9011, 7687→7697, 7474→7484, 7473→7483, 6362→6372); a `<!--WINPORTS-->` marker in Section 3 is replaced by the Windows-ports callout after the translation so its Docker numbers survive. PostgreSQL is 2284 on Windows and 2285 elsewhere (recorded maintainer decisions). Kubernetes/OpenShift storage is one checklist item `k8s-storage:<provider|openshift>`; on VMs the single topology says "single machine" everywhere (`coreWord`/`coreWordDiagram`).
 
-**Windows HTTPS** — with `platform === 'windows'` and a certificate source other than "none", Section 4 carries CAST's Windows procedure (TLS terminates at the Gateway on 443; SSO/Auth steps differ ≤ 3.6.8 vs ≥ 3.6.9) in place of the Docker/NGINX "disable the proxy's HTTP listener" bullet, and the checklist gets `win-https:<certSource>`. `windowsPorts` also translates PostgreSQL 2285 → 2284 (maintainer, 2026-11-23). The Highlight rows list the three maintainer-given hosts (rpa, cloud, auth).
+**Windows HTTPS** — with `platform === 'windows'` and a certificate source other than "none", Section 4 carries CAST's Windows procedure (TLS terminates at the Gateway on 443 — `gwPort(a)` then returns 443 for the ports table, diagram and component list, so no 8090 appears for the Gateway; SSO/Auth steps differ ≤ 3.6.8 vs ≥ 3.6.9) in place of the Docker/NGINX "disable the proxy's HTTP listener" bullet, and the checklist gets `win-https:<certSource>`. `windowsPorts` also translates PostgreSQL 2285 → 2284 (maintainer, 2026-11-23). The Highlight rows list the three maintainer-given hosts (rpa, cloud, auth).
 
 **Kubernetes flavours (2026-11-24)** — the questionnaire has one "Kubernetes" platform and a flavour radio with the maintainer's labels (Amazon Web Services — EKS, Microsoft Azure — AKS, Google Cloud Platform — GKE, On-premises / vanilla Kubernetes — K8S, On-premises / OpenShift or OKD); OpenShift is no longer a separate platform card. `ANSWERS_SCHEMA` is 2: a schema-1 file with `platform: "openshift"` is migrated on import to platform kubernetes + `k8sProvider: "openshift"`. The reverse-proxy default follows both radios (OpenShift → Route).
 
