@@ -1,7 +1,7 @@
 At a glance — Windows Server · Full (analysis + Viewer + Dashboards) · Multi-machine: 3 server machine(s) and 2 workstation role(s); 17 mandatory network flows out of 27; checklist: 14 to decide, 15 to prepare, 3 for the install day, 5 after the installation.
 How to read this document
 Points to confirm with CAST (5) — statements below are this tool's inference, come from a summary of a CAST page, or are not stated on CAST's pages
-Where CAST's own pages disagree (2) — the tool states both and does not pick one
+Where CAST's own pages disagree (1) — the tool states both and does not pick one
 1. Hardware sizing for your profile
 Project scale profile: 150–500 applications, 10–50 concurrent users — drives the sizing baseline below.
 Minimum footprint: 4 machines — 3 server machines (see Section 1's Server components table) + 1 workstation covering 2 roles (end-user + delivery/analyst — can be the same machine, or split across more if your team prefers) (see Workstation components table).
@@ -102,7 +102,7 @@ Viewer — other services	9010 / 8286	Viewer back-end (9010) and GraphRAG server
 Viewer-APIs (imaging-apis)	8070	REST API layer backing the Viewer
 ETL service	9011	Loads analysis results from PostgreSQL into Neo4j for the Viewer
 AI-service (ai-manager)	8094	Part of imaging-viewer, serving the Viewer/Viewer-APIs — per CAST's architecture diagram it is a distinct component unrelated to the MCP/AI integration (question 8) despite the similar naming
-MCP Server (Aggregator Gateway)	8285	CAST Imaging MCP Server 3.1 — the only MCP port clients reach, routed from Gateway (any /mcp route; admin routes /mcp/healthcheck, /mcp/status, /mcp/servers, /mcp/tools); published on the host by the installer; the bundled Structural (8282, CAST Imaging REST API), Semantic search (8287, Neo4j) and Text2Cypher (8289, Neo4j) MCP servers listen on the machine loopback
+MCP Server (Aggregator Gateway)	8285	CAST Imaging MCP Server 3.1 — the only MCP port clients reach, routed from Gateway (any /mcp route; admin routes /mcpserver/healthcheck (current name) and /mcp/healthcheck (older name, still supported — both return the same healthy answer on any platform), /mcp/status (overall status of all enabled MCP servers: HTTP 200 when healthy, 503 when at least one is degraded), /mcp/servers, /mcp/tools); published on the host by the installer; the bundled Structural (8282, CAST Imaging REST API), Semantic search (8287, Neo4j) and Text2Cypher (8289, Neo4j) MCP servers listen on the machine loopback
 Gatekeeper MCP	8283	Standalone service (Gatekeeper-MCP-Server, TCP 8283) connecting AI clients to CAST Imaging's Dashboard REST API (/dashboards/rest on imaging-services), routed from Gateway (path /mcp/gatekeeper); installed alongside the MCP Server, not part of its 3.1 service
 Dashboards	8097	KPI dashboards UI (path /dashboards)
 Neo4j	7697 / 7484 / 7483 / 6372	Graph database for the Viewer (Bolt / HTTP browser / HTTPS browser / backup)
